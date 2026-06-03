@@ -318,19 +318,21 @@ function zeile(k,v){ if(v===null||v===undefined||v===''||v==='–') return '';
 
 async function detailKandidat(id){
   // Hauptdatensatz + verknüpfte Daten parallel laden
-  const [k, ausb, erf, notiz, bew, aufg] = await Promise.all([
+  const [k, ausb, erf, notiz, bew, aufg, dok] = await Promise.all([
     sb.from('kandidaten').select('*').eq('id',id).single(),
     sb.from('ausbildung').select('*').eq('kandidat_id',id),
     sb.from('erfahrung').select('*').eq('kandidat_id',id),
     sb.from('notizen').select('*').eq('kandidat_id',id).order('erstellt_am',{ascending:false}),
     sb.from('bewerbungen').select('*').eq('kandidat_id',id),
     sb.from('aufgaben').select('*').eq('related_job_id',id),
+    sb.from('dokumente').select('*').eq('kandidat_id',id).order('hochgeladen_am',{ascending:false}),
   ]);
   const d=k.data; if(!d) return;
-  zeigeKandidatSeite(d, ausb.data||[], erf.data||[], notiz.data||[], bew.data||[], aufg.data||[]);
+  zeigeKandidatSeite(d, ausb.data||[], erf.data||[], notiz.data||[], bew.data||[], aufg.data||[], dok.data||[]);
 }
 
-function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg){
+function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok){
+  dok = dok || [];
   // Listen ausblenden, Detailseite zeigen
   ['kandidaten','kunden','kontakte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
@@ -410,6 +412,16 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg){
       notiz.slice(0,30).map(n=>`<div class="note">${esc(n.inhalt)||'–'}<div class="meta">${n.erstellt_am?fmtDat(n.erstellt_am):''}</div></div>`).join('')
     }${notiz.length>30?`<div class="meta" style="color:var(--muted)">… und ${notiz.length-30} weitere</div>`:''}</div>`:''}
 
+    <div class="card"><h3>Dokumente (${dok.length})</h3>
+      <div id="dokListe">${dokumenteHtml(dok)}</div>
+      <div style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <input type="file" id="dokFile" style="font-size:12px;color:var(--muted)">
+        <button class="neuBtn" onclick="ladeDokumentHoch('${d.id}')">↑ Hochladen</button>
+        <span id="dokMsg" style="font-size:12px"></span>
+      </div>
+      <div class="meta" style="color:var(--muted);font-size:11px;margin-top:8px">PDF, Word, Bilder. Max. 25 MB pro Datei.</div>
+    </div>
+
     <div class="card"><h3>System</h3><div class="grid2">
       <div>${zeile('Status', esc(d.status))}${zeile('Quelle', esc(d.quelle))}${zeile('Kandidat-ID', esc(d.id))}</div>
       <div>${zeile('Erstellt', d.erstellt_am?fmtDat(d.erstellt_am):'')}${zeile('Geändert', d.geaendert_am?fmtDat(d.geaendert_am):'')}${zeile('Letzte Aktivität', d.letzte_aktivitaet?fmtDat(d.letzte_aktivitaet):'')}</div>
@@ -426,6 +438,60 @@ function zurueckZurListe(){
 
 function fmtDat(s){ if(!s) return ''; try{const d=new Date(s);
   return d.toLocaleDateString('de-DE')+' '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});}catch{return s;} }
+
+// ---- Dokumente (Stufe 1) ----
+function dokumenteHtml(dok){
+  if(!dok.length) return '<div class="meta" style="color:var(--muted);font-size:12px">Noch keine Dokumente.</div>';
+  return dok.map(d=>{
+    const kb = d.groesse ? Math.round(d.groesse/1024) : null;
+    return `<div class="note" style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+      <div><strong>${esc(d.dateiname)}</strong>
+        <div class="meta">${kb?kb+' KB · ':''}${d.hochgeladen_am?fmtDat(d.hochgeladen_am):''}</div></div>
+      <div style="display:flex;gap:8px;white-space:nowrap">
+        <button class="neuBtn" style="padding:6px 12px" onclick="oeffneDokument('${esc(d.pfad)}')">Öffnen</button>
+        <button class="neuBtn cancelbtn" style="padding:6px 12px" onclick="loescheDokument('${d.id}','${esc(d.pfad)}')">×</button>
+      </div></div>`;
+  }).join('');
+}
+
+async function oeffneDokument(pfad){
+  // signierte URL erzeugen (gültig 60 Min), dann in neuem Tab öffnen
+  const {data,error}=await sb.storage.from('dokumente').createSignedUrl(pfad, 3600);
+  if(error||!data){ alert('Konnte Dokument nicht öffnen: '+(error?.message||'')); return; }
+  window.open(data.signedUrl,'_blank');
+}
+
+async function ladeDokumentHoch(kandidatId){
+  const inp=document.getElementById('dokFile');
+  const msg=document.getElementById('dokMsg');
+  const file=inp.files[0];
+  if(!file){ msg.style.color='var(--hot)'; msg.textContent='Bitte erst eine Datei wählen.'; return; }
+  if(file.size > 25*1024*1024){ msg.style.color='var(--hot)'; msg.textContent='Datei zu groß (max. 25 MB).'; return; }
+  msg.style.color='var(--muted)'; msg.textContent='Lade hoch…';
+  // eindeutiger Pfad: kandidat/<id>/<zeit>_<name>
+  const safeName=file.name.replace(/[^\w.\-]/g,'_');
+  const pfad=`kandidat/${kandidatId}/${Date.now()}_${safeName}`;
+  const up=await sb.storage.from('dokumente').upload(pfad, file, {upsert:false});
+  if(up.error){ msg.style.color='var(--hot)'; msg.textContent='Fehler: '+up.error.message; return; }
+  // Verknüpfung in Tabelle speichern
+  const rec={
+    id:'dok_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
+    kandidat_id:kandidatId, dateiname:file.name, pfad,
+    groesse:file.size, typ:file.type||null
+  };
+  const ins=await sb.from('dokumente').insert(rec);
+  if(ins.error){ msg.style.color='var(--hot)'; msg.textContent='Fehler beim Verknüpfen: '+ins.error.message; return; }
+  msg.style.color='var(--ok)'; msg.textContent='✓ Hochgeladen.';
+  setTimeout(()=>detailKandidat(kandidatId), 500);
+}
+
+async function loescheDokument(id, pfad){
+  if(!confirm('Dieses Dokument wirklich löschen?')) return;
+  await sb.storage.from('dokumente').remove([pfad]);
+  await sb.from('dokumente').delete().eq('id',id);
+  location.reload();
+}
+
 
 // ---- Bearbeiten / Neu anlegen ----
 const EDIT_STATUS=['New','In Review','Available','Engaged','Offered','Hired','Rejected'];
