@@ -1,0 +1,869 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Y.A.V.I.S. CRM</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1d2129; --line:#2a2f3a;
+    --ink:#e8eaf0; --muted:#9aa3b2; --accent:#d7b46a; --accent2:#6aa9d7;
+    --hot:#e0683c; --ok:#5bbf8a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Calibri","Segoe UI",Candara,Optima,sans-serif;}
+  header{display:flex;align-items:center;gap:18px;padding:14px 22px;
+    border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:10}
+  header h1{font-size:15px;letter-spacing:.18em;text-transform:uppercase;margin:0;
+    font-weight:600;color:var(--accent)}
+  .tabs{display:flex;gap:4px;margin-left:auto}
+  .tab{padding:8px 16px;border:1px solid var(--line);background:transparent;color:var(--muted);
+    cursor:pointer;font:inherit;font-size:12px;letter-spacing:.08em;text-transform:uppercase;border-radius:2px}
+  .tab.active{background:var(--accent);color:#0f1115;border-color:var(--accent);font-weight:600}
+  .wrap{max-width:1280px;margin:0 auto;padding:22px}
+  .bar{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:18px}
+  .field{display:flex;flex-direction:column;gap:4px}
+  .field label{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  input,select{background:var(--panel2);border:1px solid var(--line);color:var(--ink);
+    padding:9px 11px;font:inherit;font-size:13px;border-radius:2px;min-width:150px}
+  input:focus,select:focus{outline:none;border-color:var(--accent)}
+  button.go{background:var(--accent2);color:#0f1115;border:none;padding:10px 18px;
+    font:inherit;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+    cursor:pointer;border-radius:2px}
+  button.go:hover{filter:brightness(1.1)}
+  .count{font-size:12px;color:var(--muted);margin:6px 2px 14px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;padding:9px 12px;border-bottom:2px solid var(--line);
+    font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  td{padding:9px 12px;border-bottom:1px solid var(--line)}
+  tr:hover td{background:var(--panel)}
+  .pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;
+    background:var(--panel2);border:1px solid var(--line)}
+  .pill.hot{background:rgba(224,104,60,.15);color:var(--hot);border-color:var(--hot)}
+  .km{color:var(--accent);font-weight:600}
+  .setup{background:var(--panel);border:1px solid var(--accent);padding:18px;border-radius:4px;margin-bottom:18px}
+  .setup code{background:#000;padding:1px 5px;border-radius:2px;color:var(--accent)}
+  .empty{padding:40px;text-align:center;color:var(--muted)}
+  a{color:var(--accent2)}
+  .row-click{cursor:pointer}
+  dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);
+    border-radius:6px;max-width:680px;width:92%;padding:0}
+  dialog::backdrop{background:rgba(0,0,0,.6)}
+  .dlg-head{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+  .dlg-body{padding:20px;max-height:70vh;overflow:auto}
+  .kv{display:grid;grid-template-columns:160px 1fr;gap:6px 14px;font-size:13px}
+  .kv dt{color:var(--muted)}
+  .x{cursor:pointer;color:var(--muted);font-size:20px;border:none;background:none}
+  /* Detailseite */
+  #detailPage{display:none}
+  .detail-head{display:flex;align-items:center;gap:16px;margin-bottom:8px}
+  .detail-head .back{background:var(--panel2);border:1px solid var(--line);color:var(--ink);
+    padding:8px 14px;cursor:pointer;font:inherit;font-size:12px;border-radius:2px}
+  .detail-head h2{margin:0;font-size:22px;color:var(--accent)}
+  .detail-sub{color:var(--muted);font-size:13px;margin-bottom:22px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:20px;margin-bottom:18px}
+  .card h3{margin:0 0 16px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent2);border-bottom:1px solid var(--line);padding-bottom:10px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px 32px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+  .kvr{display:grid;grid-template-columns:170px 1fr;gap:8px;font-size:13px;padding:4px 0;align-items:start}
+  .kvr .k{color:var(--muted)}
+  .kvr .v{color:var(--ink);word-break:break-word}
+  .timeline-item{border-left:2px solid var(--line);padding:0 0 16px 16px;position:relative}
+  .timeline-item:before{content:'';position:absolute;left:-5px;top:4px;width:8px;height:8px;
+    border-radius:50%;background:var(--accent)}
+  .timeline-item .t{font-weight:600;font-size:14px}
+  .timeline-item .m{color:var(--muted);font-size:12px;margin:2px 0}
+  .stufen{display:flex;gap:0;margin:6px 0 4px;flex-wrap:wrap}
+  .stufe{flex:1;min-width:90px;text-align:center;padding:8px 4px;font-size:11px;border-bottom:3px solid var(--line);color:var(--muted)}
+  .stufe.on{border-color:var(--accent);color:var(--accent);font-weight:600}
+  .calllink{color:var(--accent2);text-decoration:none}
+  .note{background:var(--panel2);border-radius:4px;padding:10px 12px;margin-bottom:8px;font-size:13px}
+  .note .meta{color:var(--muted);font-size:11px;margin-top:6px}
+  .tag{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+    padding:2px 9px;font-size:11px;margin:2px 4px 2px 0}
+  /* Bearbeiten */
+  .editbtn{background:var(--accent);color:#0f1115;border:none;padding:9px 18px;font:inherit;
+    font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;border-radius:2px;margin-left:auto}
+  .savebtn{background:var(--ok);color:#0f1115}
+  .cancelbtn{background:var(--panel2);color:var(--ink);border:1px solid var(--line)}
+  .edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 32px}
+  @media(max-width:760px){.edit-grid{grid-template-columns:1fr}}
+  .edit-field{display:flex;flex-direction:column;gap:4px}
+  .edit-field label{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .edit-field input,.edit-field select,.edit-field textarea{background:var(--panel2);
+    border:1px solid var(--line);color:var(--ink);padding:8px 10px;font:inherit;font-size:13px;border-radius:2px;width:100%}
+  .edit-field textarea{min-height:70px;resize:vertical}
+  .edit-actions{display:flex;gap:10px;margin-top:18px}
+  .neuBtn{background:var(--ok);color:#0f1115;border:none;padding:10px 16px;font:inherit;font-size:12px;
+    font-weight:600;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;border-radius:2px}
+</style>
+</head>
+<body>
+<header>
+  <h1>◆ Y.A.V.I.S. CRM</h1>
+  <div class="tabs">
+    <button class="tab active" data-view="kandidaten">Kandidaten</button>
+    <button class="tab" data-view="kunden">Kunden</button>
+    <button class="tab" data-view="kontakte">Kontakte</button>
+  </div>
+  <button class="tab" id="logoutBtn" style="display:none;margin-left:8px" onclick="logout()">Abmelden</button>
+</header>
+
+<div id="login" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:100;display:none;align-items:center;justify-content:center">
+  <div style="background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:32px;width:360px;max-width:90%">
+    <h2 style="margin:0 0 6px;color:var(--accent);font-size:16px;letter-spacing:.14em;text-transform:uppercase">◆ Anmeldung</h2>
+    <p style="color:var(--muted);font-size:12px;margin:0 0 20px">Y.A.V.I.S. CRM</p>
+    <div class="field" style="margin-bottom:12px"><label>E-Mail</label>
+      <input id="logEmail" type="email" style="width:100%" autocomplete="username"></div>
+    <div class="field" style="margin-bottom:18px"><label>Passwort</label>
+      <input id="logPass" type="password" style="width:100%" autocomplete="current-password"></div>
+    <button class="go" style="width:100%" onclick="login()">Einloggen</button>
+    <div id="logErr" style="color:var(--hot);font-size:12px;margin-top:12px;min-height:16px"></div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div id="setup" class="setup" style="display:none">
+    <strong>Einmalige Einrichtung:</strong> Trage unten deine Supabase-Zugangsdaten ein.
+    Du findest sie im Supabase-Dashboard unter <code>Project Settings → API</code>.
+    <div class="bar" style="margin-top:12px">
+      <div class="field"><label>Project URL</label>
+        <input id="cfgUrl" placeholder="https://xxxx.supabase.co" style="min-width:300px"></div>
+      <div class="field"><label>anon public key</label>
+        <input id="cfgKey" placeholder="eyJ..." style="min-width:300px"></div>
+      <button class="go" onclick="saveCfg()">Verbinden</button>
+    </div>
+  </div>
+
+  <!-- Kandidaten -->
+  <div id="view-kandidaten">
+    <div class="bar">
+      <div class="field"><label>Suche (Name, Beruf, Skills, Ort)</label>
+        <input id="kSuche" placeholder="z.B. TGA Projektleiter" style="min-width:260px"></div>
+      <div class="field"><label>Status</label>
+        <select id="kStatus"><option value="">alle</option></select></div>
+      <div class="field"><label>Umkreis um PLZ</label>
+        <input id="kPlz" placeholder="z.B. 50667" style="min-width:110px"></div>
+      <div class="field"><label>Radius km</label>
+        <select id="kRadius"><option>25</option><option selected>50</option><option>75</option><option>100</option><option>150</option></select></div>
+      <button class="go" onclick="ladeKandidaten()">Suchen</button>
+      <button class="neuBtn" onclick="neuerKandidat()">+ Neuer Kandidat</button>
+    </div>
+    <div class="count" id="kCount"></div>
+    <table><thead><tr>
+      <th>Name</th><th>Berufsbezeichnung</th><th>PLZ / Ort</th><th>Status</th><th class="kmcol" style="display:none">Entfernung</th>
+    </tr></thead><tbody id="kBody"></tbody></table>
+  </div>
+
+  <!-- Kunden -->
+  <div id="view-kunden" style="display:none">
+    <div class="bar">
+      <div class="field"><label>Suche (Name, Branche, Ort)</label>
+        <input id="cSuche" placeholder="z.B. Ingenieurbüro" style="min-width:260px"></div>
+      <button class="go" onclick="ladeKunden()">Suchen</button>
+      <button class="neuBtn" onclick="neuerKunde()">+ Neuer Kunde</button>
+    </div>
+    <div class="count" id="cCount"></div>
+    <table><thead><tr>
+      <th>Firma</th><th>Branche</th><th>PLZ / Ort</th><th>Telefon</th>
+    </tr></thead><tbody id="cBody"></tbody></table>
+  </div>
+
+  <!-- Kontakte -->
+  <div id="view-kontakte" style="display:none">
+    <div class="bar">
+      <div class="field"><label>Suche (Name, Firma, Beruf)</label>
+        <input id="ktSuche" placeholder="z.B. Geschäftsführer" style="min-width:260px"></div>
+      <button class="go" onclick="ladeKontakte()">Suchen</button>
+      <button class="neuBtn" onclick="neuerKontakt()">+ Neuer Kontakt</button>
+    </div>
+    <div class="count" id="ktCount"></div>
+    <table><thead><tr>
+      <th>Name</th><th>Funktion</th><th>E-Mail</th><th>Telefon</th>
+    </tr></thead><tbody id="ktBody"></tbody></table>
+  </div>
+
+  <!-- Vollständige Detailseite -->
+  <div id="detailPage"></div>
+</div>
+
+<dialog id="detail"><div class="dlg-head"><strong id="dTitle"></strong>
+  <button class="x" onclick="document.getElementById('detail').close()">×</button></div>
+  <div class="dlg-body"><dl class="kv" id="dBody"></dl></div></dialog>
+
+<script>
+let sb=null;
+const cfg = { url: localStorage.getItem('sb_url'), key: localStorage.getItem('sb_key') };
+
+async function init(){
+  if(cfg.url && cfg.key){
+    sb = supabase.createClient(cfg.url, cfg.key);
+    document.getElementById('setup').style.display='none';
+    await pruefeLogin();
+  } else {
+    document.getElementById('setup').style.display='block';
+  }
+}
+
+async function pruefeLogin(){
+  const {data:{session}} = await sb.auth.getSession();
+  if(session){
+    zeigeApp();
+  } else {
+    document.getElementById('login').style.display='flex';
+  }
+}
+
+function zeigeApp(){
+  document.getElementById('login').style.display='none';
+  document.getElementById('logoutBtn').style.display='inline-block';
+  ladeStatusFilter(); ladeKandidaten();
+}
+
+async function login(){
+  const email=document.getElementById('logEmail').value.trim();
+  const pass=document.getElementById('logPass').value;
+  const err=document.getElementById('logErr'); err.textContent='';
+  const {error}=await sb.auth.signInWithPassword({email,password:pass});
+  if(error){err.textContent='Anmeldung fehlgeschlagen: '+error.message;return;}
+  zeigeApp();
+}
+
+async function logout(){
+  await sb.auth.signOut();
+  location.reload();
+}
+
+function saveCfg(){
+  const u=document.getElementById('cfgUrl').value.trim();
+  const k=document.getElementById('cfgKey').value.trim();
+  if(!u||!k){alert('Bitte beide Felder ausfüllen.');return;}
+  localStorage.setItem('sb_url',u); localStorage.setItem('sb_key',k);
+  cfg.url=u; cfg.key=k; init();
+}
+
+// Tab-Wechsel (nur echte Tabs mit data-view, nicht der Abmelden-Button)
+document.querySelectorAll('.tab[data-view]').forEach(t=>t.onclick=()=>{
+  document.getElementById('detailPage').style.display='none';
+  document.querySelectorAll('.tab[data-view]').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active');
+  ['kandidaten','kunden','kontakte'].forEach(v=>
+    document.getElementById('view-'+v).style.display = v===t.dataset.view?'block':'none');
+  if(t.dataset.view==='kunden') ladeKunden();
+  if(t.dataset.view==='kontakte') ladeKontakte();
+});
+
+async function ladeStatusFilter(){
+  const {data} = await sb.from('kandidaten').select('status');
+  if(!data) return;
+  const set=[...new Set(data.map(r=>r.status).filter(Boolean))].sort();
+  const sel=document.getElementById('kStatus');
+  set.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o);});
+}
+
+async function ladeKandidaten(){
+  const q=document.getElementById('kSuche').value.trim();
+  const status=document.getElementById('kStatus').value;
+  const plz=document.getElementById('kPlz').value.trim();
+  const radius=document.getElementById('kRadius').value;
+  const body=document.getElementById('kBody'); body.innerHTML='';
+  document.querySelector('.kmcol').style.display = plz?'table-cell':'none';
+
+  // Umkreissuche via RPC-Funktion
+  if(plz){
+    const {data,error}=await sb.rpc('kandidaten_im_umkreis',{such_plz:plz,radius_km:Number(radius)});
+    if(error){document.getElementById('kCount').textContent='Fehler: '+error.message;return;}
+    let rows=data||[];
+    if(q){const ql=q.toLowerCase();
+      rows=rows.filter(r=>[r.voller_name,r.berufsbezeichnung,r.stadt].join(' ').toLowerCase().includes(ql));}
+    if(status) rows=rows.filter(r=>r.status===status);
+    document.getElementById('kCount').textContent=rows.length+' Kandidaten im Umkreis von '+radius+' km um '+plz;
+    rows.forEach(r=>body.appendChild(zeileKandidat(r,true)));
+    if(!rows.length) body.innerHTML='<tr><td colspan="5" class="empty">Keine Treffer.</td></tr>';
+    return;
+  }
+
+  // Normale Suche
+  let query=sb.from('kandidaten').select('*').limit(200);
+  if(status) query=query.eq('status',status);
+  if(q) query=query.or(`voller_name.ilike.%${q}%,berufsbezeichnung.ilike.%${q}%,faehigkeiten.ilike.%${q}%,stadt.ilike.%${q}%`);
+  query=query.order('letzte_aktivitaet',{ascending:false,nullsFirst:false});
+  const {data,error}=await query;
+  if(error){document.getElementById('kCount').textContent='Fehler: '+error.message;return;}
+  document.getElementById('kCount').textContent=(data.length)+' Kandidaten'+(data.length>=200?' (erste 200)':'');
+  data.forEach(r=>body.appendChild(zeileKandidat(r,false)));
+  if(!data.length) body.innerHTML='<tr><td colspan="5" class="empty">Keine Treffer.</td></tr>';
+}
+
+function zeileKandidat(r,mitKm){
+  const tr=document.createElement('tr'); tr.className='row-click';
+  const hot=r.ist_hot?'<span class="pill hot">HOT</span> ':'';
+  tr.innerHTML=`<td>${hot}${esc(r.voller_name)||'–'}</td>
+    <td>${esc(r.berufsbezeichnung)||'–'}</td>
+    <td>${esc(r.plz)||''} ${esc(r.stadt)||''}</td>
+    <td><span class="pill">${esc(r.status)||'–'}</span></td>
+    ${mitKm?`<td class="km">${r.entfernung_km} km</td>`:'<td class="kmcol" style="display:none"></td>'}`;
+  tr.onclick=()=>detailKandidat(r.id);
+  return tr;
+}
+
+function tel(nr){ if(!nr) return ''; const clean=String(nr).replace(/[^\d+]/g,'');
+  return `<a class="calllink" href="tel:${clean}">${esc(nr)} ☎</a>`; }
+
+function zeile(k,v){ if(v===null||v===undefined||v===''||v==='–') return '';
+  return `<div class="kvr"><div class="k">${k}</div><div class="v">${v}</div></div>`; }
+
+async function detailKandidat(id){
+  // Hauptdatensatz + verknüpfte Daten parallel laden
+  const [k, ausb, erf, notiz, bew, aufg] = await Promise.all([
+    sb.from('kandidaten').select('*').eq('id',id).single(),
+    sb.from('ausbildung').select('*').eq('kandidat_id',id),
+    sb.from('erfahrung').select('*').eq('kandidat_id',id),
+    sb.from('notizen').select('*').eq('kandidat_id',id).order('erstellt_am',{ascending:false}),
+    sb.from('bewerbungen').select('*').eq('kandidat_id',id),
+    sb.from('aufgaben').select('*').eq('related_job_id',id),
+  ]);
+  const d=k.data; if(!d) return;
+  zeigeKandidatSeite(d, ausb.data||[], erf.data||[], notiz.data||[], bew.data||[], aufg.data||[]);
+}
+
+function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg){
+  // Listen ausblenden, Detailseite zeigen
+  ['kandidaten','kunden','kontakte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  const page=document.getElementById('detailPage'); page.style.display='block';
+
+  const adresse=[d.strasse,[d.plz,d.stadt].filter(Boolean).join(' '),d.bundesland,d.land].filter(Boolean).join(', ');
+  const tags=(d.tags||'').split(',').map(t=>t.trim()).filter(Boolean).map(t=>`<span class="tag">${esc(t)}</span>`).join('');
+
+  page.innerHTML=`
+    <div class="detail-head">
+      <button class="back" onclick="zurueckZurListe()">← Zurück</button>
+      <h2>${d.ist_hot?'🔥 ':''}${esc(d.voller_name)||'Kandidat'}</h2>
+      <button class="editbtn" onclick="bearbeiteKandidat('${d.id}')">✎ Bearbeiten</button>
+    </div>
+    <div class="detail-sub">${esc(d.berufsbezeichnung)||''}${d.arbeitgeber?' · '+esc(d.arbeitgeber):''}${d.status?' · <span class="pill">'+esc(d.status)+'</span>':''}</div>
+
+    <div class="card"><h3>Kontakt & Adresse</h3><div class="grid2">
+      <div>
+        ${zeile('E-Mail', d.email?`<a href="mailto:${esc(d.email)}">${esc(d.email)}</a>`:'')}
+        ${zeile('E-Mail beruflich', d.email_beruflich)}
+        ${zeile('Zweite E-Mail', d.email_zweit)}
+        ${zeile('Telefon', tel(d.telefon))}
+        ${zeile('Telefon privat', tel(d.telefon_privat))}
+      </div>
+      <div>
+        ${zeile('Mobil', tel(d.mobil))}
+        ${zeile('Mobil privat', tel(d.mobil_privat))}
+        ${zeile('Adresse privat', esc(adresse))}
+        ${zeile('Adresse beruflich', esc([d.strasse_beruf,[d.plz_beruf,d.stadt_beruf].filter(Boolean).join(' '),d.bundesland_beruf,d.land_beruf].filter(Boolean).join(', ')))}
+        ${zeile('XING', link(d.xing_profil))}
+        ${zeile('LinkedIn', link(d.linkedin_profil))}
+      </div>
+    </div></div>
+
+    <div class="card"><h3>Berufliche Details</h3><div class="grid2">
+      <div>
+        ${zeile('Position', esc(d.positionswunsch))}
+        ${zeile('Derzeitige Tätigkeit', esc(d.berufsbezeichnung))}
+        ${zeile('Arbeitgeber', esc(d.arbeitgeber))}
+        ${zeile('Firma zuvor', esc(d.firma_zuvor))}
+        ${zeile('Erfahrung (Jahre)', esc(d.erfahrung_jahre))}
+        ${zeile('Qualifikation', esc(d.qualifikation))}
+        ${zeile('Studiengang', esc(d.studiengang))}
+      </div>
+      <div>
+        ${zeile('Gehalt aktuell', esc(d.gehalt_aktuell))}
+        ${zeile('Gehalt erwartet', esc(d.gehalt_erwartet))}
+        ${zeile('Kündigungsfrist', esc(d.kuendigungsfrist))}
+        ${zeile('Wechselmotivation', esc(d.wechselmotivation))}
+        ${zeile('Umzugsbereitschaft', esc(d.umzugsbereitschaft))}
+        ${zeile('Wunschregion', esc(d.wunschregion))}
+        ${zeile('Geburtstag', esc(d.geburtstag))}
+      </div>
+    </div>
+    ${d.faehigkeiten?`<div style="margin-top:14px"><div class="k" style="color:var(--muted);font-size:13px;margin-bottom:6px">Fähigkeiten</div>${(d.faehigkeiten||'').split(',').map(s=>s.trim()).filter(Boolean).map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>`:''}
+    ${tags?`<div style="margin-top:10px"><div class="k" style="color:var(--muted);font-size:13px;margin-bottom:6px">Tags</div>${tags}</div>`:''}
+    ${d.profil_zusammenfassung?`<div style="margin-top:14px"><div class="k" style="color:var(--muted);font-size:13px;margin-bottom:4px">Profil</div><div class="v" style="font-size:13px">${esc(d.profil_zusammenfassung)}</div></div>`:''}
+    ${d.bemerkung?`<div style="margin-top:12px"><div class="k" style="color:var(--muted);font-size:13px;margin-bottom:4px">Bemerkung</div><div class="v" style="font-size:13px">${esc(d.bemerkung)}</div></div>`:''}
+    </div>
+
+    ${erf.length?`<div class="card"><h3>Berufserfahrung</h3>${
+      erf.map(e=>`<div class="timeline-item"><div class="t">${esc(e.titel)||'–'}</div>
+        <div class="m">${esc(e.unternehmen)||''}${(e.von||e.bis)?' · '+esc(e.von||'')+' – '+esc(e.bis||'heute'):''}</div>
+        ${e.uebersicht?`<div style="font-size:12px;color:var(--muted)">${esc(e.uebersicht)}</div>`:''}</div>`).join('')
+    }</div>`:''}
+
+    ${ausb.length?`<div class="card"><h3>Ausbildung</h3>${
+      ausb.map(a=>`<div class="timeline-item"><div class="t">${esc(a.institut)||'–'}</div>
+        <div class="m">${esc(a.grad)||''}${a.hauptfach?' · '+esc(a.hauptfach):''}${(a.von||a.bis)?' · '+esc(a.von||'')+' – '+esc(a.bis||''):''}</div></div>`).join('')
+    }</div>`:''}
+
+    ${bew.length?`<div class="card"><h3>Bewerbungen (${bew.length})</h3>${
+      bew.map(b=>`<div class="note"><strong>${esc(b.jobtitel)||'–'}</strong>
+        <div class="meta">Status: ${esc(b.status)||'–'}${b.stufe?' · Stufe: '+esc(b.stufe):''}${b.erstellt_am?' · '+fmtDat(b.erstellt_am):''}</div></div>`).join('')
+    }</div>`:''}
+
+    ${notiz.length?`<div class="card"><h3>Notizen (${notiz.length})</h3>${
+      notiz.slice(0,30).map(n=>`<div class="note">${esc(n.inhalt)||'–'}<div class="meta">${n.erstellt_am?fmtDat(n.erstellt_am):''}</div></div>`).join('')
+    }${notiz.length>30?`<div class="meta" style="color:var(--muted)">… und ${notiz.length-30} weitere</div>`:''}</div>`:''}
+
+    <div class="card"><h3>System</h3><div class="grid2">
+      <div>${zeile('Status', esc(d.status))}${zeile('Quelle', esc(d.quelle))}${zeile('Kandidat-ID', esc(d.id))}</div>
+      <div>${zeile('Erstellt', d.erstellt_am?fmtDat(d.erstellt_am):'')}${zeile('Geändert', d.geaendert_am?fmtDat(d.geaendert_am):'')}${zeile('Letzte Aktivität', d.letzte_aktivitaet?fmtDat(d.letzte_aktivitaet):'')}</div>
+    </div></div>
+  `;
+  window.scrollTo(0,0);
+}
+
+function zurueckZurListe(){
+  document.getElementById('detailPage').style.display='none';
+  const aktiv=document.querySelector('.tab.active')?.dataset.view||'kandidaten';
+  document.getElementById('view-'+aktiv).style.display='block';
+}
+
+function fmtDat(s){ if(!s) return ''; try{const d=new Date(s);
+  return d.toLocaleDateString('de-DE')+' '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});}catch{return s;} }
+
+// ---- Bearbeiten / Neu anlegen ----
+const EDIT_STATUS=['New','In Review','Available','Engaged','Offered','Hired','Rejected'];
+
+function ef(label,id,val,type='text'){
+  return `<div class="edit-field"><label>${label}</label><input id="ef_${id}" type="${type}" value="${val?String(val).replace(/"/g,'&quot;'):''}"></div>`;
+}
+function eta(label,id,val){
+  return `<div class="edit-field" style="grid-column:1/-1"><label>${label}</label><textarea id="ef_${id}">${val?esc(val):''}</textarea></div>`;
+}
+function esel(label,id,val,opts){
+  return `<div class="edit-field"><label>${label}</label><select id="ef_${id}">`+
+    ['',...opts].map(o=>`<option ${o===val?'selected':''}>${o}</option>`).join('')+`</select></div>`;
+}
+
+async function bearbeiteKandidat(id){
+  const {data:d}=await sb.from('kandidaten').select('*').eq('id',id).single();
+  if(!d) return;
+  zeigeFormular(d);
+}
+
+function neuerKandidat(){
+  zeigeFormular({id:null});
+}
+
+function zeigeFormular(d){
+  ['kandidaten','kunden','kontakte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  const page=document.getElementById('detailPage'); page.style.display='block';
+  const neu = !d.id;
+  page.innerHTML=`
+    <div class="detail-head">
+      <button class="back" onclick="${neu?'zurueckZurListe()':`detailKandidat('${d.id}')`}">← Abbrechen</button>
+      <h2>${neu?'Neuer Kandidat':'Bearbeiten: '+(esc(d.voller_name)||'')}</h2>
+    </div>
+    <div class="card"><h3>Persönliche Daten</h3><div class="edit-grid">
+      ${ef('Vorname','vorname',d.vorname)}
+      ${ef('Nachname','nachname',d.nachname)}
+      ${ef('E-Mail','email',d.email,'email')}
+      ${ef('E-Mail beruflich','email_beruflich',d.email_beruflich,'email')}
+      ${ef('Telefon','telefon',d.telefon)}
+      ${ef('Mobil','mobil',d.mobil)}
+      ${ef('Telefon privat','telefon_privat',d.telefon_privat)}
+      ${ef('Mobil privat','mobil_privat',d.mobil_privat)}
+    </div></div>
+    <div class="card"><h3>Private Adresse</h3><div class="edit-grid">
+      ${ef('Straße','strasse',d.strasse)}
+      ${ef('PLZ','plz',d.plz)}
+      ${ef('Stadt','stadt',d.stadt)}
+      ${ef('Bundesland','bundesland',d.bundesland)}
+      ${ef('Land','land',d.land||'Deutschland')}
+    </div></div>
+    <div class="card"><h3>Berufliche Adresse (Arbeitgeber)</h3><div class="edit-grid">
+      ${ef('Straße','strasse_beruf',d.strasse_beruf)}
+      ${ef('PLZ','plz_beruf',d.plz_beruf)}
+      ${ef('Stadt','stadt_beruf',d.stadt_beruf)}
+      ${ef('Bundesland','bundesland_beruf',d.bundesland_beruf)}
+      ${ef('Land','land_beruf',d.land_beruf||'Deutschland')}
+    </div><div class="meta" style="color:var(--muted);font-size:11px;margin-top:8px">Umkreissuche nutzt: PLZ privat → Vorwahl privat → PLZ beruflich → Vorwahl beruflich.</div></div>
+    <div class="card"><h3>Beruflich</h3><div class="edit-grid">
+      ${ef('Derzeitige Berufsbezeichnung','berufsbezeichnung',d.berufsbezeichnung)}
+      ${ef('Arbeitgeber','arbeitgeber',d.arbeitgeber)}
+      ${ef('Firma zuvor','firma_zuvor',d.firma_zuvor)}
+      ${ef('Erfahrung (Jahre)','erfahrung_jahre',d.erfahrung_jahre)}
+      ${ef('Qualifikation','qualifikation',d.qualifikation)}
+      ${ef('Studiengang','studiengang',d.studiengang)}
+      ${ef('Gehalt aktuell','gehalt_aktuell',d.gehalt_aktuell)}
+      ${ef('Gehalt erwartet','gehalt_erwartet',d.gehalt_erwartet)}
+      ${ef('Kündigungsfrist','kuendigungsfrist',d.kuendigungsfrist)}
+      ${ef('Umzugsbereitschaft','umzugsbereitschaft',d.umzugsbereitschaft)}
+      ${ef('Wunschregion','wunschregion',d.wunschregion)}
+      ${esel('Status','status',d.status,EDIT_STATUS)}
+      ${ef('XING Profil','xing_profil',d.xing_profil)}
+      ${ef('LinkedIn Profil','linkedin_profil',d.linkedin_profil)}
+      ${eta('Fähigkeiten (kommagetrennt)','faehigkeiten',d.faehigkeiten)}
+      ${eta('Wechselmotivation','wechselmotivation',d.wechselmotivation)}
+      ${eta('Profil','profil_zusammenfassung',d.profil_zusammenfassung)}
+      ${eta('Bemerkung','bemerkung',d.bemerkung)}
+    </div></div>
+    <div class="edit-actions">
+      <button class="neuBtn savebtn" onclick="speichereKandidat(${neu?'null':`'${d.id}'`})">✓ Speichern</button>
+      <button class="neuBtn cancelbtn" onclick="${neu?'zurueckZurListe()':`detailKandidat('${d.id}')`}">Abbrechen</button>
+    </div>
+    <div id="saveMsg" style="margin-top:12px;font-size:13px"></div>
+  `;
+  window.scrollTo(0,0);
+}
+
+function gv(id){ const el=document.getElementById('ef_'+id); return el?el.value.trim():null; }
+
+// Vorwahl aus Telefonnummer extrahieren und Koordinaten suchen
+async function vorwahlKoord(nr){
+  if(!nr) return null;
+  let clean=String(nr).replace(/[^0-9+]/g,'').replace('+49','0');
+  if(clean[0]!=='0') return null;
+  // längste passende Vorwahl suchen (5 bis 3 Stellen)
+  for(const len of [5,4,3]){
+    const vw=clean.slice(0,len);
+    try{
+      const {data}=await sb.from('vorwahl_geo').select('lat,lng').eq('vorwahl',vw).single();
+      if(data) return {lat:data.lat,lng:data.lng};
+    }catch(e){}
+  }
+  return null;
+}
+
+// Fallback-Kette: PLZ privat -> Vorwahl privat -> PLZ beruflich -> Vorwahl beruflich
+async function ermittleKoordinaten(obj){
+  async function plzKoord(plz){
+    if(!plz) return null;
+    try{ const {data}=await sb.from('plz_geo').select('lat,lng').eq('plz',plz).single();
+      if(data) return {lat:data.lat,lng:data.lng}; }catch(e){}
+    return null;
+  }
+  let k=await plzKoord(obj.plz);                       if(k) return k;
+  k=await vorwahlKoord(obj.telefon_privat||obj.telefon); if(k) return k;
+  k=await plzKoord(obj.plz_beruf);                     if(k) return k;
+  k=await vorwahlKoord(obj.telefon);                   if(k) return k;
+  return {lat:null,lng:null};
+}
+
+async function speichereKandidat(id){
+  const msg=document.getElementById('saveMsg'); msg.textContent='Speichere…'; msg.style.color='var(--muted)';
+  const vorname=gv('vorname'), nachname=gv('nachname');
+  const obj={
+    vorname, nachname,
+    voller_name:[vorname,nachname].filter(Boolean).join(' ')||null,
+    email:gv('email'), email_beruflich:gv('email_beruflich'),
+    telefon:gv('telefon'), mobil:gv('mobil'),
+    telefon_privat:gv('telefon_privat'), mobil_privat:gv('mobil_privat'),
+    strasse:gv('strasse'), plz:gv('plz'), stadt:gv('stadt'),
+    bundesland:gv('bundesland'), land:gv('land'),
+    strasse_beruf:gv('strasse_beruf'), plz_beruf:gv('plz_beruf'), stadt_beruf:gv('stadt_beruf'),
+    bundesland_beruf:gv('bundesland_beruf'), land_beruf:gv('land_beruf'),
+    berufsbezeichnung:gv('berufsbezeichnung'), arbeitgeber:gv('arbeitgeber'),
+    firma_zuvor:gv('firma_zuvor'), erfahrung_jahre:gv('erfahrung_jahre'),
+    qualifikation:gv('qualifikation'), studiengang:gv('studiengang'),
+    gehalt_aktuell:gv('gehalt_aktuell'), gehalt_erwartet:gv('gehalt_erwartet'),
+    kuendigungsfrist:gv('kuendigungsfrist'), umzugsbereitschaft:gv('umzugsbereitschaft'),
+    wunschregion:gv('wunschregion'), status:gv('status')||null,
+    xing_profil:gv('xing_profil'), linkedin_profil:gv('linkedin_profil'),
+    faehigkeiten:gv('faehigkeiten'), wechselmotivation:gv('wechselmotivation'),
+    profil_zusammenfassung:gv('profil_zusammenfassung'), bemerkung:gv('bemerkung'),
+    geaendert_am:new Date().toISOString(),
+    letzte_aktivitaet:new Date().toISOString(),
+  };
+  // Koordinaten nach Fallback-Kette: PLZ privat -> Vorwahl privat -> PLZ beruflich -> Vorwahl beruflich
+  const koord=await ermittleKoordinaten(obj);
+  obj.lat=koord.lat; obj.lng=koord.lng;
+  let res;
+  if(id){
+    res=await sb.from('kandidaten').update(obj).eq('id',id);
+  }else{
+    obj.id='knd_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+    obj.erstellt_am=new Date().toISOString();
+    res=await sb.from('kandidaten').insert(obj);
+  }
+  if(res.error){ msg.style.color='var(--hot)'; msg.textContent='Fehler: '+res.error.message; return; }
+  msg.style.color='var(--ok)'; msg.textContent='✓ Gespeichert.';
+  setTimeout(()=>detailKandidat(id||obj.id), 600);
+}
+
+// ============ KUNDEN ============
+async function detailKunde(id){
+  const [k, kont, stel, notiz] = await Promise.all([
+    sb.from('kunden').select('*').eq('id',id).single(),
+    sb.from('kontakte').select('*').eq('kunde_id',id),
+    sb.from('stellen').select('*').eq('kunde_id',id),
+    sb.from('notizen').select('*').eq('kunde_id',id).order('erstellt_am',{ascending:false}),
+  ]);
+  const d=k.data; if(!d) return;
+  ['kandidaten','kunden','kontakte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  const page=document.getElementById('detailPage'); page.style.display='block';
+  const adresse=[d.strasse,[d.plz,d.stadt].filter(Boolean).join(' '),d.bundesland,d.land].filter(Boolean).join(', ');
+  const kont_=kont.data||[], stel_=stel.data||[], notiz_=notiz.data||[];
+  page.innerHTML=`
+    <div class="detail-head">
+      <button class="back" onclick="zurueckZurListe()">← Zurück</button>
+      <h2>${esc(d.name)||'Kunde'}</h2>
+      <button class="editbtn" onclick="bearbeiteKunde('${d.id}')">✎ Bearbeiten</button>
+    </div>
+    <div class="detail-sub">${esc(d.branche)||''}</div>
+    <div class="card"><h3>Kontakt & Adresse</h3><div class="grid2">
+      <div>
+        ${zeile('Telefon', tel(d.telefon))}
+        ${zeile('Fax', esc(d.fax))}
+        ${zeile('E-Mail', d.email?`<a href="mailto:${esc(d.email)}">${esc(d.email)}</a>`:'')}
+        ${zeile('Webseite', link(d.webseite))}
+      </div>
+      <div>
+        ${zeile('Adresse', esc(adresse))}
+        ${zeile('Kundennummer', esc(d.kundennummer))}
+        ${zeile('Account Manager', esc(d.account_manager))}
+      </div>
+    </div>
+    ${d.info?`<div style="margin-top:14px"><div class="k" style="color:var(--muted);font-size:13px;margin-bottom:4px">Info</div><div class="v" style="font-size:13px">${esc(d.info)}</div></div>`:''}
+    </div>
+    ${kont_.length?`<div class="card"><h3>Ansprechpartner (${kont_.length})</h3>${
+      kont_.map(c=>`<div class="note" style="cursor:pointer" onclick="detailKontakt('${c.id}')"><strong>${esc(c.voller_name)||'–'}</strong>
+        <div class="meta">${esc(c.berufsbezeichnung)||''}${c.email?' · '+esc(c.email):''}${c.telefon_beruflich?' · '+esc(c.telefon_beruflich):''}</div></div>`).join('')
+    }</div>`:''}
+    ${stel_.length?`<div class="card"><h3>Stellen (${stel_.length})</h3>${
+      stel_.map(s=>`<div class="note"><strong>${esc(s.jobtitel)||esc(s.position)||'–'}</strong>
+        <div class="meta">${esc(s.status)||''}${s.stadt?' · '+esc(s.stadt):''}${s.gehalt?' · '+esc(s.gehalt):''}</div></div>`).join('')
+    }</div>`:''}
+    ${notiz_.length?`<div class="card"><h3>Notizen (${notiz_.length})</h3>${
+      notiz_.slice(0,30).map(n=>`<div class="note">${esc(n.inhalt)||'–'}<div class="meta">${n.erstellt_am?fmtDat(n.erstellt_am):''}</div></div>`).join('')
+    }</div>`:''}
+    <div class="card"><h3>System</h3><div class="grid2">
+      <div>${zeile('Kunde-ID', esc(d.id))}${zeile('Quelle', esc(d.quelle))}</div>
+      <div>${zeile('Erstellt', d.erstellt_am?fmtDat(d.erstellt_am):'')}${zeile('Geändert', d.geaendert_am?fmtDat(d.geaendert_am):'')}</div>
+    </div></div>
+  `;
+  window.scrollTo(0,0);
+}
+
+function bearbeiteKunde(id){ sb.from('kunden').select('*').eq('id',id).single().then(({data})=>{ if(data) zeigeKundeFormular(data); }); }
+function neuerKunde(){ zeigeKundeFormular({id:null}); }
+
+function zeigeKundeFormular(d){
+  ['kandidaten','kunden','kontakte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  const page=document.getElementById('detailPage'); page.style.display='block';
+  const neu=!d.id;
+  page.innerHTML=`
+    <div class="detail-head">
+      <button class="back" onclick="${neu?'zurueckZurListe()':`detailKunde('${d.id}')`}">← Abbrechen</button>
+      <h2>${neu?'Neuer Kunde':'Bearbeiten: '+(esc(d.name)||'')}</h2>
+    </div>
+    <div class="card"><h3>Firmendaten</h3><div class="edit-grid">
+      ${ef('Firmenname','name',d.name)}
+      ${ef('Branche','branche',d.branche)}
+      ${ef('Telefon','telefon',d.telefon)}
+      ${ef('Fax','fax',d.fax)}
+      ${ef('E-Mail','email',d.email,'email')}
+      ${ef('Webseite','webseite',d.webseite)}
+      ${ef('Kundennummer','kundennummer',d.kundennummer)}
+      ${ef('Account Manager','account_manager',d.account_manager)}
+    </div></div>
+    <div class="card"><h3>Adresse</h3><div class="edit-grid">
+      ${ef('Straße','strasse',d.strasse)}
+      ${ef('PLZ','plz',d.plz)}
+      ${ef('Stadt','stadt',d.stadt)}
+      ${ef('Bundesland','bundesland',d.bundesland)}
+      ${ef('Land','land',d.land||'Deutschland')}
+    </div></div>
+    <div class="card"><h3>Info</h3><div class="edit-grid">${eta('Info','info',d.info)}</div></div>
+    <div class="edit-actions">
+      <button class="neuBtn savebtn" onclick="speichereKunde(${neu?'null':`'${d.id}'`})">✓ Speichern</button>
+      <button class="neuBtn cancelbtn" onclick="${neu?'zurueckZurListe()':`detailKunde('${d.id}')`}">Abbrechen</button>
+    </div>
+    <div id="saveMsg" style="margin-top:12px;font-size:13px"></div>
+  `;
+  window.scrollTo(0,0);
+}
+
+async function speichereKunde(id){
+  const msg=document.getElementById('saveMsg'); msg.textContent='Speichere…'; msg.style.color='var(--muted)';
+  const obj={
+    name:gv('name'), branche:gv('branche'), telefon:gv('telefon'), fax:gv('fax'),
+    email:gv('email'), webseite:gv('webseite'), kundennummer:gv('kundennummer'),
+    account_manager:gv('account_manager'), strasse:gv('strasse'), plz:gv('plz'),
+    stadt:gv('stadt'), bundesland:gv('bundesland'), land:gv('land'), info:gv('info'),
+    geaendert_am:new Date().toISOString(), letzte_aktivitaet:new Date().toISOString(),
+  };
+  if(obj.plz){ try{ const {data:g}=await sb.from('plz_geo').select('lat,lng').eq('plz',obj.plz).single(); if(g){obj.lat=g.lat;obj.lng=g.lng;} }catch(e){} }
+  let res;
+  if(id){ res=await sb.from('kunden').update(obj).eq('id',id); }
+  else{ obj.id='kde_'+Date.now()+'_'+Math.random().toString(36).slice(2,7); obj.erstellt_am=new Date().toISOString(); res=await sb.from('kunden').insert(obj); }
+  if(res.error){ msg.style.color='var(--hot)'; msg.textContent='Fehler: '+res.error.message; return; }
+  msg.style.color='var(--ok)'; msg.textContent='✓ Gespeichert.';
+  setTimeout(()=>detailKunde(id||obj.id), 600);
+}
+
+// ============ KONTAKTE ============
+async function detailKontakt(id){
+  const {data:d}=await sb.from('kontakte').select('*').eq('id',id).single();
+  if(!d) return;
+  let kunde=null;
+  if(d.kunde_id){ const {data:kd}=await sb.from('kunden').select('id,name').eq('id',d.kunde_id).single(); kunde=kd; }
+  ['kandidaten','kunden','kontakte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  const page=document.getElementById('detailPage'); page.style.display='block';
+  const adresse=[d.strasse,[d.plz,d.stadt].filter(Boolean).join(' '),d.bundesland,d.land].filter(Boolean).join(', ');
+  page.innerHTML=`
+    <div class="detail-head">
+      <button class="back" onclick="zurueckZurListe()">← Zurück</button>
+      <h2>${esc(d.voller_name)||'Kontakt'}</h2>
+      <button class="editbtn" onclick="bearbeiteKontakt('${d.id}')">✎ Bearbeiten</button>
+    </div>
+    <div class="detail-sub">${esc(d.berufsbezeichnung)||''}${kunde?' · '+esc(kunde.name):''}</div>
+    <div class="card"><h3>Kontakt & Adresse</h3><div class="grid2">
+      <div>
+        ${zeile('Funktion', esc(d.berufsbezeichnung))}
+        ${zeile('Abteilung', esc(d.abteilung))}
+        ${zeile('E-Mail', d.email?`<a href="mailto:${esc(d.email)}">${esc(d.email)}</a>`:'')}
+        ${zeile('E-Mail privat', d.email_privat?`<a href="mailto:${esc(d.email_privat)}">${esc(d.email_privat)}</a>`:'')}
+        ${kunde?zeile('Firma', `<a href="#" onclick="detailKunde('${kunde.id}');return false">${esc(kunde.name)}</a>`):''}
+      </div>
+      <div>
+        ${zeile('Telefon beruflich', tel(d.telefon_beruflich))}
+        ${zeile('Mobil', tel(d.mobil))}
+        ${zeile('Mobil privat', tel(d.mobil_privat))}
+        ${zeile('Adresse', esc(adresse))}
+        ${zeile('XING', link(d.xing_profil))}
+        ${zeile('LinkedIn', link(d.linkedin_profil))}
+      </div>
+    </div>
+    ${d.notizen?`<div style="margin-top:14px"><div class="k" style="color:var(--muted);font-size:13px;margin-bottom:4px">Notizen</div><div class="v" style="font-size:13px">${esc(d.notizen)}</div></div>`:''}
+    </div>
+    <div class="card"><h3>System</h3><div class="grid2">
+      <div>${zeile('Kontakt-ID', esc(d.id))}${zeile('Quelle', esc(d.quelle))}</div>
+      <div>${zeile('Erstellt', d.erstellt_am?fmtDat(d.erstellt_am):'')}${zeile('Geändert', d.geaendert_am?fmtDat(d.geaendert_am):'')}</div>
+    </div></div>
+  `;
+  window.scrollTo(0,0);
+}
+
+function bearbeiteKontakt(id){ sb.from('kontakte').select('*').eq('id',id).single().then(({data})=>{ if(data) zeigeKontaktFormular(data); }); }
+function neuerKontakt(){ zeigeKontaktFormular({id:null}); }
+
+function zeigeKontaktFormular(d){
+  ['kandidaten','kunden','kontakte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  const page=document.getElementById('detailPage'); page.style.display='block';
+  const neu=!d.id;
+  page.innerHTML=`
+    <div class="detail-head">
+      <button class="back" onclick="${neu?'zurueckZurListe()':`detailKontakt('${d.id}')`}">← Abbrechen</button>
+      <h2>${neu?'Neuer Kontakt':'Bearbeiten: '+(esc(d.voller_name)||'')}</h2>
+    </div>
+    <div class="card"><h3>Persönliche Daten</h3><div class="edit-grid">
+      ${ef('Vorname','vorname',d.vorname)}
+      ${ef('Nachname','nachname',d.nachname)}
+      ${ef('Funktion','berufsbezeichnung',d.berufsbezeichnung)}
+      ${ef('Abteilung','abteilung',d.abteilung)}
+      ${ef('E-Mail','email',d.email,'email')}
+      ${ef('E-Mail privat','email_privat',d.email_privat,'email')}
+      ${ef('Telefon beruflich','telefon_beruflich',d.telefon_beruflich)}
+      ${ef('Mobil','mobil',d.mobil)}
+      ${ef('Mobil privat','mobil_privat',d.mobil_privat)}
+      ${ef('Kunde-ID (Firma)','kunde_id',d.kunde_id)}
+      ${ef('XING Profil','xing_profil',d.xing_profil)}
+      ${ef('LinkedIn Profil','linkedin_profil',d.linkedin_profil)}
+    </div></div>
+    <div class="card"><h3>Adresse</h3><div class="edit-grid">
+      ${ef('Straße','strasse',d.strasse)}
+      ${ef('PLZ','plz',d.plz)}
+      ${ef('Stadt','stadt',d.stadt)}
+      ${ef('Bundesland','bundesland',d.bundesland)}
+      ${ef('Land','land',d.land||'Deutschland')}
+    </div></div>
+    <div class="card"><h3>Notizen</h3><div class="edit-grid">${eta('Notizen','notizen',d.notizen)}</div></div>
+    <div class="edit-actions">
+      <button class="neuBtn savebtn" onclick="speichereKontakt(${neu?'null':`'${d.id}'`})">✓ Speichern</button>
+      <button class="neuBtn cancelbtn" onclick="${neu?'zurueckZurListe()':`detailKontakt('${d.id}')`}">Abbrechen</button>
+    </div>
+    <div id="saveMsg" style="margin-top:12px;font-size:13px"></div>
+  `;
+  window.scrollTo(0,0);
+}
+
+async function speichereKontakt(id){
+  const msg=document.getElementById('saveMsg'); msg.textContent='Speichere…'; msg.style.color='var(--muted)';
+  const vorname=gv('vorname'), nachname=gv('nachname');
+  const obj={
+    vorname, nachname, voller_name:[vorname,nachname].filter(Boolean).join(' ')||null,
+    berufsbezeichnung:gv('berufsbezeichnung'), abteilung:gv('abteilung'),
+    email:gv('email'), email_privat:gv('email_privat'),
+    telefon_beruflich:gv('telefon_beruflich'), mobil:gv('mobil'), mobil_privat:gv('mobil_privat'),
+    kunde_id:gv('kunde_id')||null, xing_profil:gv('xing_profil'), linkedin_profil:gv('linkedin_profil'),
+    strasse:gv('strasse'), plz:gv('plz'), stadt:gv('stadt'),
+    bundesland:gv('bundesland'), land:gv('land'), notizen:gv('notizen'),
+    geaendert_am:new Date().toISOString(), letzte_aktivitaet:new Date().toISOString(),
+  };
+  if(obj.plz){ try{ const {data:g}=await sb.from('plz_geo').select('lat,lng').eq('plz',obj.plz).single(); if(g){obj.lat=g.lat;obj.lng=g.lng;} }catch(e){} }
+  let res;
+  if(id){ res=await sb.from('kontakte').update(obj).eq('id',id); }
+  else{ obj.id='kon_'+Date.now()+'_'+Math.random().toString(36).slice(2,7); obj.erstellt_am=new Date().toISOString(); res=await sb.from('kontakte').insert(obj); }
+  if(res.error){ msg.style.color='var(--hot)'; msg.textContent='Fehler: '+res.error.message; return; }
+  msg.style.color='var(--ok)'; msg.textContent='✓ Gespeichert.';
+  setTimeout(()=>detailKontakt(id||obj.id), 600);
+}
+
+
+async function ladeKunden(){
+  const q=document.getElementById('cSuche').value.trim();
+  const body=document.getElementById('cBody'); body.innerHTML='';
+  let query=sb.from('kunden').select('*').limit(200).order('name');
+  if(q) query=query.or(`name.ilike.%${q}%,branche.ilike.%${q}%,stadt.ilike.%${q}%`);
+  const {data,error}=await query;
+  if(error){document.getElementById('cCount').textContent='Fehler: '+error.message;return;}
+  document.getElementById('cCount').textContent=data.length+' Kunden';
+  data.forEach(r=>{
+    const tr=document.createElement('tr');tr.className='row-click';
+    tr.innerHTML=`<td>${esc(r.name)||'–'}</td><td>${esc(r.branche)||'–'}</td>
+      <td>${esc(r.plz)||''} ${esc(r.stadt)||''}</td><td>${esc(r.telefon)||'–'}</td>`;
+    tr.onclick=()=>detailKunde(r.id);
+    body.appendChild(tr);
+  });
+  if(!data.length) body.innerHTML='<tr><td colspan="4" class="empty">Keine Treffer.</td></tr>';
+}
+
+async function ladeKontakte(){
+  const q=document.getElementById('ktSuche').value.trim();
+  const body=document.getElementById('ktBody'); body.innerHTML='';
+  let query=sb.from('kontakte').select('*').limit(200).order('nachname');
+  if(q) query=query.or(`voller_name.ilike.%${q}%,berufsbezeichnung.ilike.%${q}%`);
+  const {data,error}=await query;
+  if(error){document.getElementById('ktCount').textContent='Fehler: '+error.message;return;}
+  document.getElementById('ktCount').textContent=data.length+' Kontakte';
+  data.forEach(r=>{
+    const tr=document.createElement('tr');tr.className='row-click';
+    tr.innerHTML=`<td>${esc(r.voller_name)||'–'}</td><td>${esc(r.berufsbezeichnung)||'–'}</td>
+      <td>${esc(r.email)||'–'}</td><td>${esc(r.telefon_beruflich)||esc(r.mobil)||'–'}</td>`;
+    tr.onclick=()=>detailKontakt(r.id);
+    body.appendChild(tr);
+  });
+  if(!data.length) body.innerHTML='<tr><td colspan="4" class="empty">Keine Treffer.</td></tr>';
+}
+
+function zeigeDetail(title,obj){
+  document.getElementById('dTitle').textContent=title;
+  const dl=document.getElementById('dBody'); dl.innerHTML='';
+  for(const [k,v] of Object.entries(obj)){
+    if(!v) continue;
+    const dt=document.createElement('dt');dt.textContent=k;
+    const dd=document.createElement('dd');dd.innerHTML=v;
+    dl.appendChild(dt);dl.appendChild(dd);
+  }
+  document.getElementById('detail').showModal();
+}
+function esc(s){return s==null?'':String(s).replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));}
+function link(u){return u?`<a href="${esc(u)}" target="_blank">öffnen ↗</a>`:'';}
+
+// Enter-Taste löst Suche aus
+['kSuche','kPlz'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')ladeKandidaten();}));
+document.getElementById('cSuche').addEventListener('keydown',e=>{if(e.key==='Enter')ladeKunden();});
+document.getElementById('ktSuche').addEventListener('keydown',e=>{if(e.key==='Enter')ladeKontakte();});
+document.getElementById('logPass').addEventListener('keydown',e=>{if(e.key==='Enter')login();});
+
+init();
+</script>
+</body>
+</html>
