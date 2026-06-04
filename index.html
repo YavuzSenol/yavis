@@ -370,6 +370,7 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok){
       <div>
         ${zeile('Position', esc(d.positionswunsch))}
         ${zeile('Derzeitige Tätigkeit', esc(d.berufsbezeichnung))}
+        ${d.position_original?zeile('Position laut CV', esc(d.position_original)):''}
         ${zeile('Arbeitgeber', esc(d.arbeitgeber))}
         ${zeile('Firma zuvor', esc(d.firma_zuvor))}
         ${zeile('Erfahrung (Jahre)', esc(d.erfahrung_jahre))}
@@ -552,6 +553,7 @@ function zeigeFormular(d){
     </div><div class="meta" style="color:var(--muted);font-size:11px;margin-top:8px">Umkreissuche nutzt: PLZ privat → Vorwahl privat → PLZ beruflich → Vorwahl beruflich.</div></div>
     <div class="card"><h3>Beruflich</h3><div class="edit-grid">
       ${ef('Derzeitige Berufsbezeichnung','berufsbezeichnung',d.berufsbezeichnung)}
+      ${ef('Position laut CV (Original)','position_original',d.position_original)}
       ${ef('Arbeitgeber','arbeitgeber',d.arbeitgeber)}
       ${ef('Firma zuvor','firma_zuvor',d.firma_zuvor)}
       ${ef('Erfahrung (Jahre)','erfahrung_jahre',d.erfahrung_jahre)}
@@ -625,7 +627,7 @@ async function speichereKandidat(id){
     bundesland:gv('bundesland'), land:gv('land'),
     strasse_beruf:gv('strasse_beruf'), plz_beruf:gv('plz_beruf'), stadt_beruf:gv('stadt_beruf'),
     bundesland_beruf:gv('bundesland_beruf'), land_beruf:gv('land_beruf'),
-    berufsbezeichnung:gv('berufsbezeichnung'), arbeitgeber:gv('arbeitgeber'),
+    berufsbezeichnung:gv('berufsbezeichnung'), position_original:gv('position_original'), arbeitgeber:gv('arbeitgeber'),
     firma_zuvor:gv('firma_zuvor'), erfahrung_jahre:gv('erfahrung_jahre'),
     qualifikation:gv('qualifikation'), studiengang:gv('studiengang'),
     gehalt_aktuell:gv('gehalt_aktuell'), gehalt_erwartet:gv('gehalt_erwartet'),
