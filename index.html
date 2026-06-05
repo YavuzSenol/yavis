@@ -211,6 +211,11 @@
       <button class="go" onclick="ladeKandidaten()">Suchen</button>
       <button class="neuBtn" onclick="neuerKandidat()">+ Neuer Kandidat</button>
     </div>
+    <div style="margin:-4px 0 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <button class="tab" onclick="toggleTagPanel()">🏷️ Nach Tags filtern <span id="tagFilterCount"></span></button>
+      <span id="tagAktiv"></span>
+    </div>
+    <div id="tagPanel" style="display:none;border:1px solid var(--line);background:var(--panel);border-radius:4px;padding:14px;margin-bottom:14px"></div>
     <div class="count" id="kCount"></div>
     <table><thead><tr>
       <th>Name</th><th>Berufsbezeichnung</th><th>Ort</th><th>Telefon</th><th>Status</th><th class="kmcol" style="display:none">Entfernung</th>
@@ -397,6 +402,63 @@ async function ladeStatusFilter(){
   set.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o);});
 }
 
+// ===== Tags / Kategorien (Filtersuche) =====
+const TAG_KATEGORIEN = {
+  'Gewerk': ['HKLS','Elektrotechnik','MSR','Heizung','Lüftung','Klima','Kälte','Sanitär','Brandschutz','Löschtechnik','Sprinkler','Nachrichtentechnik','Reinraumtechnik','Energie','Wasser','Sicherheitstechnik','EHS','HVAC','Lichtplanung','Architekt'],
+  'Leistungsphase': ['Planung','Ausführung','Kalkulation','Vergabe','Inbetriebnahme','Objektüberwachung','Projektentwicklung','Facility Management','FM','Sanierung','LPH8','SFB','EPCM'],
+  'Branche': ['Anlagenbau','Industrie','Rechenzentrum','Krankenhaus','Chemie','Pharma','Automotive','Halbleiter','Kraftwerk','Immobilien','Hochbau','Wohnungsbau','Labor','Life Science','Prozesstechnik','Verfahrenstechnik','Civil'],
+  'Software': ['AutoCAD','AutoCAD MEP','Revit','BIM','Plancal Nova','Trimble Nova','TRICAD','Dialux','Relux','MicroStation','Dendrit','MH-Software','Simulation'],
+};
+const TAG_MUELL=['kurzesupdatemail','kurzesupdatewgmail','false'];
+const TAG_KANON={}; Object.values(TAG_KATEGORIEN).flat().forEach(t=>TAG_KANON[t.toLowerCase()]=t);
+function normTag(raw){ if(!raw) return null; let t=String(raw).trim().replace(/^#+/,'').trim(); if(!t) return null; const low=t.toLowerCase(); if(TAG_MUELL.includes(low)) return null; return TAG_KANON[low]||t; }
+function parseTags(raw){ if(!raw) return []; const out=[]; String(raw).split(/[;,]/).forEach(p=>{ const t=normTag(p); if(t&&!out.includes(t)) out.push(t); }); return out; }
+function kategorieVon(tag){ for(const k in TAG_KATEGORIEN){ if(TAG_KATEGORIEN[k].includes(tag)) return k; } return 'Sonstige'; }
+let tagFilter=new Set();
+let alleTagsCache=null;
+function tagModusWert(){ const el=document.getElementById('tagModus'); return el?el.value:'und'; }
+async function ladeAlleTags(){
+  if(alleTagsCache) return alleTagsCache;
+  let alle=[];
+  for(let from=0; from<3000; from+=1000){ const a=await sb.from('kandidaten').select('tags').range(from,from+999); if(a.data) alle=alle.concat(a.data); if(!a.data||a.data.length<1000) break; }
+  const set=new Set(); alle.forEach(r=>parseTags(r.tags).forEach(t=>set.add(t)));
+  alleTagsCache=[...set]; return alleTagsCache;
+}
+async function toggleTagPanel(){
+  const p=document.getElementById('tagPanel');
+  if(p.style.display==='none'){ p.innerHTML='<div style="color:var(--muted);font-size:13px">Lade Tags …</div>'; p.style.display='block'; await ladeAlleTags(); renderTagPanel(); }
+  else p.style.display='none';
+}
+function renderTagPanel(){
+  const panel=document.getElementById('tagPanel'); const modus=tagModusWert();
+  const gruppen={}; (alleTagsCache||[]).forEach(t=>{ const k=kategorieVon(t); (gruppen[k]=gruppen[k]||[]).push(t); });
+  let html=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
+    <strong style="font-size:13px">🏷️ Tags filtern</strong>
+    <label style="font-size:12px;color:var(--muted)">Verknüpfung
+      <select id="tagModus" onchange="renderTagPanel();ladeKandidaten()" style="min-width:auto;padding:4px 8px;margin-left:4px">
+        <option value="und"${modus==='und'?' selected':''}>UND (alle)</option>
+        <option value="oder"${modus==='oder'?' selected':''}>ODER (mind. eine)</option></select></label>
+    ${tagFilter.size?'<button class="tab" style="padding:4px 10px" onclick="tagFilterLeeren()">✕ Zurücksetzen</button>':''}</div>`;
+  ['Gewerk','Leistungsphase','Branche','Software','Sonstige'].forEach(g=>{
+    const tags=(gruppen[g]||[]).sort((a,b)=>a.localeCompare(b,'de')); if(!tags.length) return;
+    html+=`<div style="margin-bottom:10px"><div class="dcol-h" style="margin-bottom:5px">${g} <span style="color:var(--muted);font-weight:400">(${tags.length})</span></div>${
+      tags.map(t=>`<span class="tag" style="cursor:pointer;user-select:none;margin:2px 5px 2px 0;display:inline-block;${tagFilter.has(t)?'background:var(--accent);color:#0f1115;border-color:var(--accent);font-weight:600':''}" onclick="toggleTagFilter('${t.replace(/'/g,"\\'")}')">${esc(t)}</span>`).join('')
+    }</div>`; });
+  panel.innerHTML=html;
+}
+function toggleTagFilter(t){ if(tagFilter.has(t)) tagFilter.delete(t); else tagFilter.add(t); renderTagPanel(); aktualisiereTagAktiv(); ladeKandidaten(); }
+function tagFilterLeeren(){ tagFilter.clear(); renderTagPanel(); aktualisiereTagAktiv(); ladeKandidaten(); }
+function aktualisiereTagAktiv(){
+  const btnC=document.getElementById('tagFilterCount'); if(btnC) btnC.textContent=tagFilter.size?'('+tagFilter.size+')':'';
+  const el=document.getElementById('tagAktiv'); if(!el) return;
+  el.innerHTML = tagFilter.size? [...tagFilter].map(t=>`<span class="tag" style="background:var(--accent);color:#0f1115;border-color:var(--accent);cursor:pointer" onclick="toggleTagFilter('${t.replace(/'/g,"\\'")}')">${esc(t)} ✕</span>`).join('') : '';
+}
+function tagsMatchFilter(raw){
+  if(!tagFilter.size) return true;
+  const ts=parseTags(raw);
+  return tagModusWert()==='oder' ? [...tagFilter].some(t=>ts.includes(t)) : [...tagFilter].every(t=>ts.includes(t));
+}
+
 async function ladeKandidaten(){
   const q=document.getElementById('kSuche').value.trim();
   const status=document.getElementById('kStatus').value;
@@ -413,7 +475,8 @@ async function ladeKandidaten(){
     if(q){const ql=q.toLowerCase();
       rows=rows.filter(r=>[r.voller_name,r.berufsbezeichnung,r.stadt].join(' ').toLowerCase().includes(ql));}
     if(status) rows=rows.filter(r=>r.status===status);
-    document.getElementById('kCount').textContent=rows.length+' Kandidaten im Umkreis von '+radius+' km um '+plz;
+    if(tagFilter.size) rows=rows.filter(r=>tagsMatchFilter(r.tags));
+    document.getElementById('kCount').textContent=rows.length+' Kandidaten im Umkreis von '+radius+' km um '+plz+(tagFilter.size?' · Tags: '+[...tagFilter].join(', '):'');
     rows.forEach(r=>body.appendChild(zeileKandidat(r,true)));
     if(!rows.length) body.innerHTML='<tr><td colspan="5" class="empty">Keine Treffer.</td></tr>';
     return;
@@ -423,10 +486,14 @@ async function ladeKandidaten(){
   let query=sb.from('kandidaten').select('*').limit(200);
   if(status) query=query.eq('status',status);
   if(q) query=query.or(`voller_name.ilike.%${q}%,berufsbezeichnung.ilike.%${q}%,faehigkeiten.ilike.%${q}%,stadt.ilike.%${q}%`);
+  if(tagFilter.size){
+    if(tagModusWert()==='oder'){ query=query.or([...tagFilter].map(t=>`tags.ilike.%;${t};%`).join(',')); }
+    else { tagFilter.forEach(t=>{ query=query.ilike('tags','%;'+t+';%'); }); }
+  }
   query=query.order('letzte_aktivitaet',{ascending:false,nullsFirst:false});
   const {data,error}=await query;
   if(error){document.getElementById('kCount').textContent='Fehler: '+error.message;return;}
-  document.getElementById('kCount').textContent=(data.length)+' Kandidaten'+(data.length>=200?' (erste 200)':'');
+  document.getElementById('kCount').textContent=(data.length)+' Kandidaten'+(data.length>=200?' (erste 200)':'')+(tagFilter.size?' · Tags: '+[...tagFilter].join(', ')+' ('+tagModusWert().toUpperCase()+')':'');
   data.forEach(r=>body.appendChild(zeileKandidat(r,false)));
   if(!data.length) body.innerHTML='<tr><td colspan="5" class="empty">Keine Treffer.</td></tr>';
 }
@@ -685,7 +752,7 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl){
 
   const adrPriv=[d.strasse,[d.plz,d.stadt].filter(Boolean).join(' '),d.bundesland,d.land].filter(Boolean).join(', ');
   const adrBerufl=[d.strasse_beruf,[d.plz_beruf,d.stadt_beruf].filter(Boolean).join(' '),d.bundesland_beruf,d.land_beruf].filter(Boolean).join(', ');
-  const tags=(d.tags||'').split(',').map(t=>t.trim()).filter(Boolean).map(t=>`<span class="tag">${esc(t)}</span>`).join('');
+  const tags=parseTags(d.tags).map(t=>`<span class="tag">${esc(t)}</span>`).join('');
 
   const fotoHtml=fotoUrl
     ?`<div class="foto-wrap">
