@@ -189,6 +189,8 @@
   <button class="tab" data-view="kunden">Kunden</button>
   <button class="tab" data-view="kontakte">Kontakte</button>
   <button class="tab" data-view="wiedervorlagen">📋 Wiedervorlagen</button>
+  <button class="tab" data-view="projekte">📁 Projekte</button>
+  <button class="tab" data-view="newsletter">✉️ Newsletter</button>
 </nav>
 <div class="wrap">
   <div id="setup" class="setup" style="display:none">
@@ -282,6 +284,18 @@
     <table><thead><tr>
       <th>Fällig am</th><th>Betreff</th><th>Wer</th><th>Priorität</th><th>Erledigt</th>
     </tr></thead><tbody id="wvBody"></tbody></table>
+  </div>
+
+  <!-- Projekte (Platzhalter) -->
+  <div id="view-projekte" style="display:none">
+    <h2 style="color:var(--accent);font-size:18px;margin:0 0 8px">📁 Projekte</h2>
+    <div style="color:var(--muted);font-size:14px">Dieser Bereich ist angelegt und wird später mit Leben gefüllt (z. B. offene Stellen / Vakanzen).</div>
+  </div>
+
+  <!-- Newsletter (Platzhalter) -->
+  <div id="view-newsletter" style="display:none">
+    <h2 style="color:var(--accent);font-size:18px;margin:0 0 8px">✉️ Newsletter</h2>
+    <div style="color:var(--muted);font-size:14px">Dieser Bereich ist angelegt und wird später mit Leben gefüllt (z. B. Verteiler / Empfängerlisten).</div>
   </div>
 
   <!-- Vollständige Detailseite -->
@@ -424,7 +438,7 @@ document.querySelectorAll('.tab[data-view]').forEach(t=>t.onclick=()=>{
   document.getElementById('detailPage').style.display='none';
   document.querySelectorAll('.tab[data-view]').forEach(x=>x.classList.remove('active'));
   t.classList.add('active');
-  ['kandidaten','kunden','kontakte','wiedervorlagen'].forEach(v=>
+  ['kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>
     document.getElementById('view-'+v).style.display = v===t.dataset.view?'block':'none');
   if(t.dataset.view==='kunden') ladeKunden();
   if(t.dataset.view==='kontakte') ladeKontakte();
@@ -544,7 +558,7 @@ function zurStartseite(){
   document.getElementById('detailPage').style.display='none';
   document.querySelectorAll('.tab[data-view]').forEach(x=>x.classList.remove('active'));
   const kt=document.querySelector('.tab[data-view="kandidaten"]'); if(kt) kt.classList.add('active');
-  ['kandidaten','kunden','kontakte','wiedervorlagen'].forEach(v=>document.getElementById('view-'+v).style.display = v==='kandidaten'?'block':'none');
+  ['kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display = v==='kandidaten'?'block':'none');
   ladeKandidaten();
   window.scrollTo(0,0);
 }
@@ -913,7 +927,7 @@ async function detailKandidat(id){
 function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl){
   dok = dok || [];
   kontextDatensatz={typ:'Kandidat',id:d.id,name:d.voller_name};
-  ['kandidaten','kunden','kontakte','wiedervorlagen'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  ['kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
 
   const adrPriv=[d.strasse,[d.plz,d.stadt].filter(Boolean).join(' '),d.bundesland,d.land].filter(Boolean).join(', ');
@@ -1191,7 +1205,7 @@ function neuerKandidat(){
 }
 
 function zeigeFormular(d){
-  ['kandidaten','kunden','kontakte','wiedervorlagen'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  ['kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
   const neu = !d.id;
   page.innerHTML=`
@@ -1346,7 +1360,7 @@ async function detailKunde(id){
   ]);
   const d=k.data; if(!d) return;
   kontextDatensatz={typ:'Kunde',id:d.id,name:d.name};
-  ['kandidaten','kunden','kontakte','wiedervorlagen'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  ['kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
   const adresse=[d.strasse,[d.plz,d.stadt].filter(Boolean).join(' '),d.bundesland,d.land].filter(Boolean).join(', ');
   const kont_=kont.data||[], stel_=stel.data||[], notiz_=notiz.data||[], aufg_=aufg.data||[];
@@ -1396,7 +1410,7 @@ function bearbeiteKunde(id){ sb.from('kunden').select('*').eq('id',id).single().
 function neuerKunde(){ zeigeKundeFormular({id:null}); }
 
 function zeigeKundeFormular(d){
-  ['kandidaten','kunden','kontakte','wiedervorlagen'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  ['kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
   const neu=!d.id;
   page.innerHTML=`
@@ -1460,7 +1474,7 @@ async function detailKontakt(id){
   const {data:aufgTab}=await sb.from('aufgaben').select('*').eq('verknuepft_mit',id).order('faelligkeitsdatum',{ascending:true,nullsFirst:false});
   const aufg_=aufgTab||[];
   kontextDatensatz={typ:'Kontakt',id:d.id,name:d.voller_name};
-  ['kandidaten','kunden','kontakte','wiedervorlagen'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  ['kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
   const adresse=[d.strasse,[d.plz,d.stadt].filter(Boolean).join(' '),d.bundesland,d.land].filter(Boolean).join(', ');
   page.innerHTML=`
@@ -1505,7 +1519,7 @@ function bearbeiteKontakt(id){ sb.from('kontakte').select('*').eq('id',id).singl
 function neuerKontakt(){ zeigeKontaktFormular({id:null}); }
 
 function zeigeKontaktFormular(d){
-  ['kandidaten','kunden','kontakte','wiedervorlagen'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  ['kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
   const neu=!d.id;
   page.innerHTML=`
