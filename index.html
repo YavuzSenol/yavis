@@ -226,6 +226,7 @@
         <select id="kRadius"><option>25</option><option selected>50</option><option>75</option><option>100</option><option>150</option></select></div>
       <button class="go" onclick="ladeKandidaten()">Suchen</button>
       <button class="neuBtn" onclick="neuerKandidat()">+ Neuer Kandidat</button>
+      <button class="neuBtn" onclick="profilEinlesenStart()" title="LinkedIn/XING-Profil oder Text einfügen → KI legt Kandidat an">📋 Aus Profil/Text</button>
     </div>
     <div style="margin:-4px 0 12px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="kPosUnter" onchange="ladeKandidaten()" style="min-width:auto;width:14px;height:14px;padding:0;margin:0">Position ＋ niedrigere einbeziehen</label>
@@ -343,6 +344,24 @@
       <button class="go" onclick="aufgabeSpeichern()">✓ Speichern</button>
       <button class="tab" onclick="document.getElementById('taskDlg').close()">Abbrechen</button>
       <span id="tdMsg" style="font-size:13px;margin-left:4px"></span>
+    </div>
+  </div></dialog>
+
+<dialog id="profilDlg" style="width:min(640px,94vw);border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:6px;padding:0">
+  <div class="dlg-head" style="display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line)">
+    <strong>📋 Kandidat aus Profil / Text anlegen</strong>
+    <button class="x" style="margin-left:auto;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer" onclick="document.getElementById('profilDlg').close()">×</button></div>
+  <div style="padding:18px">
+    <div style="color:var(--muted);font-size:12px;margin-bottom:10px">Profiltext aus <b>LinkedIn / XING</b> (oder einen Lebenslauf) hier komplett einfügen. Die KI füllt die Felder — du prüfst sie danach im Formular, bevor gespeichert wird.</div>
+    <textarea id="pfText" rows="10" placeholder="Profiltext hier einfügen …" style="width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink);padding:11px;font:inherit;font-size:13px;border-radius:3px;resize:vertical"></textarea>
+    <div style="display:flex;gap:12px;margin-top:10px;flex-wrap:wrap">
+      <div class="field" style="flex:1;min-width:200px"><label>XING-Profil (optional)</label><input id="pfXing" placeholder="https://www.xing.com/profile/..." style="width:100%"></div>
+      <div class="field" style="flex:1;min-width:200px"><label>LinkedIn-Profil (optional)</label><input id="pfLinkedin" placeholder="https://www.linkedin.com/in/..." style="width:100%"></div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;margin-top:14px">
+      <button class="go" onclick="profilAuslesen()">🔍 Auslesen</button>
+      <button class="tab" onclick="document.getElementById('profilDlg').close()">Abbrechen</button>
+      <span id="pfMsg" style="font-size:13px;margin-left:4px"></span>
     </div>
   </div></dialog>
 
@@ -1689,6 +1708,40 @@ async function cvUebernehmen(){
 
   document.getElementById('cvOverlay').classList.remove('on');
   await detailKandidat(id); // Seite neu laden
+}
+
+// ===== Kandidat aus Profil-/LinkedIn-Text anlegen =====
+const PROFIL_EDGE_URL = 'https://afbyqrwqnccgudpqxziv.supabase.co/functions/v1/profil-auslesen';
+function profilEinlesenStart(){
+  document.getElementById('pfText').value='';
+  document.getElementById('pfXing').value='';
+  document.getElementById('pfLinkedin').value='';
+  document.getElementById('pfMsg').textContent='';
+  const d=document.getElementById('profilDlg'); if(!d.open) d.showModal();
+  setTimeout(()=>document.getElementById('pfText').focus(),120);
+}
+async function profilAuslesen(){
+  const text=document.getElementById('pfText').value.trim();
+  const msg=document.getElementById('pfMsg');
+  if(text.length<20){ msg.style.color='var(--hot)'; msg.textContent='Bitte mehr Profiltext einfügen.'; return; }
+  msg.style.color='var(--muted)'; msg.textContent='🤖 KI liest das Profil … (ein paar Sekunden)';
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+    if(!session) throw new Error('Nicht eingeloggt');
+    const resp=await fetch(PROFIL_EDGE_URL,{ method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token,'apikey':'sb_publishable_Cn0V4tpBeLxiwl3MyTvzdg_tCcFfkl7'},
+      body:JSON.stringify({text}) });
+    const result=await resp.json();
+    if(!result.ok) throw new Error(result.error||'Unbekannter Fehler');
+    const f=result.fields||{};
+    const d={ ...f, id:null,
+      xing_profil:document.getElementById('pfXing').value.trim()||f.xing_profil||'',
+      linkedin_profil:document.getElementById('pfLinkedin').value.trim()||f.linkedin_profil||'' };
+    document.getElementById('profilDlg').close();
+    zeigeFormular(d);
+    const sm=document.getElementById('saveMsg');
+    if(sm){ sm.style.color='var(--accent2)'; sm.textContent='✨ Von KI vorbefüllt – bitte prüfen und dann „✓ Speichern".'; }
+  }catch(e){ msg.style.color='var(--hot)'; msg.textContent='Fehler: '+e.message; }
 }
 
 init();
