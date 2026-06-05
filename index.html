@@ -832,8 +832,10 @@ const SPALTEN_DEF=[
 ];
 // Spalten, die NICHT in der PLZ-Umkreis-Funktion enthalten sind (Nachladen nötig)
 const SPALTEN_VOLL=['nachname','vorname','arbeitgeber','email','telefon','mobil'];
-let sichtbareSpalten = (()=>{ try{ const s=JSON.parse(localStorage.getItem('kand_spalten')); if(Array.isArray(s)&&s.length) return s; }catch(e){} return ['voller_name','berufsbezeichnung','stadt','telefon','status']; })();
-function spaltenListe(){ return SPALTEN_DEF.filter(c=>sichtbareSpalten.includes(c.key)); }
+const SPALTEN_MAP=Object.fromEntries(SPALTEN_DEF.map(c=>[c.key,c]));
+let sichtbareSpalten = (()=>{ try{ const s=JSON.parse(localStorage.getItem('kand_spalten')); if(Array.isArray(s)&&s.length) return s.filter(k=>SPALTEN_MAP[k]); }catch(e){} return ['voller_name','berufsbezeichnung','stadt','telefon']; })();
+function spaltenSpeichern(){ localStorage.setItem('kand_spalten', JSON.stringify(sichtbareSpalten)); }
+function spaltenListe(){ return sichtbareSpalten.map(k=>SPALTEN_MAP[k]).filter(Boolean); }
 function spaltenAnzahl(){ return spaltenListe().length+1; }
 function brauchtVolleDaten(){ return sichtbareSpalten.some(k=>SPALTEN_VOLL.includes(k)); }
 function spaltenHeaderRender(plz){
@@ -847,15 +849,32 @@ function toggleSpaltenPanel(){
 }
 function renderSpaltenPanel(){
   const p=document.getElementById('spaltenPanel');
-  p.innerHTML=`<div style="font-size:13px;font-weight:600;margin-bottom:10px">🗂 Spalten anzeigen</div>`+
-    SPALTEN_DEF.map(c=>`<label style="display:inline-flex;align-items:center;gap:6px;margin:0 16px 8px 0;font-size:13px;cursor:pointer">
-      <input type="checkbox" ${sichtbareSpalten.includes(c.key)?'checked':''} onchange="toggleSpalte('${c.key}')" style="min-width:auto;width:14px;height:14px;padding:0;margin:0">${c.label}</label>`).join('');
+  const aktiv=sichtbareSpalten, inaktiv=SPALTEN_DEF.filter(c=>!sichtbareSpalten.includes(c.key));
+  let html=`<div style="font-size:13px;font-weight:600;margin-bottom:4px">🗂 Spalten & Reihenfolge</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Mit ↑ ↓ verschieben, mit ✕ ausblenden.</div>`;
+  aktiv.forEach((k,i)=>{ const c=SPALTEN_MAP[k]; if(!c) return; const up=i===0, dn=i===aktiv.length-1;
+    html+=`<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;margin-bottom:4px;background:var(--panel2);border:1px solid var(--line);border-radius:3px;max-width:360px">
+      <span style="flex:1;font-size:13px">${c.label}</span>
+      <button class="tab" style="padding:2px 9px${up?';opacity:.3':''}" ${up?'disabled':''} onclick="moveSpalte('${k}',-1)">↑</button>
+      <button class="tab" style="padding:2px 9px${dn?';opacity:.3':''}" ${dn?'disabled':''} onclick="moveSpalte('${k}',1)">↓</button>
+      <button class="tab" style="padding:2px 9px" onclick="toggleSpalte('${k}')" title="Ausblenden">✕</button>
+    </div>`; });
+  if(inaktiv.length){
+    html+=`<div style="font-size:12px;color:var(--muted);margin:10px 0 6px">Hinzufügen:</div>`+
+      inaktiv.map(c=>`<span class="tag" style="cursor:pointer;margin:2px 5px 2px 0;display:inline-block" onclick="toggleSpalte('${c.key}')">+ ${c.label}</span>`).join('');
+  }
+  p.innerHTML=html;
 }
 function toggleSpalte(key){
   if(sichtbareSpalten.includes(key)){ if(sichtbareSpalten.length<=1) return; sichtbareSpalten=sichtbareSpalten.filter(k=>k!==key); }
-  else { const ord=SPALTEN_DEF.map(c=>c.key); sichtbareSpalten=ord.filter(k=>sichtbareSpalten.includes(k)||k===key); }
-  localStorage.setItem('kand_spalten', JSON.stringify(sichtbareSpalten));
-  renderSpaltenPanel(); ladeKandidaten();
+  else { sichtbareSpalten=[...sichtbareSpalten,key]; } // hinten anhängen, Reihenfolge bleibt
+  spaltenSpeichern(); renderSpaltenPanel(); ladeKandidaten();
+}
+function moveSpalte(key,dir){
+  const i=sichtbareSpalten.indexOf(key), j=i+dir;
+  if(i<0||j<0||j>=sichtbareSpalten.length) return;
+  const a=[...sichtbareSpalten]; [a[i],a[j]]=[a[j],a[i]]; sichtbareSpalten=a;
+  spaltenSpeichern(); renderSpaltenPanel(); ladeKandidaten();
 }
 function zeileKandidat(r,mitKm){
   const tr=document.createElement('tr'); tr.className='row-click';
