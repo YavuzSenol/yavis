@@ -186,8 +186,8 @@
 <div class="layout">
 <nav class="sidebar">
   <button class="tab active" data-view="kandidaten">Kandidaten</button>
-  <button class="tab" data-view="kunden">Kunden</button>
-  <button class="tab" data-view="kontakte">Kontakte</button>
+  <button class="tab" data-view="kunden">Firmen</button>
+  <button class="tab" data-view="kontakte">Ansprechpartner</button>
   <button class="tab" data-view="wiedervorlagen">📋 Wiedervorlagen</button>
   <button class="tab" data-view="projekte">📁 Projekte</button>
   <button class="tab" data-view="newsletter">✉️ Newsletter</button>
@@ -247,26 +247,32 @@
     <div class="bar">
       <div class="field"><label>Suche (Name, Branche, Ort)</label>
         <input id="cSuche" placeholder="z.B. Ingenieurbüro" style="min-width:260px"></div>
+      <div class="field"><label>Typ</label>
+        <select id="cTyp" onchange="ladeKunden()">
+          <option value="">alle</option>
+          <option>Auftraggeber</option><option>Auftraggeber-Potenzial</option>
+          <option>Lieferant</option><option>Sonstige</option>
+        </select></div>
       <button class="go" onclick="ladeKunden()">Suchen</button>
-      <button class="neuBtn" onclick="neuerKunde()">+ Neuer Kunde</button>
+      <button class="neuBtn" onclick="neuerKunde()">+ Neue Firma</button>
     </div>
     <div class="count" id="cCount"></div>
     <table><thead><tr>
-      <th>Firma</th><th>Branche</th><th>PLZ / Ort</th><th>Telefon</th>
+      <th>Firma</th><th>Typ</th><th>Branche</th><th>PLZ / Ort</th><th>Telefon</th>
     </tr></thead><tbody id="cBody"></tbody></table>
   </div>
 
   <!-- Kontakte -->
   <div id="view-kontakte" style="display:none">
     <div class="bar">
-      <div class="field"><label>Suche (Name, Firma, Beruf)</label>
-        <input id="ktSuche" placeholder="z.B. Geschäftsführer" style="min-width:260px"></div>
+      <div class="field"><label>Suche (Name, Beruf)</label>
+        <input id="ktSuche" placeholder="z.B. Michael Müller" style="min-width:260px"></div>
       <button class="go" onclick="ladeKontakte()">Suchen</button>
-      <button class="neuBtn" onclick="neuerKontakt()">+ Neuer Kontakt</button>
+      <button class="neuBtn" onclick="neuerKontakt()">+ Neuer Ansprechpartner</button>
     </div>
     <div class="count" id="ktCount"></div>
     <table><thead><tr>
-      <th>Name</th><th>Funktion</th><th>E-Mail</th><th>Telefon</th>
+      <th>Name</th><th>Firma</th><th>Funktion</th><th>E-Mail</th><th>Telefon</th>
     </tr></thead><tbody id="ktBody"></tbody></table>
   </div>
 
@@ -1173,6 +1179,7 @@ async function loescheDokument(id, pfad){
 // ---- Bearbeiten / Neu anlegen ----
 const EDIT_STATUS=['New','In Review','Available','Engaged','Offered','Hired','Rejected'];
 const ANREDE_OPTS=['Keine','Herr','Herr Dr.','Frau','Frau Dr.'];
+const FIRMEN_TYPEN=['Auftraggeber','Auftraggeber-Potenzial','Lieferant','Sonstige'];
 
 function ef(label,id,val,type='text'){
   return `<div class="edit-field"><label>${label}</label><input id="ef_${id}" type="${type}" value="${val?String(val).replace(/"/g,'&quot;'):''}"></div>`;
@@ -1370,7 +1377,7 @@ async function detailKunde(id){
       <h2>${esc(d.name)||'Kunde'}</h2>
       <button class="editbtn" onclick="bearbeiteKunde('${d.id}')">✎ Bearbeiten</button>
     </div>
-    <div class="detail-sub">${esc(d.branche)||''}</div>
+    <div class="detail-sub"><span class="pill">${esc(d.typ)||'Auftraggeber'}</span>${d.branche?' · '+esc(d.branche):''}</div>
     <div class="card"><h3>Kontakt & Adresse</h3><div class="grid2">
       <div>
         ${zeile('Telefon', tel(d.telefon))}
@@ -1416,10 +1423,11 @@ function zeigeKundeFormular(d){
   page.innerHTML=`
     <div class="detail-head">
       <button class="back" onclick="${neu?'zurueckZurListe()':`detailKunde('${d.id}')`}">← Abbrechen</button>
-      <h2>${neu?'Neuer Kunde':'Bearbeiten: '+(esc(d.name)||'')}</h2>
+      <h2>${neu?'Neue Firma':'Bearbeiten: '+(esc(d.name)||'')}</h2>
     </div>
     <div class="card"><h3>Firmendaten</h3><div class="edit-grid">
       ${ef('Firmenname','name',d.name)}
+      ${esel('Typ','typ',d.typ||'Auftraggeber',FIRMEN_TYPEN)}
       ${ef('Branche','branche',d.branche)}
       ${ef('Telefon','telefon',d.telefon)}
       ${ef('Fax','fax',d.fax)}
@@ -1448,7 +1456,7 @@ function zeigeKundeFormular(d){
 async function speichereKunde(id){
   const msg=document.getElementById('saveMsg'); msg.textContent='Speichere…'; msg.style.color='var(--muted)';
   const obj={
-    name:gv('name'), branche:gv('branche'), telefon:gv('telefon'), fax:gv('fax'),
+    name:gv('name'), typ:gv('typ')||'Auftraggeber', branche:gv('branche'), telefon:gv('telefon'), fax:gv('fax'),
     email:gv('email'), webseite:gv('webseite'), kundennummer:gv('kundennummer'),
     account_manager:gv('account_manager'), strasse:gv('strasse'), plz:gv('plz'),
     stadt:gv('stadt'), bundesland:gv('bundesland'), land:gv('land'), info:gv('info'),
@@ -1525,7 +1533,7 @@ function zeigeKontaktFormular(d){
   page.innerHTML=`
     <div class="detail-head">
       <button class="back" onclick="${neu?'zurueckZurListe()':`detailKontakt('${d.id}')`}">← Abbrechen</button>
-      <h2>${neu?'Neuer Kontakt':'Bearbeiten: '+(esc(d.voller_name)||'')}</h2>
+      <h2>${neu?'Neuer Ansprechpartner':'Bearbeiten: '+(esc(d.voller_name)||'')}</h2>
     </div>
     <div class="card"><h3>Persönliche Daten</h3><div class="edit-grid">
       ${ef('Vorname','vorname',d.vorname)}
@@ -1583,20 +1591,22 @@ async function speichereKontakt(id){
 
 async function ladeKunden(){
   const q=document.getElementById('cSuche').value.trim();
+  const typ=document.getElementById('cTyp').value;
   const body=document.getElementById('cBody'); body.innerHTML='';
   let query=sb.from('kunden').select('*').limit(200).order('name');
   if(q) query=query.or(`name.ilike.%${q}%,branche.ilike.%${q}%,stadt.ilike.%${q}%`);
+  if(typ) query=query.eq('typ',typ);
   const {data,error}=await query;
   if(error){document.getElementById('cCount').textContent='Fehler: '+error.message;return;}
-  document.getElementById('cCount').textContent=data.length+' Kunden';
+  document.getElementById('cCount').textContent=data.length+' Firmen'+(typ?' · '+typ:'');
   data.forEach(r=>{
     const tr=document.createElement('tr');tr.className='row-click';
-    tr.innerHTML=`<td>${esc(r.name)||'–'}</td><td>${esc(r.branche)||'–'}</td>
+    tr.innerHTML=`<td>${esc(r.name)||'–'}</td><td><span class="pill">${esc(r.typ)||'Auftraggeber'}</span></td><td>${esc(r.branche)||'–'}</td>
       <td>${esc(r.plz)||''} ${esc(r.stadt)||''}</td><td>${esc(r.telefon)||'–'}</td>`;
     tr.onclick=()=>detailKunde(r.id);
     body.appendChild(tr);
   });
-  if(!data.length) body.innerHTML='<tr><td colspan="4" class="empty">Keine Treffer.</td></tr>';
+  if(!data.length) body.innerHTML='<tr><td colspan="5" class="empty">Keine Treffer.</td></tr>';
 }
 
 async function ladeKontakte(){
@@ -1606,15 +1616,23 @@ async function ladeKontakte(){
   if(q) query=query.or(`voller_name.ilike.%${q}%,berufsbezeichnung.ilike.%${q}%`);
   const {data,error}=await query;
   if(error){document.getElementById('ktCount').textContent='Fehler: '+error.message;return;}
-  document.getElementById('ktCount').textContent=data.length+' Kontakte';
+  // Firmennamen in einem Rutsch auflösen
+  const firmaIds=[...new Set((data||[]).map(r=>r.kunde_id).filter(Boolean))];
+  const firmaMap={};
+  if(firmaIds.length){ const {data:fd}=await sb.from('kunden').select('id,name').in('id',firmaIds);
+    (fd||[]).forEach(f=>firmaMap[f.id]=f.name); }
+  document.getElementById('ktCount').textContent=data.length+' Ansprechpartner';
   data.forEach(r=>{
     const tr=document.createElement('tr');tr.className='row-click';
-    tr.innerHTML=`<td>${esc(r.voller_name)||'–'}</td><td>${esc(r.berufsbezeichnung)||'–'}</td>
-      <td>${esc(r.email)||'–'}</td><td>${esc(r.telefon_beruflich)||esc(r.mobil)||'–'}</td>`;
+    const firma=r.kunde_id?firmaMap[r.kunde_id]:'';
+    tr.innerHTML=`<td>${esc(r.voller_name)||'–'}</td><td>${firma?esc(firma):'<span style="color:var(--muted)">ohne Firma</span>'}</td>
+      <td>${esc(r.berufsbezeichnung)||'–'}</td>
+      <td>${r.email?`<a class="calllink" href="mailto:${esc(r.email)}" onclick="event.stopPropagation()">${esc(r.email)}</a>`:'–'}</td>
+      <td>${esc(r.telefon_beruflich)||esc(r.mobil)||'–'}</td>`;
     tr.onclick=()=>detailKontakt(r.id);
     body.appendChild(tr);
   });
-  if(!data.length) body.innerHTML='<tr><td colspan="4" class="empty">Keine Treffer.</td></tr>';
+  if(!data.length) body.innerHTML='<tr><td colspan="5" class="empty">Keine Treffer.</td></tr>';
 }
 
 function zeigeDetail(title,obj){
