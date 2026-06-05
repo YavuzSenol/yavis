@@ -11,6 +11,9 @@ Gib NUR valides JSON zurueck, keine Erklaerung, keine Markdown-Zeichen. Wenn ein
 
 Felder:
 - vorname, nachname, email, telefon, mobil
+- begruessung: Anrede, GENAU einer dieser Werte: "Herr", "Frau", "Herr Dr.", "Frau Dr.".
+  Leite das Geschlecht aus dem Vornamen ab. "Dr." NUR ergaenzen, wenn ein echter Doktortitel (Dr.) vorkommt.
+  Bei geschlechtsneutralem/unklarem Vornamen leer lassen ("").
 - strasse, plz, stadt
 - geburtstag (Format TT.MM.JJJJ)
 - position_original: die AKTUELLE/juengste Berufsbezeichnung WOERTLICH wie im Text (z.B. "Projektleitender Ingenieur")
@@ -39,6 +42,8 @@ Felder:
 - faehigkeiten (Skills, kommagetrennt)
 - erfahrung_jahre (grobe Schaetzung als Zahl)
 - profil_zusammenfassung (3-4 Saetze, Deutsch)
+- xing_profil: vollstaendige XING-Profil-URL, falls im Text vorhanden (enthaelt "xing.com"), sonst "".
+- linkedin_profil: vollstaendige LinkedIn-Profil-URL, falls im Text vorhanden (enthaelt "linkedin.com"), sonst "".
 
 Profil-/Lebenslauf-Text:
 `;
