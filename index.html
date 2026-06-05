@@ -210,8 +210,6 @@
     <div class="bar">
       <div class="field"><label>Suche (Name, Beruf, Skills, Ort)</label>
         <input id="kSuche" placeholder="z.B. TGA Projektleiter" style="min-width:260px"></div>
-      <div class="field"><label>Status</label>
-        <select id="kStatus"><option value="">alle</option></select></div>
       <div class="field"><label>Position</label>
         <select id="kPosition" onchange="ladeKandidaten()"><option value="">alle Positionen</option>
           <option>Geschäftsführung</option><option>COO</option><option>Niederlassungsleitung</option>
@@ -411,7 +409,6 @@ async function pruefeLogin(){
 function zeigeApp(){
   document.getElementById('login').style.display='none';
   document.getElementById('logoutBtn').style.display='inline-block';
-  ladeStatusFilter();
   const p=new URLSearchParams(location.search);
   const anruf=p.get('anruf')||p.get('caller')||p.get('nummer')||p.get('number');
   if(anruf){ pruefeAnruf(anruf); } else { ladeKandidaten(); }
@@ -552,7 +549,6 @@ function zurStartseite(){
   if(!sb) return;
   // Alle Filter zurücksetzen
   document.getElementById('kSuche').value='';
-  document.getElementById('kStatus').value='';
   document.getElementById('kPosition').value='';
   const pu=document.getElementById('kPosUnter'); if(pu) pu.checked=false;
   document.getElementById('kPlz').value='';
@@ -571,7 +567,6 @@ function zurStartseite(){
 
 async function ladeKandidaten(){
   const q=document.getElementById('kSuche').value.trim();
-  const status=document.getElementById('kStatus').value;
   const position=document.getElementById('kPosition').value;
   const posUnter=document.getElementById('kPosUnter').checked;
   const posListe=position?(posUnter?positionenUndDarunter(position):[position]):null;
@@ -588,7 +583,6 @@ async function ladeKandidaten(){
     let rows=data||[];
     if(q){const ql=q.toLowerCase();
       rows=rows.filter(r=>[r.voller_name,r.berufsbezeichnung,r.stadt].join(' ').toLowerCase().includes(ql));}
-    if(status) rows=rows.filter(r=>r.status===status);
     if(posListe) rows=rows.filter(r=>posListe.includes(r.berufsbezeichnung));
     // Die Umkreis-Funktion liefert nur Basisfelder → volle Datensätze nachladen,
     // wenn Tag-Filter aktiv ist ODER Spalten angezeigt werden, die sie nicht enthält.
@@ -608,7 +602,6 @@ async function ladeKandidaten(){
 
   // Normale Suche
   let query=sb.from('kandidaten').select('*').limit(200);
-  if(status) query=query.eq('status',status);
   if(posListe) query=query.in('berufsbezeichnung',posListe);
   if(q) query=query.or(`voller_name.ilike.%${q}%,berufsbezeichnung.ilike.%${q}%,faehigkeiten.ilike.%${q}%,stadt.ilike.%${q}%`);
   const tmod=tagModusWert();
