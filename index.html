@@ -388,22 +388,44 @@ function nrPasst(a,b){
 async function pruefeAnruf(nummer){
   const count=document.getElementById('kCount');
   document.getElementById('kSuche').value=nummer;
-  count.textContent='📞 Eingehender Anruf '+nummer+' – suche Kandidat …';
-  const {data,error}=await sb.from('kandidaten')
-    .select('id,voller_name,berufsbezeichnung,stadt,status,telefon,mobil,telefon_privat,mobil_privat')
-    .limit(2000);
-  if(error){ count.textContent='Fehler bei Anrufersuche: '+error.message; return; }
-  const treffer=(data||[]).filter(r=>
-    [r.telefon,r.mobil,r.telefon_privat,r.mobil_privat].some(f=>nrPasst(f,nummer)));
-  if(treffer.length===1){ count.textContent='📞 Anrufer erkannt: '+nummer; detailKandidat(treffer[0].id); return; }
+  count.textContent='📞 Eingehender Anruf '+nummer+' – suche in Kandidaten, Kunden & Kontakten …';
+  const [ka,ku,ko]=await Promise.all([
+    sb.from('kandidaten').select('id,voller_name,berufsbezeichnung,stadt,status,telefon,mobil,telefon_privat,mobil_privat').limit(2000),
+    sb.from('kunden').select('id,name,branche,stadt,telefon').limit(2000),
+    sb.from('kontakte').select('id,voller_name,berufsbezeichnung,stadt,telefon_beruflich,mobil,mobil_privat').limit(2000),
+  ]);
+  const fehler=ka.error||ku.error||ko.error;
+  if(fehler){ count.textContent='Fehler bei Anrufersuche: '+fehler.message; return; }
+  const treffer=[];
+  (ka.data||[]).forEach(r=>{ if([r.telefon,r.mobil,r.telefon_privat,r.mobil_privat].some(f=>nrPasst(f,nummer)))
+    treffer.push({typ:'Kandidat',ic:'👤',name:r.voller_name,sub:r.berufsbezeichnung,ort:r.stadt,status:r.status,
+      nr:r.mobil||r.telefon||r.mobil_privat||r.telefon_privat,open:()=>detailKandidat(r.id)}); });
+  (ku.data||[]).forEach(r=>{ if(nrPasst(r.telefon,nummer))
+    treffer.push({typ:'Kunde',ic:'🏢',name:r.name,sub:r.branche,ort:r.stadt,status:'Kunde',
+      nr:r.telefon,open:()=>detailKunde(r.id)}); });
+  (ko.data||[]).forEach(r=>{ if([r.telefon_beruflich,r.mobil,r.mobil_privat].some(f=>nrPasst(f,nummer)))
+    treffer.push({typ:'Kontakt',ic:'📇',name:r.voller_name,sub:r.berufsbezeichnung,ort:r.stadt,status:'Kontakt',
+      nr:r.telefon_beruflich||r.mobil||r.mobil_privat,open:()=>detailKontakt(r.id)}); });
+
+  if(treffer.length===1){ count.textContent='📞 Anrufer erkannt ('+treffer[0].typ+'): '+nummer; treffer[0].open(); return; }
   const body=document.getElementById('kBody'); body.innerHTML='';
   if(treffer.length===0){
-    count.innerHTML='📞 Eingehender Anruf <b>'+esc(nummer)+'</b> – kein Kandidat gefunden.';
-    body.innerHTML='<tr><td colspan="5" class="empty">Keine Übereinstimmung. Über „+ Neuer Kandidat" anlegen.</td></tr>';
+    count.innerHTML='📞 Eingehender Anruf <b>'+esc(nummer)+'</b> – kein Eintrag gefunden.';
+    body.innerHTML='<tr><td colspan="5" class="empty">Keine Übereinstimmung in Kandidaten, Kunden oder Kontakten.</td></tr>';
     return;
   }
-  count.innerHTML='📞 Eingehender Anruf <b>'+esc(nummer)+'</b> – '+treffer.length+' mögliche Kandidaten:';
-  treffer.forEach(r=>body.appendChild(zeileKandidat(r,false)));
+  count.innerHTML='📞 Eingehender Anruf <b>'+esc(nummer)+'</b> – '+treffer.length+' Treffer:';
+  treffer.forEach(t=>{
+    const tr=document.createElement('tr'); tr.className='row-click';
+    const nrClean=t.nr?String(t.nr).replace(/[^\d+]/g,''):'';
+    tr.innerHTML=`<td>${t.ic} ${esc(t.name)||'–'} <span class="pill">${t.typ}</span></td>
+      <td>${esc(t.sub)||'–'}</td>
+      <td>${esc(t.ort)||''}</td>
+      <td>${t.nr?`<a class="calllink" href="tel:${nrClean}">${esc(t.nr)}</a>`:'–'}</td>
+      <td><span class="pill">${esc(t.status)||'–'}</span></td>`;
+    tr.onclick=t.open;
+    body.appendChild(tr);
+  });
 }
 
 function zeileKandidat(r,mitKm){
