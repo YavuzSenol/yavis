@@ -45,7 +45,19 @@ There is no build, lint, or test suite — this is a static-file project.
 
 ## Deploy / workflow
 
-Deploy is **manual via the GitHub web UI** (the user has no push token, HTTPS-only, no SSH). Repo: `github.com/YavuzSenol/yavis`, live at `yavuzsenol.github.io/yavis`. To ship a change: edit `index.html` on GitHub → "Commit changes" → after 1–2 min reload the live app with Ctrl+F5. Do not assume `git push` works locally.
+Repo: `github.com/YavuzSenol/yavis`, live at `yavuzsenol.github.io/yavis`. Local repo is `C:\Claude`, branch `main` tracks `origin/main`.
+
+**Direct push now works** (set up 05.06.2026 via Git Credential Manager device-flow login; HTTPS, credentials cached in Windows — no popup on subsequent pushes, no SSH). To ship a change to `index.html`:
+
+```powershell
+git add index.html
+git commit -m "kurze Beschreibung"
+git push
+```
+
+After 1–2 min reload the live app with Ctrl+F5. The old manual GitHub-web-upload route still works as a fallback but is no longer necessary.
+
+If a push ever hangs on auth, the device-code flow is the reliable path: kill the stuck `git.exe`, re-run `git push`, and in the Git Credential Manager dialog choose **"Sign in with a code"** (the browser-redirect option failed on this machine) → enter the code at github.com/login/device → Authorize.
 
 ## Secrets — important
 
