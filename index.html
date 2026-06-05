@@ -231,13 +231,13 @@
     <div style="margin:-4px 0 12px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="kPosUnter" onchange="ladeKandidaten()" style="min-width:auto;width:14px;height:14px;padding:0;margin:0">Position ＋ niedrigere einbeziehen</label>
       <button class="tab" onclick="toggleTagPanel()">🏷️ Nach Tags filtern <span id="tagFilterCount"></span></button>
+      <button class="tab" onclick="toggleSpaltenPanel()">🗂 Spalten</button>
       <span id="tagAktiv"></span>
     </div>
     <div id="tagPanel" style="display:none;border:1px solid var(--line);background:var(--panel);border-radius:4px;padding:14px;margin-bottom:14px"></div>
+    <div id="spaltenPanel" style="display:none;border:1px solid var(--line);background:var(--panel);border-radius:4px;padding:14px;margin-bottom:14px"></div>
     <div class="count" id="kCount"></div>
-    <table><thead><tr>
-      <th>Name</th><th>Berufsbezeichnung</th><th>Ort</th><th>Telefon</th><th>Status</th><th class="kmcol" style="display:none">Entfernung</th>
-    </tr></thead><tbody id="kBody"></tbody></table>
+    <table><thead><tr id="kHead"></tr></thead><tbody id="kBody"></tbody></table>
   </div>
 
   <!-- Kunden -->
@@ -559,7 +559,7 @@ async function ladeKandidaten(){
   const plz=document.getElementById('kPlz').value.trim();
   const radius=document.getElementById('kRadius').value;
   const body=document.getElementById('kBody'); body.innerHTML='';
-  document.querySelector('.kmcol').style.display = plz?'table-cell':'none';
+  spaltenHeaderRender(plz);
 
   // Umkreissuche via RPC-Funktion
   if(plz){
@@ -570,17 +570,19 @@ async function ladeKandidaten(){
       rows=rows.filter(r=>[r.voller_name,r.berufsbezeichnung,r.stadt].join(' ').toLowerCase().includes(ql));}
     if(status) rows=rows.filter(r=>r.status===status);
     if(posListe) rows=rows.filter(r=>posListe.includes(r.berufsbezeichnung));
-    if(tagFilterAktiv()){
-      // Die Umkreis-Funktion liefert keine Tags → für die Treffer nachladen
-      const ids=rows.map(r=>r.id); const tagMap={};
+    // Die Umkreis-Funktion liefert nur Basisfelder → volle Datensätze nachladen,
+    // wenn Tag-Filter aktiv ist ODER Spalten angezeigt werden, die sie nicht enthält.
+    if(rows.length && (tagFilterAktiv() || brauchtVolleDaten())){
+      const ids=rows.map(r=>r.id); const map={};
       for(let i=0;i<ids.length;i+=300){ const teil=ids.slice(i,i+300);
-        const {data:td}=await sb.from('kandidaten').select('id,tags').in('id',teil);
-        (td||[]).forEach(r=>tagMap[r.id]=r.tags); }
-      rows=rows.filter(r=>tagsMatchFilter(tagMap[r.id]));
+        const {data:td}=await sb.from('kandidaten').select('*').in('id',teil);
+        (td||[]).forEach(x=>map[x.id]=x); }
+      rows=rows.map(r=>({...(map[r.id]||{}), ...r})); // volle Daten + entfernung_km aus RPC
     }
+    if(tagFilterAktiv()) rows=rows.filter(r=>tagsMatchFilter(r.tags));
     document.getElementById('kCount').textContent=rows.length+' Kandidaten im Umkreis von '+radius+' km um '+plz+posLabel+tagFilterLabel();
     rows.forEach(r=>body.appendChild(zeileKandidat(r,true)));
-    if(!rows.length) body.innerHTML='<tr><td colspan="5" class="empty">Keine Treffer.</td></tr>';
+    if(!rows.length) body.innerHTML='<tr><td colspan="'+spaltenAnzahl()+'" class="empty">Keine Treffer.</td></tr>';
     return;
   }
 
@@ -602,7 +604,7 @@ async function ladeKandidaten(){
   if(error){document.getElementById('kCount').textContent='Fehler: '+error.message;return;}
   document.getElementById('kCount').textContent=(data.length)+' Kandidaten'+(data.length>=200?' (erste 200)':'')+posLabel+tagFilterLabel();
   data.forEach(r=>body.appendChild(zeileKandidat(r,false)));
-  if(!data.length) body.innerHTML='<tr><td colspan="5" class="empty">Keine Treffer.</td></tr>';
+  if(!data.length) body.innerHTML='<tr><td colspan="'+spaltenAnzahl()+'" class="empty">Keine Treffer.</td></tr>';
 }
 
 // ===== Starface: Anrufererkennung =====
@@ -644,6 +646,7 @@ async function pruefeAnruf(nummer){
   if(treffer.length===1){ const t=treffer[0]; count.textContent='📞 Anrufer erkannt ('+t.typ+'): '+nummer; t.open();
     anrufNotizPopup(t.typ,t.id,t.name,nummer); return; }
   const body=document.getElementById('kBody'); body.innerHTML='';
+  const kh=document.getElementById('kHead'); if(kh) kh.innerHTML='<th>Name</th><th>Berufsbezeichnung</th><th>Ort</th><th>Telefon</th><th>Status</th>';
   if(treffer.length===0){
     count.innerHTML='📞 Eingehender Anruf <b>'+esc(nummer)+'</b> – kein Eintrag gefunden.';
     body.innerHTML='<tr><td colspan="5" class="empty">Keine Übereinstimmung in Kandidaten, Kunden oder Kontakten.</td></tr>';
@@ -811,17 +814,54 @@ async function ladeWiedervorlagen(){
   });
 }
 
+// ===== Kandidatenliste: konfigurierbare Spalten =====
+function telLink(nr){ if(!nr) return '–'; const c=String(nr).replace(/[^\d+]/g,'');
+  return `<a class="calllink" href="tel:${c}" onclick="event.stopPropagation()">${esc(nr)}</a>`; }
+const SPALTEN_DEF=[
+  {key:'voller_name', label:'Name', render:r=>`${r.ist_hot?'<span class="pill hot">HOT</span> ':''}${esc(r.voller_name)||'–'}`},
+  {key:'nachname', label:'Nachname', render:r=>esc(r.nachname)||'–'},
+  {key:'vorname', label:'Vorname', render:r=>esc(r.vorname)||'–'},
+  {key:'berufsbezeichnung', label:'Berufsbezeichnung', render:r=>esc(r.berufsbezeichnung)||'–'},
+  {key:'arbeitgeber', label:'Arbeitgeber', render:r=>esc(r.arbeitgeber)||'–'},
+  {key:'stadt', label:'Stadt', render:r=>esc(r.stadt)||''},
+  {key:'plz', label:'PLZ', render:r=>esc(r.plz)||''},
+  {key:'email', label:'E-Mail', render:r=>r.email?`<a class="calllink" href="mailto:${esc(r.email)}" onclick="event.stopPropagation()">${esc(r.email)}</a>`:'–'},
+  {key:'telefon', label:'Telefon', render:r=>telLink(r.telefon||r.telefon_privat)},
+  {key:'mobil', label:'Mobil', render:r=>telLink(r.mobil||r.mobil_privat)},
+  {key:'status', label:'Status', render:r=>`<span class="pill">${esc(r.status)||'–'}</span>`},
+];
+// Spalten, die NICHT in der PLZ-Umkreis-Funktion enthalten sind (Nachladen nötig)
+const SPALTEN_VOLL=['nachname','vorname','arbeitgeber','email','telefon','mobil'];
+let sichtbareSpalten = (()=>{ try{ const s=JSON.parse(localStorage.getItem('kand_spalten')); if(Array.isArray(s)&&s.length) return s; }catch(e){} return ['voller_name','berufsbezeichnung','stadt','telefon','status']; })();
+function spaltenListe(){ return SPALTEN_DEF.filter(c=>sichtbareSpalten.includes(c.key)); }
+function spaltenAnzahl(){ return spaltenListe().length+1; }
+function brauchtVolleDaten(){ return sichtbareSpalten.some(k=>SPALTEN_VOLL.includes(k)); }
+function spaltenHeaderRender(plz){
+  const head=document.getElementById('kHead'); if(!head) return;
+  head.innerHTML = spaltenListe().map(c=>`<th>${c.label}</th>`).join('')
+    + `<th class="kmcol" style="display:${plz?'table-cell':'none'}">Entfernung</th>`;
+}
+function toggleSpaltenPanel(){
+  const p=document.getElementById('spaltenPanel');
+  if(p.style.display==='none'){ renderSpaltenPanel(); p.style.display='block'; } else p.style.display='none';
+}
+function renderSpaltenPanel(){
+  const p=document.getElementById('spaltenPanel');
+  p.innerHTML=`<div style="font-size:13px;font-weight:600;margin-bottom:10px">🗂 Spalten anzeigen</div>`+
+    SPALTEN_DEF.map(c=>`<label style="display:inline-flex;align-items:center;gap:6px;margin:0 16px 8px 0;font-size:13px;cursor:pointer">
+      <input type="checkbox" ${sichtbareSpalten.includes(c.key)?'checked':''} onchange="toggleSpalte('${c.key}')" style="min-width:auto;width:14px;height:14px;padding:0;margin:0">${c.label}</label>`).join('');
+}
+function toggleSpalte(key){
+  if(sichtbareSpalten.includes(key)){ if(sichtbareSpalten.length<=1) return; sichtbareSpalten=sichtbareSpalten.filter(k=>k!==key); }
+  else { const ord=SPALTEN_DEF.map(c=>c.key); sichtbareSpalten=ord.filter(k=>sichtbareSpalten.includes(k)||k===key); }
+  localStorage.setItem('kand_spalten', JSON.stringify(sichtbareSpalten));
+  renderSpaltenPanel(); ladeKandidaten();
+}
 function zeileKandidat(r,mitKm){
   const tr=document.createElement('tr'); tr.className='row-click';
-  const hot=r.ist_hot?'<span class="pill hot">HOT</span> ':'';
-  const nr=r.mobil||r.telefon||r.mobil_privat||r.telefon_privat||'';
-  const nrClean=nr?String(nr).replace(/[^\d+]/g,''):'';
-  tr.innerHTML=`<td>${hot}${esc(r.voller_name)||'–'}</td>
-    <td>${esc(r.berufsbezeichnung)||'–'}</td>
-    <td>${esc(r.stadt)||''}</td>
-    <td>${nr?`<a class="calllink" href="tel:${nrClean}">${esc(nr)}</a>`:'–'}</td>
-    <td><span class="pill">${esc(r.status)||'–'}</span></td>
-    ${mitKm?`<td class="km">${r.entfernung_km} km</td>`:'<td class="kmcol" style="display:none"></td>'}`;
+  let tds = spaltenListe().map(c=>`<td>${c.render(r)}</td>`).join('');
+  tds += mitKm?`<td class="km">${r.entfernung_km} km</td>`:'<td class="kmcol" style="display:none"></td>';
+  tr.innerHTML=tds;
   tr.onclick=()=>detailKandidat(r.id);
   return tr;
 }
