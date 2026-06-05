@@ -35,9 +35,9 @@
   button.go:hover{filter:brightness(1.1)}
   .count{font-size:12px;color:var(--muted);margin:6px 2px 14px}
   table{width:100%;border-collapse:collapse;font-size:13px}
-  th{text-align:left;padding:9px 12px;border-bottom:2px solid var(--line);
+  th{text-align:left;padding:6px 10px;border-bottom:2px solid var(--line);
     font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
-  td{padding:9px 12px;border-bottom:1px solid var(--line)}
+  td{padding:6px 10px;border-bottom:1px solid var(--line);font-size:13px}
   tr:hover td{background:var(--panel)}
   .pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;
     background:var(--panel2);border:1px solid var(--line)}
@@ -62,26 +62,35 @@
   .detail-head .back{background:var(--panel2);border:1px solid var(--line);color:var(--ink);
     padding:8px 14px;cursor:pointer;font:inherit;font-size:12px;border-radius:2px}
   .detail-head h2{margin:0;font-size:22px;color:var(--accent)}
-  .detail-sub{color:var(--muted);font-size:13px;margin-bottom:22px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:20px;margin-bottom:18px}
-  .card h3{margin:0 0 16px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;
-    color:var(--accent2);border-bottom:1px solid var(--line);padding-bottom:10px}
+  .detail-sub{color:var(--muted);font-size:13px;margin-bottom:10px}
+  /* 4-Spalten Kompakt-Layout */
+  .dcols{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--line);
+    border-radius:6px;background:var(--panel);margin-bottom:10px;overflow:hidden}
+  .dcol{padding:12px 14px;border-right:1px solid var(--line);min-width:0;overflow:hidden}
+  .dcol:last-child{border-right:none}
+  .dcol-h{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent2);
+    font-weight:700;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--line);display:block}
+  @media(max-width:960px){.dcols{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:560px){.dcols{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px 16px;margin-bottom:10px}
+  .card h3{margin:0 0 10px;font-size:9px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent2);border-bottom:1px solid var(--line);padding-bottom:6px}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px 32px}
   @media(max-width:760px){.grid2{grid-template-columns:1fr}}
-  .kvr{display:grid;grid-template-columns:170px 1fr;gap:8px;font-size:13px;padding:4px 0;align-items:start}
-  .kvr .k{color:var(--muted)}
-  .kvr .v{color:var(--ink);word-break:break-word}
-  .timeline-item{border-left:2px solid var(--line);padding:0 0 16px 16px;position:relative}
+  .kvr{display:grid;grid-template-columns:auto 1fr;gap:2px 8px;font-size:12px;padding:2px 0;align-items:start;min-width:0}
+  .kvr .k{color:var(--muted);white-space:nowrap;font-size:11px}
+  .kvr .v{color:var(--ink);word-break:break-word;font-size:12px}
+  .timeline-item{border-left:2px solid var(--line);padding:0 0 10px 12px;position:relative}
   .timeline-item:before{content:'';position:absolute;left:-5px;top:4px;width:8px;height:8px;
     border-radius:50%;background:var(--accent)}
-  .timeline-item .t{font-weight:600;font-size:14px}
-  .timeline-item .m{color:var(--muted);font-size:12px;margin:2px 0}
+  .timeline-item .t{font-weight:600;font-size:13px}
+  .timeline-item .m{color:var(--muted);font-size:11px;margin:2px 0}
   .stufen{display:flex;gap:0;margin:6px 0 4px;flex-wrap:wrap}
   .stufe{flex:1;min-width:90px;text-align:center;padding:8px 4px;font-size:11px;border-bottom:3px solid var(--line);color:var(--muted)}
   .stufe.on{border-color:var(--accent);color:var(--accent);font-weight:600}
   .calllink{color:var(--accent2);text-decoration:none}
-  .note{background:var(--panel2);border-radius:4px;padding:10px 12px;margin-bottom:8px;font-size:13px}
-  .note .meta{color:var(--muted);font-size:11px;margin-top:6px}
+  .note{background:var(--panel2);border-radius:4px;padding:7px 10px;margin-bottom:5px;font-size:12px}
+  .note .meta{color:var(--muted);font-size:11px;margin-top:4px}
   .tag{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:10px;
     padding:2px 9px;font-size:11px;margin:2px 4px 2px 0}
   /* Bearbeiten */
@@ -155,7 +164,7 @@
     </div>
     <div class="count" id="kCount"></div>
     <table><thead><tr>
-      <th>Name</th><th>Berufsbezeichnung</th><th>PLZ / Ort</th><th>Status</th><th class="kmcol" style="display:none">Entfernung</th>
+      <th>Name</th><th>Berufsbezeichnung</th><th>Ort</th><th>Telefon</th><th>Status</th><th class="kmcol" style="display:none">Entfernung</th>
     </tr></thead><tbody id="kBody"></tbody></table>
   </div>
 
@@ -302,9 +311,12 @@ async function ladeKandidaten(){
 function zeileKandidat(r,mitKm){
   const tr=document.createElement('tr'); tr.className='row-click';
   const hot=r.ist_hot?'<span class="pill hot">HOT</span> ':'';
+  const nr=r.mobil||r.telefon||r.mobil_privat||r.telefon_privat||'';
+  const nrClean=nr?String(nr).replace(/[^\d+]/g,''):'';
   tr.innerHTML=`<td>${hot}${esc(r.voller_name)||'–'}</td>
     <td>${esc(r.berufsbezeichnung)||'–'}</td>
-    <td>${esc(r.plz)||''} ${esc(r.stadt)||''}</td>
+    <td>${esc(r.stadt)||''}</td>
+    <td>${nr?`<a class="calllink" href="tel:${nrClean}">${esc(nr)}</a>`:'–'}</td>
     <td><span class="pill">${esc(r.status)||'–'}</span></td>
     ${mitKm?`<td class="km">${r.entfernung_km} km</td>`:'<td class="kmcol" style="display:none"></td>'}`;
   tr.onclick=()=>detailKandidat(r.id);
@@ -338,7 +350,8 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok){
   ['kandidaten','kunden','kontakte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
 
-  const adresse=[d.strasse,[d.plz,d.stadt].filter(Boolean).join(' '),d.bundesland,d.land].filter(Boolean).join(', ');
+  const adrPriv=[d.strasse,[d.plz,d.stadt].filter(Boolean).join(' '),d.bundesland,d.land].filter(Boolean).join(', ');
+  const adrBerufl=[d.strasse_beruf,[d.plz_beruf,d.stadt_beruf].filter(Boolean).join(' '),d.bundesland_beruf,d.land_beruf].filter(Boolean).join(', ');
   const tags=(d.tags||'').split(',').map(t=>t.trim()).filter(Boolean).map(t=>`<span class="tag">${esc(t)}</span>`).join('');
 
   page.innerHTML=`
@@ -349,55 +362,60 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok){
     </div>
     <div class="detail-sub">${esc(d.berufsbezeichnung)||''}${d.arbeitgeber?' · '+esc(d.arbeitgeber):''}${d.status?' · <span class="pill">'+esc(d.status)+'</span>':''}</div>
 
-    <div class="card"><h3>Kontakt & Adresse</h3><div class="grid2">
-      <div>
+    <div class="dcols">
+      <div class="dcol">
+        <span class="dcol-h">Kontakt</span>
         ${zeile('Anrede', esc(d.begruessung))}
         ${zeile('E-Mail', d.email?`<a href="mailto:${esc(d.email)}">${esc(d.email)}</a>`:'')}
-        ${zeile('E-Mail beruflich', d.email_beruflich)}
-        ${zeile('Zweite E-Mail', d.email_zweit)}
+        ${zeile('E-Mail berufl.', d.email_beruflich?`<a href="mailto:${esc(d.email_beruflich)}">${esc(d.email_beruflich)}</a>`:'')}
+        ${zeile('2. E-Mail', d.email_zweit)}
         ${zeile('Telefon', tel(d.telefon))}
-        ${zeile('Telefon privat', tel(d.telefon_privat))}
-      </div>
-      <div>
+        ${zeile('Tel. privat', tel(d.telefon_privat))}
         ${zeile('Mobil', tel(d.mobil))}
         ${zeile('Mobil privat', tel(d.mobil_privat))}
-        ${zeile('Adresse privat', esc(adresse))}
-        ${zeile('Adresse beruflich', esc([d.strasse_beruf,[d.plz_beruf,d.stadt_beruf].filter(Boolean).join(' '),d.bundesland_beruf,d.land_beruf].filter(Boolean).join(', ')))}
+      </div>
+      <div class="dcol">
+        <span class="dcol-h">Adresse & Online</span>
+        ${zeile('Adresse priv.', esc(adrPriv))}
+        ${zeile('Adresse berufl.', esc(adrBerufl))}
+        ${zeile('Geburtstag', esc(d.geburtstag))}
         ${zeile('XING', link(d.xing_profil))}
         ${zeile('LinkedIn', link(d.linkedin_profil))}
       </div>
-    </div></div>
-
-    <div class="card"><h3>Berufliche Details</h3><div class="grid2">
-      <div>
-        ${zeile('Position', esc(d.positionswunsch))}
-        ${zeile('Derzeitige Tätigkeit', esc(d.berufsbezeichnung))}
-        ${d.position_original?zeile('Position laut CV', esc(d.position_original)):''}
-        ${zeile('In Position seit', esc(d.in_position_seit))}
+      <div class="dcol">
+        <span class="dcol-h">Beruflich</span>
+        ${zeile('Tätigkeit', esc(d.berufsbezeichnung))}
+        ${d.position_original?zeile('Pos. laut CV', esc(d.position_original)):''}
+        ${zeile('In Pos. seit', esc(d.in_position_seit))}
         ${zeile('Arbeitgeber', esc(d.arbeitgeber))}
         ${zeile('Bei Firma seit', esc(d.bei_firma_seit))}
         ${zeile('Firma zuvor', esc(d.firma_zuvor))}
-        ${zeile('Erfahrung (Jahre)', esc(d.erfahrung_jahre))}
+        ${zeile('Erfahrung', d.erfahrung_jahre?esc(d.erfahrung_jahre)+' J.':'')}
         ${zeile('Qualifikation', esc(d.qualifikation))}
         ${zeile('Studiengang', esc(d.studiengang))}
-      </div>
-      <div>
         ${zeile('Gehalt aktuell', esc(d.gehalt_aktuell))}
-        ${zeile('Gehalt erwartet', esc(d.gehalt_erwartet))}
+        ${zeile('Gehalt Wunsch', esc(d.gehalt_erwartet))}
         ${zeile('Kündigungsfrist', esc(d.kuendigungsfrist))}
-        ${zeile('Wechselmotivation', esc(d.wechselmotivation))}
-        ${zeile('Umzugsbereitschaft', esc(d.umzugsbereitschaft))}
-        ${zeile('Wunschregion', esc(d.wunschregion))}
-        ${zeile('Geburtstag', esc(d.geburtstag))}
-        ${zeile('Interne Wertung', esc(d.wertung_intern))}
+      </div>
+      <div class="dcol">
+        <span class="dcol-h">Recruiting</span>
+        ${zeile('Status', d.status?`<span class="pill">${esc(d.status)}</span>`:'')}
         ${zeile('Kontaktstatus', esc(d.kontaktstatus))}
+        ${zeile('Int. Wertung', esc(d.wertung_intern))}
+        ${zeile('Positionswunsch', esc(d.positionswunsch))}
+        ${zeile('Wechselmotiv.', esc(d.wechselmotivation))}
+        ${zeile('Umzug', esc(d.umzugsbereitschaft))}
+        ${zeile('Wunschregion', esc(d.wunschregion))}
+        ${zeile('Quelle', esc(d.quelle))}
       </div>
     </div>
-    ${d.faehigkeiten?`<div style="margin-top:14px"><div class="k" style="color:var(--muted);font-size:13px;margin-bottom:6px">Fähigkeiten</div>${(d.faehigkeiten||'').split(',').map(s=>s.trim()).filter(Boolean).map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>`:''}
-    ${tags?`<div style="margin-top:10px"><div class="k" style="color:var(--muted);font-size:13px;margin-bottom:6px">Tags</div>${tags}</div>`:''}
-    ${d.profil_zusammenfassung?`<div style="margin-top:14px"><div class="k" style="color:var(--muted);font-size:13px;margin-bottom:4px">Profil</div><div class="v" style="font-size:13px">${esc(d.profil_zusammenfassung)}</div></div>`:''}
-    ${d.bemerkung?`<div style="margin-top:12px"><div class="k" style="color:var(--muted);font-size:13px;margin-bottom:4px">Bemerkung</div><div class="v" style="font-size:13px">${esc(d.bemerkung)}</div></div>`:''}
-    </div>
+
+    ${(d.faehigkeiten||tags||d.profil_zusammenfassung||d.bemerkung)?`<div class="card">
+      ${d.faehigkeiten?`<div style="margin-bottom:8px"><span class="dcol-h">Fähigkeiten</span>${(d.faehigkeiten||'').split(',').map(s=>s.trim()).filter(Boolean).map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>`:''}
+      ${tags?`<div style="margin-bottom:8px"><span class="dcol-h">Tags</span>${tags}</div>`:''}
+      ${d.profil_zusammenfassung?`<div style="margin-bottom:6px"><span class="dcol-h">Profil</span><div style="font-size:12px;margin-top:4px">${esc(d.profil_zusammenfassung)}</div></div>`:''}
+      ${d.bemerkung?`<div><span class="dcol-h">Bemerkung</span><div style="font-size:12px;margin-top:4px">${esc(d.bemerkung)}</div></div>`:''}
+    </div>`:''}
 
     ${erf.length?`<div class="card"><h3>Berufserfahrung</h3>${
       erf.map(e=>`<div class="timeline-item"><div class="t">${esc(e.titel)||'–'}</div>
@@ -429,10 +447,15 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok){
       <div class="meta" style="color:var(--muted);font-size:11px;margin-top:8px">PDF, Word, Bilder. Max. 25 MB pro Datei.</div>
     </div>
 
-    <div class="card"><h3>System</h3><div class="grid2">
-      <div>${zeile('Status', esc(d.status))}${zeile('Quelle', esc(d.quelle))}${zeile('Kandidat-ID', esc(d.id))}</div>
-      <div>${zeile('Erstellt', d.erstellt_am?fmtDat(d.erstellt_am):'')}${zeile('Geändert', d.geaendert_am?fmtDat(d.geaendert_am):'')}${zeile('Letzte Aktivität', d.letzte_aktivitaet?fmtDat(d.letzte_aktivitaet):'')}</div>
-    </div></div>
+    <div class="card"><h3>System</h3>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px 20px">
+        ${zeile('Kandidat-ID', esc(d.id))}
+        ${zeile('Erstellt', d.erstellt_am?fmtDat(d.erstellt_am):'')}
+        ${zeile('Geändert', d.geaendert_am?fmtDat(d.geaendert_am):'')}
+        ${zeile('Letzte Aktivität', d.letzte_aktivitaet?fmtDat(d.letzte_aktivitaet):'')}
+        ${zeile('Quelle', esc(d.quelle))}
+      </div>
+    </div>
   `;
   window.scrollTo(0,0);
 }
