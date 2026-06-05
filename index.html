@@ -502,6 +502,7 @@ async function loescheDokument(id, pfad){
 
 // ---- Bearbeiten / Neu anlegen ----
 const EDIT_STATUS=['New','In Review','Available','Engaged','Offered','Hired','Rejected'];
+const ANREDE_OPTS=['Keine','Herr','Herr Dr.','Frau','Frau Dr.'];
 
 function ef(label,id,val,type='text'){
   return `<div class="edit-field"><label>${label}</label><input id="ef_${id}" type="${type}" value="${val?String(val).replace(/"/g,'&quot;'):''}"></div>`;
@@ -512,6 +513,15 @@ function eta(label,id,val){
 function esel(label,id,val,opts){
   return `<div class="edit-field"><label>${label}</label><select id="ef_${id}">`+
     ['',...opts].map(o=>`<option ${o===val?'selected':''}>${o}</option>`).join('')+`</select></div>`;
+}
+// Anrede als Dropdown; unbekannten Bestandswert erhalten, leer => "Keine"
+function anredeSelect(val){
+  const v=val||'';
+  const opts=[...ANREDE_OPTS];
+  if(v && !opts.includes(v)) opts.push(v);
+  const sel=v||'Keine';
+  return `<div class="edit-field"><label>Anrede / Begrüßung</label><select id="ef_begruessung">`+
+    opts.map(o=>`<option ${o===sel?'selected':''}>${esc(o)}</option>`).join('')+`</select></div>`;
 }
 
 async function bearbeiteKandidat(id){
@@ -534,7 +544,7 @@ function zeigeFormular(d){
       <h2>${neu?'Neuer Kandidat':'Bearbeiten: '+(esc(d.voller_name)||'')}</h2>
     </div>
     <div class="card"><h3>Persönliche Daten</h3><div class="edit-grid">
-      ${ef('Anrede / Begrüßung','begruessung',d.begruessung)}
+      ${anredeSelect(d.begruessung)}
       ${ef('Vorname','vorname',d.vorname)}
       ${ef('Nachname','nachname',d.nachname)}
       ${ef('E-Mail','email',d.email,'email')}
@@ -644,7 +654,7 @@ async function speichereKandidat(id){
     gehalt_aktuell:gv('gehalt_aktuell'), gehalt_erwartet:gv('gehalt_erwartet'),
     kuendigungsfrist:gv('kuendigungsfrist'), umzugsbereitschaft:gv('umzugsbereitschaft'),
     wunschregion:gv('wunschregion'), status:gv('status')||null,
-    begruessung:gv('begruessung'), wertung_intern:gv('wertung_intern'),
+    begruessung:(gv('begruessung')==='Keine'?null:gv('begruessung')), wertung_intern:gv('wertung_intern'),
     bei_firma_seit:gv('bei_firma_seit'), in_position_seit:gv('in_position_seit'),
     kontaktstatus:gv('kontaktstatus'),
     xing_profil:gv('xing_profil'), linkedin_profil:gv('linkedin_profil'),
