@@ -165,6 +165,7 @@
     <button class="tab active" data-view="kandidaten">Kandidaten</button>
     <button class="tab" data-view="kunden">Kunden</button>
     <button class="tab" data-view="kontakte">Kontakte</button>
+    <button class="tab" data-view="wiedervorlagen">📋 Wiedervorlagen</button>
   </div>
   <button class="tab" id="logoutBtn" style="display:none;margin-left:8px" onclick="logout()">Abmelden</button>
 </header>
@@ -244,6 +245,22 @@
     </tr></thead><tbody id="ktBody"></tbody></table>
   </div>
 
+  <!-- Wiedervorlagen -->
+  <div id="view-wiedervorlagen" style="display:none">
+    <div class="bar">
+      <div class="field"><label>Anzeigen</label>
+        <select id="wvFilter" onchange="ladeWiedervorlagen()">
+          <option value="offen">Nur offene</option>
+          <option value="faellig">Fällig (heute &amp; überfällig)</option>
+          <option value="alle">Alle</option>
+        </select></div>
+    </div>
+    <div class="count" id="wvCount"></div>
+    <table><thead><tr>
+      <th>Fällig am</th><th>Betreff</th><th>Wer</th><th>Priorität</th><th>Erledigt</th>
+    </tr></thead><tbody id="wvBody"></tbody></table>
+  </div>
+
   <!-- Vollständige Detailseite -->
   <div id="detailPage"></div>
 </div>
@@ -277,6 +294,32 @@
       <button class="go" onclick="anrufNotizSpeichern()">✓ Speichern</button>
       <button class="tab" onclick="document.getElementById('callNote').close()">Abbrechen</button>
       <span id="cnMsg" style="font-size:13px;margin-left:4px"></span>
+    </div>
+  </div></dialog>
+
+<dialog id="taskDlg" style="width:min(560px,92vw);border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:6px;padding:0">
+  <div class="dlg-head" style="display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line)">
+    <strong>📋 Aufgabe / Wiedervorlage</strong>
+    <button class="x" style="margin-left:auto;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer" onclick="document.getElementById('taskDlg').close()">×</button></div>
+  <div style="padding:18px">
+    <div id="tdWho" style="color:var(--accent);font-size:14px;font-weight:600;margin-bottom:12px"></div>
+    <div class="field" style="margin-bottom:10px"><label>Betreff</label>
+      <input id="tdBetreff" placeholder="z.B. Wieder anrufen wegen Stelle" style="width:100%"
+        onkeydown="if(event.key==='Enter')document.getElementById('tdDatum').focus()"></div>
+    <div style="display:flex;gap:12px;margin-bottom:10px">
+      <div class="field" style="flex:1"><label>Fällig am</label>
+        <input id="tdDatum" type="date" style="width:100%"></div>
+      <div class="field" style="flex:1"><label>Priorität</label>
+        <select id="tdPrio" style="width:100%"><option>Normal</option><option>Hoch</option><option>Niedrig</option></select></div>
+    </div>
+    <div class="field" style="margin-bottom:4px"><label>Beschreibung (optional)</label>
+      <textarea id="tdText" rows="4" placeholder="Details … (Strg+Enter speichert)"
+        style="width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink);padding:11px;font:inherit;font-size:14px;border-radius:3px;resize:vertical"
+        onkeydown="if(event.ctrlKey&&event.key==='Enter')aufgabeSpeichern()"></textarea></div>
+    <div style="display:flex;gap:10px;align-items:center;margin-top:14px">
+      <button class="go" onclick="aufgabeSpeichern()">✓ Speichern</button>
+      <button class="tab" onclick="document.getElementById('taskDlg').close()">Abbrechen</button>
+      <span id="tdMsg" style="font-size:13px;margin-left:4px"></span>
     </div>
   </div></dialog>
 
@@ -339,10 +382,11 @@ document.querySelectorAll('.tab[data-view]').forEach(t=>t.onclick=()=>{
   document.getElementById('detailPage').style.display='none';
   document.querySelectorAll('.tab[data-view]').forEach(x=>x.classList.remove('active'));
   t.classList.add('active');
-  ['kandidaten','kunden','kontakte'].forEach(v=>
+  ['kandidaten','kunden','kontakte','wiedervorlagen'].forEach(v=>
     document.getElementById('view-'+v).style.display = v===t.dataset.view?'block':'none');
   if(t.dataset.view==='kunden') ladeKunden();
   if(t.dataset.view==='kontakte') ladeKontakte();
+  if(t.dataset.view==='wiedervorlagen') ladeWiedervorlagen();
 });
 
 async function ladeStatusFilter(){
@@ -477,6 +521,122 @@ async function anrufNotizSpeichern(){
   }, 650);
 }
 
+// ===== Aufgaben & Wiedervorlagen =====
+let kontextDatensatz=null; // {typ,id,name} der gerade offenen Detailseite
+function heuteISO(){ const d=new Date(); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
+function plusTageISO(n){ const d=new Date(); d.setDate(d.getDate()+n); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
+function fmtDatum(s){ if(!s) return ''; const d=new Date(s); return isNaN(d)?esc(s):d.toLocaleDateString('de-DE'); }
+function istOffen(status){ if(!status) return true; const s=String(status).toLowerCase(); return s!=='completed'&&s!=='erledigt'&&s!=='abgeschlossen'; }
+
+async function ladeAufgabenFuer(id){
+  const {data}=await sb.from('aufgaben').select('*').eq('verknuepft_mit',id).order('faelligkeitsdatum',{ascending:true,nullsFirst:false});
+  return data||[];
+}
+function aufgabenCardHtml(tasks, typ, id){
+  const offen=tasks.filter(t=>istOffen(t.status));
+  const erledigt=tasks.filter(t=>!istOffen(t.status));
+  const heute=heuteISO();
+  const row=(t)=>{
+    const ueber=istOffen(t.status)&&t.faelligkeitsdatum&&t.faelligkeitsdatum<heute;
+    const prio=t.prioritaet&&/high|hoch/i.test(t.prioritaet)?'<span class="pill hot">Hoch</span> ':'';
+    return `<div class="note" style="display:flex;gap:10px;align-items:flex-start">
+      <div style="flex:1">
+        <strong>${prio}${esc(t.betreff)||'–'}</strong>
+        ${t.beschreibung?`<div style="font-size:13px;margin-top:3px">${esc(t.beschreibung)}</div>`:''}
+        <div class="meta">${t.faelligkeitsdatum?`<span style="${ueber?'color:var(--hot);font-weight:600':''}">📅 ${fmtDatum(t.faelligkeitsdatum)}${ueber?' · überfällig':''}</span>`:'ohne Datum'}${(!istOffen(t.status)&&t.status)?' · '+esc(t.status):''}</div>
+      </div>
+      ${istOffen(t.status)?`<button class="tab" style="white-space:nowrap" onclick="aufgabeErledigt('${t.id}','${typ}','${id}')">✓ Erledigt</button>`:''}
+    </div>`;
+  };
+  return `<div class="card"><h3>Aufgaben &amp; Wiedervorlagen ${offen.length?'('+offen.length+' offen)':''}</h3>
+    <button class="neuBtn" style="margin-bottom:12px" onclick="aufgabeNeuPopup()">+ Aufgabe / Wiedervorlage</button>
+    ${offen.length?offen.map(row).join(''):'<div style="color:var(--muted);font-size:13px">Keine offenen Aufgaben.</div>'}
+    ${erledigt.length?`<details style="margin-top:10px"><summary style="cursor:pointer;color:var(--muted);font-size:13px">Erledigte (${erledigt.length})</summary>${erledigt.slice(0,20).map(row).join('')}</details>`:''}
+  </div>`;
+}
+function aufgabeNeuPopup(){
+  if(!kontextDatensatz) return;
+  const dlg=document.getElementById('taskDlg');
+  document.getElementById('tdWho').textContent=(kontextDatensatz.name||'')+' · '+kontextDatensatz.typ;
+  document.getElementById('tdBetreff').value='';
+  document.getElementById('tdDatum').value=plusTageISO(14);
+  document.getElementById('tdPrio').value='Normal';
+  document.getElementById('tdText').value='';
+  document.getElementById('tdMsg').textContent='';
+  if(!dlg.open) dlg.showModal();
+  setTimeout(()=>document.getElementById('tdBetreff').focus(),120);
+}
+async function aufgabeSpeichern(){
+  if(!kontextDatensatz) return;
+  const betreff=document.getElementById('tdBetreff').value.trim();
+  const datum=document.getElementById('tdDatum').value;
+  const prio=document.getElementById('tdPrio').value;
+  const text=document.getElementById('tdText').value.trim();
+  const msg=document.getElementById('tdMsg');
+  if(!betreff){ msg.style.color='var(--hot)'; msg.textContent='Bitte einen Betreff eingeben.'; return; }
+  msg.style.color='var(--muted)'; msg.textContent='Speichere …';
+  const {typ,id,name}=kontextDatensatz;
+  const rec={ id:'task_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
+    betreff, beschreibung:text||null, status:'Offen', prioritaet:prio,
+    faelligkeitsdatum:datum||null, verknuepft_mit:id, kontaktname:name||null,
+    erstellt_am:new Date().toISOString(), geaendert_am:new Date().toISOString() };
+  const {error}=await sb.from('aufgaben').insert(rec);
+  if(error){ msg.style.color='var(--hot)'; msg.textContent='Fehler: '+error.message; return; }
+  msg.style.color='var(--ok)'; msg.textContent='✓ Gespeichert';
+  setTimeout(()=>{ document.getElementById('taskDlg').close();
+    if(typ==='Kandidat') detailKandidat(id);
+    else if(typ==='Kunde') detailKunde(id);
+    else if(typ==='Kontakt') detailKontakt(id);
+  }, 650);
+}
+async function aufgabeErledigt(taskId, typ, id){
+  await sb.from('aufgaben').update({status:'Completed', abschlusszeit:new Date().toISOString(), geaendert_am:new Date().toISOString()}).eq('id',taskId);
+  if(typ==='WV') ladeWiedervorlagen();
+  else if(typ==='Kandidat') detailKandidat(id);
+  else if(typ==='Kunde') detailKunde(id);
+  else if(typ==='Kontakt') detailKontakt(id);
+}
+async function ladeWiedervorlagen(){
+  const body=document.getElementById('wvBody'); body.innerHTML='';
+  const cnt=document.getElementById('wvCount'); cnt.textContent='Lade …';
+  const modus=document.getElementById('wvFilter').value;
+  let q=sb.from('aufgaben').select('*').order('faelligkeitsdatum',{ascending:true,nullsFirst:false}).limit(500);
+  if(modus!=='alle') q=q.neq('status','Completed');
+  const {data,error}=await q;
+  if(error){ cnt.textContent='Fehler: '+error.message; return; }
+  const heute=heuteISO();
+  let tasks=data||[];
+  if(modus==='faellig') tasks=tasks.filter(t=>t.faelligkeitsdatum&&t.faelligkeitsdatum<=heute);
+  // Namen/Typen der verknüpften Datensätze in einem Rutsch auflösen
+  const ids=[...new Set(tasks.map(t=>t.verknuepft_mit).filter(Boolean))];
+  const map={};
+  if(ids.length){
+    const [ka,ku,ko]=await Promise.all([
+      sb.from('kandidaten').select('id,voller_name').in('id',ids),
+      sb.from('kunden').select('id,name').in('id',ids),
+      sb.from('kontakte').select('id,voller_name').in('id',ids),
+    ]);
+    (ka.data||[]).forEach(r=>map[r.id]={typ:'Kandidat',ic:'👤',name:r.voller_name,open:()=>detailKandidat(r.id)});
+    (ku.data||[]).forEach(r=>map[r.id]={typ:'Kunde',ic:'🏢',name:r.name,open:()=>detailKunde(r.id)});
+    (ko.data||[]).forEach(r=>map[r.id]={typ:'Kontakt',ic:'📇',name:r.voller_name,open:()=>detailKontakt(r.id)});
+  }
+  cnt.textContent=tasks.length+' Aufgabe'+(tasks.length===1?'':'n')+(modus==='alle'?'':modus==='faellig'?' (fällig/überfällig)':' (offen)');
+  if(!tasks.length){ body.innerHTML='<tr><td colspan="5" class="empty">Keine Aufgaben.</td></tr>'; return; }
+  tasks.forEach(t=>{
+    const ref=map[t.verknuepft_mit];
+    const ueber=istOffen(t.status)&&t.faelligkeitsdatum&&t.faelligkeitsdatum<heute;
+    const tr=document.createElement('tr'); tr.className='row-click';
+    tr.innerHTML=`
+      <td style="${ueber?'color:var(--hot);font-weight:600':''}">${t.faelligkeitsdatum?fmtDatum(t.faelligkeitsdatum):'–'}${ueber?' ⚠':''}</td>
+      <td>${esc(t.betreff)||'–'}</td>
+      <td>${ref?ref.ic+' '+esc(ref.name)+' <span class="pill">'+ref.typ+'</span>':(t.kontaktname?esc(t.kontaktname):'–')}</td>
+      <td>${t.prioritaet&&/high|hoch/i.test(t.prioritaet)?'<span class="pill hot">Hoch</span>':esc(t.prioritaet||'')}</td>
+      <td>${istOffen(t.status)?`<button class="tab" onclick="event.stopPropagation();aufgabeErledigt('${t.id}','WV')">✓</button>`:esc(t.status||'')}</td>`;
+    if(ref) tr.onclick=ref.open;
+    body.appendChild(tr);
+  });
+}
+
 function zeileKandidat(r,mitKm){
   const tr=document.createElement('tr'); tr.className='row-click';
   const hot=r.ist_hot?'<span class="pill hot">HOT</span> ':'';
@@ -505,7 +665,7 @@ async function detailKandidat(id){
     sb.from('erfahrung').select('*').eq('kandidat_id',id),
     sb.from('notizen').select('*').eq('kandidat_id',id).order('erstellt_am',{ascending:false}),
     sb.from('bewerbungen').select('*').eq('kandidat_id',id),
-    sb.from('aufgaben').select('*').eq('related_job_id',id),
+    sb.from('aufgaben').select('*').eq('verknuepft_mit',id).order('faelligkeitsdatum',{ascending:true,nullsFirst:false}),
     sb.from('dokumente').select('*').eq('kandidat_id',id).order('hochgeladen_am',{ascending:false}),
   ]);
   const d=k.data; if(!d) return;
@@ -519,7 +679,8 @@ async function detailKandidat(id){
 
 function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl){
   dok = dok || [];
-  ['kandidaten','kunden','kontakte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  kontextDatensatz={typ:'Kandidat',id:d.id,name:d.voller_name};
+  ['kandidaten','kunden','kontakte','wiedervorlagen'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
 
   const adrPriv=[d.strasse,[d.plz,d.stadt].filter(Boolean).join(' '),d.bundesland,d.land].filter(Boolean).join(', ');
@@ -619,6 +780,8 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl){
       </div>
 
     </div>
+
+    ${aufgabenCardHtml(aufg,'Kandidat',d.id)}
 
     <!-- AUFKLAPPBARE FENSTER -->
     ${erf.length?`<details class="acc">
@@ -795,7 +958,7 @@ function neuerKandidat(){
 }
 
 function zeigeFormular(d){
-  ['kandidaten','kunden','kontakte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  ['kandidaten','kunden','kontakte','wiedervorlagen'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
   const neu = !d.id;
   page.innerHTML=`
@@ -941,17 +1104,19 @@ async function speichereKandidat(id){
 
 // ============ KUNDEN ============
 async function detailKunde(id){
-  const [k, kont, stel, notiz] = await Promise.all([
+  const [k, kont, stel, notiz, aufg] = await Promise.all([
     sb.from('kunden').select('*').eq('id',id).single(),
     sb.from('kontakte').select('*').eq('kunde_id',id),
     sb.from('stellen').select('*').eq('kunde_id',id),
     sb.from('notizen').select('*').eq('kunde_id',id).order('erstellt_am',{ascending:false}),
+    sb.from('aufgaben').select('*').eq('verknuepft_mit',id).order('faelligkeitsdatum',{ascending:true,nullsFirst:false}),
   ]);
   const d=k.data; if(!d) return;
-  ['kandidaten','kunden','kontakte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  kontextDatensatz={typ:'Kunde',id:d.id,name:d.name};
+  ['kandidaten','kunden','kontakte','wiedervorlagen'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
   const adresse=[d.strasse,[d.plz,d.stadt].filter(Boolean).join(' '),d.bundesland,d.land].filter(Boolean).join(', ');
-  const kont_=kont.data||[], stel_=stel.data||[], notiz_=notiz.data||[];
+  const kont_=kont.data||[], stel_=stel.data||[], notiz_=notiz.data||[], aufg_=aufg.data||[];
   page.innerHTML=`
     <div class="detail-head">
       <button class="back" onclick="zurueckZurListe()">← Zurück</button>
@@ -985,6 +1150,7 @@ async function detailKunde(id){
     ${notiz_.length?`<div class="card"><h3>Notizen (${notiz_.length})</h3>${
       notiz_.slice(0,30).map(n=>`<div class="note">${esc(n.inhalt)||'–'}<div class="meta">${n.erstellt_am?fmtDat(n.erstellt_am):''}</div></div>`).join('')
     }</div>`:''}
+    ${aufgabenCardHtml(aufg_,'Kunde',d.id)}
     <div class="card"><h3>System</h3><div class="grid2">
       <div>${zeile('Kunde-ID', esc(d.id))}${zeile('Quelle', esc(d.quelle))}</div>
       <div>${zeile('Erstellt', d.erstellt_am?fmtDat(d.erstellt_am):'')}${zeile('Geändert', d.geaendert_am?fmtDat(d.geaendert_am):'')}</div>
@@ -997,7 +1163,7 @@ function bearbeiteKunde(id){ sb.from('kunden').select('*').eq('id',id).single().
 function neuerKunde(){ zeigeKundeFormular({id:null}); }
 
 function zeigeKundeFormular(d){
-  ['kandidaten','kunden','kontakte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  ['kandidaten','kunden','kontakte','wiedervorlagen'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
   const neu=!d.id;
   page.innerHTML=`
@@ -1058,7 +1224,10 @@ async function detailKontakt(id){
   if(d.kunde_id){ const {data:kd}=await sb.from('kunden').select('id,name').eq('id',d.kunde_id).single(); kunde=kd; }
   const {data:notizTab}=await sb.from('notizen').select('*').eq('kontakt_id',id).order('erstellt_am',{ascending:false});
   const notizT_=notizTab||[];
-  ['kandidaten','kunden','kontakte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  const {data:aufgTab}=await sb.from('aufgaben').select('*').eq('verknuepft_mit',id).order('faelligkeitsdatum',{ascending:true,nullsFirst:false});
+  const aufg_=aufgTab||[];
+  kontextDatensatz={typ:'Kontakt',id:d.id,name:d.voller_name};
+  ['kandidaten','kunden','kontakte','wiedervorlagen'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
   const adresse=[d.strasse,[d.plz,d.stadt].filter(Boolean).join(' '),d.bundesland,d.land].filter(Boolean).join(', ');
   page.innerHTML=`
@@ -1090,6 +1259,7 @@ async function detailKontakt(id){
     ${notizT_.length?`<div class="card"><h3>Notizen (${notizT_.length})</h3>${
       notizT_.slice(0,30).map(n=>`<div class="note">${esc(n.inhalt)||'–'}<div class="meta">${n.typ?esc(n.typ)+' · ':''}${n.erstellt_am?fmtDat(n.erstellt_am):''}</div></div>`).join('')
     }</div>`:''}
+    ${aufgabenCardHtml(aufg_,'Kontakt',d.id)}
     <div class="card"><h3>System</h3><div class="grid2">
       <div>${zeile('Kontakt-ID', esc(d.id))}${zeile('Quelle', esc(d.quelle))}</div>
       <div>${zeile('Erstellt', d.erstellt_am?fmtDat(d.erstellt_am):'')}${zeile('Geändert', d.geaendert_am?fmtDat(d.geaendert_am):'')}</div>
@@ -1102,7 +1272,7 @@ function bearbeiteKontakt(id){ sb.from('kontakte').select('*').eq('id',id).singl
 function neuerKontakt(){ zeigeKontaktFormular({id:null}); }
 
 function zeigeKontaktFormular(d){
-  ['kandidaten','kunden','kontakte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  ['kandidaten','kunden','kontakte','wiedervorlagen'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
   const neu=!d.id;
   page.innerHTML=`
