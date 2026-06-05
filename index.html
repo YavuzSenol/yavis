@@ -290,7 +290,10 @@ async function pruefeLogin(){
 function zeigeApp(){
   document.getElementById('login').style.display='none';
   document.getElementById('logoutBtn').style.display='inline-block';
-  ladeStatusFilter(); ladeKandidaten();
+  ladeStatusFilter();
+  const p=new URLSearchParams(location.search);
+  const anruf=p.get('anruf')||p.get('caller')||p.get('nummer')||p.get('number');
+  if(anruf){ pruefeAnruf(anruf); } else { ladeKandidaten(); }
 }
 
 async function login(){
@@ -366,6 +369,41 @@ async function ladeKandidaten(){
   document.getElementById('kCount').textContent=(data.length)+' Kandidaten'+(data.length>=200?' (erste 200)':'');
   data.forEach(r=>body.appendChild(zeileKandidat(r,false)));
   if(!data.length) body.innerHTML='<tr><td colspan="5" class="empty">Keine Treffer.</td></tr>';
+}
+
+// ===== Starface: Anrufererkennung =====
+// Nummer auf nationale Kernziffern reduzieren (Format-unabhängig)
+function normNr(s){
+  if(!s) return '';
+  let d=String(s).replace(/\D/g,'');        // nur Ziffern
+  d=d.replace(/^0049/,'').replace(/^49/,''); // Ländervorwahl raus
+  d=d.replace(/^0/,'');                       // führende Amtsnull raus
+  return d;
+}
+function nrPasst(a,b){
+  a=normNr(a); b=normNr(b);
+  if(a.length<6||b.length<6) return false;
+  return a===b || a.endsWith(b) || b.endsWith(a);
+}
+async function pruefeAnruf(nummer){
+  const count=document.getElementById('kCount');
+  document.getElementById('kSuche').value=nummer;
+  count.textContent='📞 Eingehender Anruf '+nummer+' – suche Kandidat …';
+  const {data,error}=await sb.from('kandidaten')
+    .select('id,voller_name,berufsbezeichnung,stadt,status,telefon,mobil,telefon_privat,mobil_privat')
+    .limit(2000);
+  if(error){ count.textContent='Fehler bei Anrufersuche: '+error.message; return; }
+  const treffer=(data||[]).filter(r=>
+    [r.telefon,r.mobil,r.telefon_privat,r.mobil_privat].some(f=>nrPasst(f,nummer)));
+  if(treffer.length===1){ count.textContent='📞 Anrufer erkannt: '+nummer; detailKandidat(treffer[0].id); return; }
+  const body=document.getElementById('kBody'); body.innerHTML='';
+  if(treffer.length===0){
+    count.innerHTML='📞 Eingehender Anruf <b>'+esc(nummer)+'</b> – kein Kandidat gefunden.';
+    body.innerHTML='<tr><td colspan="5" class="empty">Keine Übereinstimmung. Über „+ Neuer Kandidat" anlegen.</td></tr>';
+    return;
+  }
+  count.innerHTML='📞 Eingehender Anruf <b>'+esc(nummer)+'</b> – '+treffer.length+' mögliche Kandidaten:';
+  treffer.forEach(r=>body.appendChild(zeileKandidat(r,false)));
 }
 
 function zeileKandidat(r,mitKm){
