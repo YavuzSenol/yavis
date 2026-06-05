@@ -351,6 +351,7 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok){
 
     <div class="card"><h3>Kontakt & Adresse</h3><div class="grid2">
       <div>
+        ${zeile('Anrede', esc(d.begruessung))}
         ${zeile('E-Mail', d.email?`<a href="mailto:${esc(d.email)}">${esc(d.email)}</a>`:'')}
         ${zeile('E-Mail beruflich', d.email_beruflich)}
         ${zeile('Zweite E-Mail', d.email_zweit)}
@@ -372,7 +373,9 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok){
         ${zeile('Position', esc(d.positionswunsch))}
         ${zeile('Derzeitige Tätigkeit', esc(d.berufsbezeichnung))}
         ${d.position_original?zeile('Position laut CV', esc(d.position_original)):''}
+        ${zeile('In Position seit', esc(d.in_position_seit))}
         ${zeile('Arbeitgeber', esc(d.arbeitgeber))}
+        ${zeile('Bei Firma seit', esc(d.bei_firma_seit))}
         ${zeile('Firma zuvor', esc(d.firma_zuvor))}
         ${zeile('Erfahrung (Jahre)', esc(d.erfahrung_jahre))}
         ${zeile('Qualifikation', esc(d.qualifikation))}
@@ -386,6 +389,8 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok){
         ${zeile('Umzugsbereitschaft', esc(d.umzugsbereitschaft))}
         ${zeile('Wunschregion', esc(d.wunschregion))}
         ${zeile('Geburtstag', esc(d.geburtstag))}
+        ${zeile('Interne Wertung', esc(d.wertung_intern))}
+        ${zeile('Kontaktstatus', esc(d.kontaktstatus))}
       </div>
     </div>
     ${d.faehigkeiten?`<div style="margin-top:14px"><div class="k" style="color:var(--muted);font-size:13px;margin-bottom:6px">Fähigkeiten</div>${(d.faehigkeiten||'').split(',').map(s=>s.trim()).filter(Boolean).map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>`:''}
@@ -529,6 +534,7 @@ function zeigeFormular(d){
       <h2>${neu?'Neuer Kandidat':'Bearbeiten: '+(esc(d.voller_name)||'')}</h2>
     </div>
     <div class="card"><h3>Persönliche Daten</h3><div class="edit-grid">
+      ${ef('Anrede / Begrüßung','begruessung',d.begruessung)}
       ${ef('Vorname','vorname',d.vorname)}
       ${ef('Nachname','nachname',d.nachname)}
       ${ef('E-Mail','email',d.email,'email')}
@@ -556,6 +562,8 @@ function zeigeFormular(d){
       ${ef('Derzeitige Berufsbezeichnung','berufsbezeichnung',d.berufsbezeichnung)}
       ${ef('Position laut CV (Original)','position_original',d.position_original)}
       ${ef('Arbeitgeber','arbeitgeber',d.arbeitgeber)}
+      ${ef('Bei Firma seit','bei_firma_seit',d.bei_firma_seit)}
+      ${ef('In Position seit','in_position_seit',d.in_position_seit)}
       ${ef('Firma zuvor','firma_zuvor',d.firma_zuvor)}
       ${ef('Erfahrung (Jahre)','erfahrung_jahre',d.erfahrung_jahre)}
       ${ef('Qualifikation','qualifikation',d.qualifikation)}
@@ -566,6 +574,8 @@ function zeigeFormular(d){
       ${ef('Umzugsbereitschaft','umzugsbereitschaft',d.umzugsbereitschaft)}
       ${ef('Wunschregion','wunschregion',d.wunschregion)}
       ${esel('Status','status',d.status,EDIT_STATUS)}
+      ${ef('Interne Wertung','wertung_intern',d.wertung_intern)}
+      ${ef('Kontaktstatus','kontaktstatus',d.kontaktstatus)}
       ${ef('XING Profil','xing_profil',d.xing_profil)}
       ${ef('LinkedIn Profil','linkedin_profil',d.linkedin_profil)}
       ${eta('Fähigkeiten (kommagetrennt)','faehigkeiten',d.faehigkeiten)}
@@ -634,6 +644,9 @@ async function speichereKandidat(id){
     gehalt_aktuell:gv('gehalt_aktuell'), gehalt_erwartet:gv('gehalt_erwartet'),
     kuendigungsfrist:gv('kuendigungsfrist'), umzugsbereitschaft:gv('umzugsbereitschaft'),
     wunschregion:gv('wunschregion'), status:gv('status')||null,
+    begruessung:gv('begruessung'), wertung_intern:gv('wertung_intern'),
+    bei_firma_seit:gv('bei_firma_seit'), in_position_seit:gv('in_position_seit'),
+    kontaktstatus:gv('kontaktstatus'),
     xing_profil:gv('xing_profil'), linkedin_profil:gv('linkedin_profil'),
     faehigkeiten:gv('faehigkeiten'), wechselmotivation:gv('wechselmotivation'),
     profil_zusammenfassung:gv('profil_zusammenfassung'), bemerkung:gv('bemerkung'),
