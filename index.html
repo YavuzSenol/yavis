@@ -121,6 +121,30 @@
   .edit-actions{display:flex;gap:10px;margin-top:18px}
   .neuBtn{background:var(--ok);color:#0f1115;border:none;padding:10px 16px;font:inherit;font-size:12px;
     font-weight:600;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;border-radius:2px}
+  /* CV-Auslese */
+  .cvbtn{background:var(--panel2);color:var(--accent2);border:1px solid var(--accent2);padding:9px 14px;
+    font:inherit;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+    cursor:pointer;border-radius:2px}
+  .cvbtn:hover{background:var(--accent2);color:#0f1115}
+  .cvbtn:disabled{opacity:.5;cursor:not-allowed}
+  #cvOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;
+    align-items:center;justify-content:center}
+  #cvOverlay.on{display:flex}
+  #cvBox{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    width:560px;max-width:94vw;max-height:88vh;overflow:auto}
+  #cvBox .cvh{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;
+    justify-content:space-between;align-items:center}
+  #cvBox .cvh strong{font-size:14px;color:var(--accent)}
+  #cvBox .cvb{padding:16px 18px}
+  .cv-section{margin-bottom:14px}
+  .cv-section-title{font-size:9px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent2);font-weight:700;margin-bottom:6px;display:block}
+  .cv-row{display:grid;grid-template-columns:140px 1fr;gap:3px 10px;font-size:12px;
+    padding:3px 0;border-bottom:1px solid var(--line)}
+  .cv-row .cv-k{color:var(--muted);font-size:11px}
+  .cv-row .cv-v{color:var(--ink);word-break:break-word}
+  .cv-row.new .cv-v{color:var(--ok)}
+  .cv-row.skip .cv-v{color:var(--muted);font-style:italic}
   /* Kandidaten-Foto */
   .foto-wrap{position:relative;flex-shrink:0}
   .foto-avatar{width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--line);
@@ -223,6 +247,18 @@
   <!-- Vollständige Detailseite -->
   <div id="detailPage"></div>
 </div>
+
+<!-- CV-Auslese Overlay -->
+<div id="cvOverlay">
+  <div id="cvBox">
+    <div class="cvh">
+      <strong>📄 CV-Auslese — Vorschau</strong>
+      <button class="x" onclick="document.getElementById('cvOverlay').classList.remove('on')">×</button>
+    </div>
+    <div class="cvb" id="cvBody"></div>
+  </div>
+</div>
+<input type="file" id="cvInput" accept="application/pdf" style="display:none">
 
 <dialog id="detail"><div class="dlg-head"><strong id="dTitle"></strong>
   <button class="x" onclick="document.getElementById('detail').close()">×</button></div>
@@ -397,7 +433,10 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl){
         <h2 style="margin:0 0 2px">${d.ist_hot?'🔥 ':''}${esc(d.voller_name)||'Kandidat'}</h2>
         <div class="detail-sub" style="margin:0">${esc(d.berufsbezeichnung)||''}${d.arbeitgeber?' · '+esc(d.arbeitgeber):''}${d.status?' · <span class="pill">'+esc(d.status)+'</span>':''}</div>
       </div>
-      <button class="editbtn" onclick="bearbeiteKandidat('${d.id}')">✎ Bearbeiten</button>
+      <div style="display:flex;gap:8px;margin-left:auto">
+        <button class="cvbtn" id="cvBtn" onclick="cvAuslesen('${d.id}')">📄 CV einlesen</button>
+        <button class="editbtn" style="margin-left:0" onclick="bearbeiteKandidat('${d.id}')">✎ Bearbeiten</button>
+      </div>
     </div>
 
     <div class="dpanels">
@@ -1066,6 +1105,152 @@ function link(u){return u?`<a href="${esc(u)}" target="_blank">öffnen ↗</a>`:
 document.getElementById('cSuche').addEventListener('keydown',e=>{if(e.key==='Enter')ladeKunden();});
 document.getElementById('ktSuche').addEventListener('keydown',e=>{if(e.key==='Enter')ladeKontakte();});
 document.getElementById('logPass').addEventListener('keydown',e=>{if(e.key==='Enter')login();});
+
+// ============ CV-AUSLESE ============
+const CV_EDGE_URL = 'https://afbyqrwqnccgudpqxziv.supabase.co/functions/v1/cv-auslesen';
+
+// Feldbezeichnungen für die Vorschau
+const CV_LABELS = {
+  berufsbezeichnung:'Berufsbezeichnung',position_original:'Position laut CV',
+  vorname:'Vorname',nachname:'Nachname',geburtstag:'Geburtstag',
+  mobil_privat:'Mobil privat',qualifikation:'Qualifikation',
+  studiengang:'Studiengang',erfahrung_jahre:'Erfahrung (Jahre)',
+  faehigkeiten:'Fähigkeiten',profil_zusammenfassung:'Profil',
+};
+
+// Felder die IMMER überschrieben werden (unabhängig vom DB-Inhalt)
+const CV_ALWAYS = new Set(['berufsbezeichnung','position_original','mobil_privat']);
+
+let _cvKandidatId=null, _cvFelder=null, _cvDbDaten=null;
+
+function cvAuslesen(kandidatId){
+  _cvKandidatId=kandidatId;
+  const inp=document.getElementById('cvInput');
+  inp.value='';
+  inp.onchange=()=>cvPdfLaden(kandidatId);
+  inp.click();
+}
+
+async function cvPdfLaden(kandidatId){
+  const inp=document.getElementById('cvInput');
+  const file=inp.files[0]; if(!file) return;
+  if(file.type!=='application/pdf'){ alert('Bitte nur PDF-Dateien hochladen.'); return; }
+  if(file.size>20*1024*1024){ alert('PDF zu groß (max. 20 MB).'); return; }
+
+  // Ladeanimation
+  const btn=document.getElementById('cvBtn');
+  if(btn){ btn.disabled=true; btn.textContent='⏳ Lese CV…'; }
+
+  try{
+    // PDF → base64
+    const base64 = await new Promise((res,rej)=>{
+      const reader=new FileReader();
+      reader.onload=e=>res(e.target.result.split(',')[1]);
+      reader.onerror=rej;
+      reader.readAsDataURL(file);
+    });
+
+    // Session-Token holen
+    const {data:{session}} = await sb.auth.getSession();
+    if(!session) throw new Error('Nicht eingeloggt');
+
+    // Edge Function aufrufen
+    const resp = await fetch(CV_EDGE_URL, {
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'Authorization':'Bearer '+session.access_token,
+        'apikey':'sb_publishable_Cn0V4tpBeLxiwl3MyTvzdg_tCcFfkl7',
+      },
+      body: JSON.stringify({ pdf_base64: base64 }),
+    });
+
+    const result = await resp.json();
+    if(!result.ok) throw new Error(result.error||'Unbekannter Fehler');
+
+    // Aktuelle DB-Daten laden für Vergleich
+    const {data:dbDaten} = await sb.from('kandidaten').select('*').eq('id',kandidatId).single();
+    _cvFelder=result.fields;
+    _cvDbDaten=dbDaten||{};
+
+    cvZeigeVorschau();
+  } catch(e){
+    alert('Fehler beim CV-Auslesen:\n'+e.message);
+  } finally{
+    if(btn){ btn.disabled=false; btn.textContent='📄 CV einlesen'; }
+  }
+}
+
+function cvZeigeVorschau(){
+  const felder=_cvFelder, db=_cvDbDaten;
+  const overlay=document.getElementById('cvOverlay');
+  const body=document.getElementById('cvBody');
+
+  let html='';
+
+  // 1. Wird immer überschrieben
+  html+=`<div class="cv-section"><span class="cv-section-title">✏️ Wird immer aktualisiert</span>`;
+  for(const k of CV_ALWAYS){
+    const v=felder[k];
+    if(v) html+=`<div class="cv-row new"><div class="cv-k">${CV_LABELS[k]||k}</div><div class="cv-v">${esc(String(v))}</div></div>`;
+  }
+  html+=`</div>`;
+
+  // 2. Leere Felder werden befüllt
+  const zuFuellen=[];
+  const bereitsGefuellt=[];
+  for(const [k,v] of Object.entries(felder)){
+    if(CV_ALWAYS.has(k)||!v) continue;
+    const dbVal=db[k];
+    if(!dbVal||String(dbVal).trim()==='') zuFuellen.push([k,v]);
+    else bereitsGefuellt.push([k,dbVal]);
+  }
+
+  if(zuFuellen.length){
+    html+=`<div class="cv-section"><span class="cv-section-title">➕ Wird neu befüllt (war leer)</span>`;
+    for(const [k,v] of zuFuellen)
+      html+=`<div class="cv-row new"><div class="cv-k">${CV_LABELS[k]||k}</div><div class="cv-v">${esc(String(v))}</div></div>`;
+    html+=`</div>`;
+  }
+
+  if(bereitsGefuellt.length){
+    html+=`<div class="cv-section"><span class="cv-section-title">🔒 Bereits gefüllt – wird nicht verändert</span>`;
+    for(const [k,v] of bereitsGefuellt)
+      html+=`<div class="cv-row skip"><div class="cv-k">${CV_LABELS[k]||k}</div><div class="cv-v">${esc(String(v))}</div></div>`;
+    html+=`</div>`;
+  }
+
+  html+=`<div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end">
+    <button class="neuBtn cancelbtn" onclick="document.getElementById('cvOverlay').classList.remove('on')">Abbrechen</button>
+    <button class="neuBtn savebtn" onclick="cvUebernehmen()">✓ Felder übernehmen</button>
+  </div>`;
+
+  body.innerHTML=html;
+  overlay.classList.add('on');
+}
+
+async function cvUebernehmen(){
+  const felder=_cvFelder, db=_cvDbDaten, id=_cvKandidatId;
+  if(!felder||!id) return;
+
+  const update={geaendert_am:new Date().toISOString(), letzte_aktivitaet:new Date().toISOString()};
+
+  for(const [k,v] of Object.entries(felder)){
+    if(!v) continue;
+    if(CV_ALWAYS.has(k)){
+      update[k]=v; // immer überschreiben
+    } else {
+      const dbVal=db[k];
+      if(!dbVal||String(dbVal).trim()==='') update[k]=v; // nur wenn leer
+    }
+  }
+
+  const {error}=await sb.from('kandidaten').update(update).eq('id',id);
+  if(error){ alert('Fehler beim Speichern: '+error.message); return; }
+
+  document.getElementById('cvOverlay').classList.remove('on');
+  await detailKandidat(id); // Seite neu laden
+}
 
 init();
 </script>
