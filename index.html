@@ -264,6 +264,22 @@
   <button class="x" onclick="document.getElementById('detail').close()">×</button></div>
   <div class="dlg-body"><dl class="kv" id="dBody"></dl></div></dialog>
 
+<dialog id="callNote" style="width:min(560px,92vw);border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:6px;padding:0">
+  <div class="dlg-head" style="display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line)">
+    <strong id="cnTitle">📞 Anruf-Notiz</strong>
+    <button class="x" style="margin-left:auto;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer" onclick="document.getElementById('callNote').close()">×</button></div>
+  <div style="padding:18px">
+    <div id="cnWho" style="color:var(--accent);font-size:14px;font-weight:600;margin-bottom:12px"></div>
+    <textarea id="cnText" rows="6" placeholder="Notiz zum Anruf … (Strg+Enter speichert)"
+      style="width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink);padding:11px;font:inherit;font-size:14px;border-radius:3px;resize:vertical"
+      onkeydown="if(event.ctrlKey&&event.key==='Enter')anrufNotizSpeichern()"></textarea>
+    <div style="display:flex;gap:10px;align-items:center;margin-top:14px">
+      <button class="go" onclick="anrufNotizSpeichern()">✓ Speichern</button>
+      <button class="tab" onclick="document.getElementById('callNote').close()">Abbrechen</button>
+      <span id="cnMsg" style="font-size:13px;margin-left:4px"></span>
+    </div>
+  </div></dialog>
+
 <script>
 let sb=null;
 const cfg = { url: localStorage.getItem('sb_url'), key: localStorage.getItem('sb_key') };
@@ -398,16 +414,17 @@ async function pruefeAnruf(nummer){
   if(fehler){ count.textContent='Fehler bei Anrufersuche: '+fehler.message; return; }
   const treffer=[];
   (ka.data||[]).forEach(r=>{ if([r.telefon,r.mobil,r.telefon_privat,r.mobil_privat].some(f=>nrPasst(f,nummer)))
-    treffer.push({typ:'Kandidat',ic:'👤',name:r.voller_name,sub:r.berufsbezeichnung,ort:r.stadt,status:r.status,
+    treffer.push({typ:'Kandidat',ic:'👤',id:r.id,name:r.voller_name,sub:r.berufsbezeichnung,ort:r.stadt,status:r.status,
       nr:r.mobil||r.telefon||r.mobil_privat||r.telefon_privat,open:()=>detailKandidat(r.id)}); });
   (ku.data||[]).forEach(r=>{ if(nrPasst(r.telefon,nummer))
-    treffer.push({typ:'Kunde',ic:'🏢',name:r.name,sub:r.branche,ort:r.stadt,status:'Kunde',
+    treffer.push({typ:'Kunde',ic:'🏢',id:r.id,name:r.name,sub:r.branche,ort:r.stadt,status:'Kunde',
       nr:r.telefon,open:()=>detailKunde(r.id)}); });
   (ko.data||[]).forEach(r=>{ if([r.telefon_beruflich,r.mobil,r.mobil_privat].some(f=>nrPasst(f,nummer)))
-    treffer.push({typ:'Kontakt',ic:'📇',name:r.voller_name,sub:r.berufsbezeichnung,ort:r.stadt,status:'Kontakt',
+    treffer.push({typ:'Kontakt',ic:'📇',id:r.id,name:r.voller_name,sub:r.berufsbezeichnung,ort:r.stadt,status:'Kontakt',
       nr:r.telefon_beruflich||r.mobil||r.mobil_privat,open:()=>detailKontakt(r.id)}); });
 
-  if(treffer.length===1){ count.textContent='📞 Anrufer erkannt ('+treffer[0].typ+'): '+nummer; treffer[0].open(); return; }
+  if(treffer.length===1){ const t=treffer[0]; count.textContent='📞 Anrufer erkannt ('+t.typ+'): '+nummer; t.open();
+    anrufNotizPopup(t.typ,t.id,t.name,nummer); return; }
   const body=document.getElementById('kBody'); body.innerHTML='';
   if(treffer.length===0){
     count.innerHTML='📞 Eingehender Anruf <b>'+esc(nummer)+'</b> – kein Eintrag gefunden.';
@@ -423,9 +440,41 @@ async function pruefeAnruf(nummer){
       <td>${esc(t.ort)||''}</td>
       <td>${t.nr?`<a class="calllink" href="tel:${nrClean}">${esc(t.nr)}</a>`:'–'}</td>
       <td><span class="pill">${esc(t.status)||'–'}</span></td>`;
-    tr.onclick=t.open;
+    tr.onclick=()=>{ t.open(); anrufNotizPopup(t.typ,t.id,t.name,nummer); };
     body.appendChild(tr);
   });
+}
+
+// Anruf-Notiz-Popup: öffnet Dialog, speichert in notizen-Tabelle
+function anrufNotizPopup(typ, id, name, nummer){
+  const dlg=document.getElementById('callNote');
+  document.getElementById('cnWho').textContent=(name||'Unbekannt')+' · '+typ+(nummer?' · '+nummer:'');
+  const ta=document.getElementById('cnText'); ta.value='';
+  document.getElementById('cnMsg').textContent='';
+  dlg.dataset.typ=typ; dlg.dataset.id=id; dlg.dataset.nummer=nummer||'';
+  if(!dlg.open) dlg.showModal();
+  setTimeout(()=>ta.focus(),120);
+}
+async function anrufNotizSpeichern(){
+  const dlg=document.getElementById('callNote');
+  const txt=document.getElementById('cnText').value.trim();
+  const msg=document.getElementById('cnMsg');
+  if(!txt){ msg.style.color='var(--hot)'; msg.textContent='Bitte eine Notiz eingeben.'; return; }
+  msg.style.color='var(--muted)'; msg.textContent='Speichere …';
+  const typ=dlg.dataset.typ, id=dlg.dataset.id;
+  const rec={ id:'note_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
+    inhalt:txt, typ:'Anruf', erstellt_am:new Date().toISOString(), geaendert_am:new Date().toISOString() };
+  if(typ==='Kandidat') rec.kandidat_id=id;
+  else if(typ==='Kunde') rec.kunde_id=id;
+  else if(typ==='Kontakt') rec.kontakt_id=id;
+  const {error}=await sb.from('notizen').insert(rec);
+  if(error){ msg.style.color='var(--hot)'; msg.textContent='Fehler: '+error.message; return; }
+  msg.style.color='var(--ok)'; msg.textContent='✓ Gespeichert';
+  setTimeout(()=>{ dlg.close();
+    if(typ==='Kandidat') detailKandidat(id);
+    else if(typ==='Kunde') detailKunde(id);
+    else if(typ==='Kontakt') detailKontakt(id);
+  }, 650);
 }
 
 function zeileKandidat(r,mitKm){
@@ -1007,6 +1056,8 @@ async function detailKontakt(id){
   if(!d) return;
   let kunde=null;
   if(d.kunde_id){ const {data:kd}=await sb.from('kunden').select('id,name').eq('id',d.kunde_id).single(); kunde=kd; }
+  const {data:notizTab}=await sb.from('notizen').select('*').eq('kontakt_id',id).order('erstellt_am',{ascending:false});
+  const notizT_=notizTab||[];
   ['kandidaten','kunden','kontakte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
   const adresse=[d.strasse,[d.plz,d.stadt].filter(Boolean).join(' '),d.bundesland,d.land].filter(Boolean).join(', ');
@@ -1036,6 +1087,9 @@ async function detailKontakt(id){
     </div>
     ${d.notizen?`<div style="margin-top:14px"><div class="k" style="color:var(--muted);font-size:13px;margin-bottom:4px">Notizen</div><div class="v" style="font-size:13px">${esc(d.notizen)}</div></div>`:''}
     </div>
+    ${notizT_.length?`<div class="card"><h3>Notizen (${notizT_.length})</h3>${
+      notizT_.slice(0,30).map(n=>`<div class="note">${esc(n.inhalt)||'–'}<div class="meta">${n.typ?esc(n.typ)+' · ':''}${n.erstellt_am?fmtDat(n.erstellt_am):''}</div></div>`).join('')
+    }</div>`:''}
     <div class="card"><h3>System</h3><div class="grid2">
       <div>${zeile('Kontakt-ID', esc(d.id))}${zeile('Quelle', esc(d.quelle))}</div>
       <div>${zeile('Erstellt', d.erstellt_am?fmtDat(d.erstellt_am):'')}${zeile('Geändert', d.geaendert_am?fmtDat(d.geaendert_am):'')}</div>
