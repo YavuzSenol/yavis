@@ -434,11 +434,15 @@ function renderTagPanel(){
   const gruppen={}; (alleTagsCache||[]).forEach(t=>{ const k=kategorieVon(t); (gruppen[k]=gruppen[k]||[]).push(t); });
   let html=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
     <strong style="font-size:13px">🏷️ Tags filtern</strong>
-    <label style="font-size:12px;color:var(--muted)">Verknüpfung
+    <label style="font-size:12px;color:var(--muted)">Bedingung
       <select id="tagModus" onchange="renderTagPanel();ladeKandidaten()" style="min-width:auto;padding:4px 8px;margin-left:4px">
-        <option value="und"${modus==='und'?' selected':''}>UND (alle)</option>
-        <option value="oder"${modus==='oder'?' selected':''}>ODER (mind. eine)</option></select></label>
-    ${tagFilter.size?'<button class="tab" style="padding:4px 10px" onclick="tagFilterLeeren()">✕ Zurücksetzen</button>':''}</div>`;
+        <option value="und"${modus==='und'?' selected':''}>alles einbeziehen (UND)</option>
+        <option value="oder"${modus==='oder'?' selected':''}>jegliche einbeziehen (ODER)</option>
+        <option value="nicht"${modus==='nicht'?' selected':''}>enthält nicht</option>
+        <option value="nichtleer"${modus==='nichtleer'?' selected':''}>ist nicht leer (hat Tags)</option>
+        <option value="leer"${modus==='leer'?' selected':''}>ist leer (ohne Tags)</option></select></label>
+    ${tagFilter.size?'<button class="tab" style="padding:4px 10px" onclick="tagFilterLeeren()">✕ Zurücksetzen</button>':''}
+    ${(modus==='leer'||modus==='nichtleer')?'<span style="font-size:12px;color:var(--muted)">(Tag-Auswahl wird hier ignoriert)</span>':''}</div>`;
   ['Gewerk','Leistungsphase','Branche','Software','Sonstige'].forEach(g=>{
     const tags=(gruppen[g]||[]).sort((a,b)=>a.localeCompare(b,'de')); if(!tags.length) return;
     html+=`<div style="margin-bottom:10px"><div class="dcol-h" style="margin-bottom:5px">${g} <span style="color:var(--muted);font-weight:400">(${tags.length})</span></div>${
@@ -453,10 +457,23 @@ function aktualisiereTagAktiv(){
   const el=document.getElementById('tagAktiv'); if(!el) return;
   el.innerHTML = tagFilter.size? [...tagFilter].map(t=>`<span class="tag" style="background:var(--accent);color:#0f1115;border-color:var(--accent);cursor:pointer" onclick="toggleTagFilter('${t.replace(/'/g,"\\'")}')">${esc(t)} ✕</span>`).join('') : '';
 }
+function tagFilterAktiv(){ const m=tagModusWert(); return tagFilter.size>0 || m==='leer' || m==='nichtleer'; }
 function tagsMatchFilter(raw){
+  const m=tagModusWert(); const ts=parseTags(raw);
+  if(m==='leer') return ts.length===0;
+  if(m==='nichtleer') return ts.length>0;
   if(!tagFilter.size) return true;
-  const ts=parseTags(raw);
-  return tagModusWert()==='oder' ? [...tagFilter].some(t=>ts.includes(t)) : [...tagFilter].every(t=>ts.includes(t));
+  if(m==='oder') return [...tagFilter].some(t=>ts.includes(t));
+  if(m==='nicht') return ![...tagFilter].some(t=>ts.includes(t));
+  return [...tagFilter].every(t=>ts.includes(t)); // und
+}
+function tagFilterLabel(){
+  const m=tagModusWert();
+  if(m==='leer') return ' · ohne Tags';
+  if(m==='nichtleer') return ' · mit Tags';
+  if(!tagFilter.size) return '';
+  const ml={und:'UND',oder:'ODER',nicht:'enthält nicht'}[m]||m;
+  return ' · Tags: '+[...tagFilter].join(', ')+' ('+ml+')';
 }
 
 async function ladeKandidaten(){
@@ -475,8 +492,15 @@ async function ladeKandidaten(){
     if(q){const ql=q.toLowerCase();
       rows=rows.filter(r=>[r.voller_name,r.berufsbezeichnung,r.stadt].join(' ').toLowerCase().includes(ql));}
     if(status) rows=rows.filter(r=>r.status===status);
-    if(tagFilter.size) rows=rows.filter(r=>tagsMatchFilter(r.tags));
-    document.getElementById('kCount').textContent=rows.length+' Kandidaten im Umkreis von '+radius+' km um '+plz+(tagFilter.size?' · Tags: '+[...tagFilter].join(', '):'');
+    if(tagFilterAktiv()){
+      // Die Umkreis-Funktion liefert keine Tags → für die Treffer nachladen
+      const ids=rows.map(r=>r.id); const tagMap={};
+      for(let i=0;i<ids.length;i+=300){ const teil=ids.slice(i,i+300);
+        const {data:td}=await sb.from('kandidaten').select('id,tags').in('id',teil);
+        (td||[]).forEach(r=>tagMap[r.id]=r.tags); }
+      rows=rows.filter(r=>tagsMatchFilter(tagMap[r.id]));
+    }
+    document.getElementById('kCount').textContent=rows.length+' Kandidaten im Umkreis von '+radius+' km um '+plz+tagFilterLabel();
     rows.forEach(r=>body.appendChild(zeileKandidat(r,true)));
     if(!rows.length) body.innerHTML='<tr><td colspan="5" class="empty">Keine Treffer.</td></tr>';
     return;
@@ -486,14 +510,18 @@ async function ladeKandidaten(){
   let query=sb.from('kandidaten').select('*').limit(200);
   if(status) query=query.eq('status',status);
   if(q) query=query.or(`voller_name.ilike.%${q}%,berufsbezeichnung.ilike.%${q}%,faehigkeiten.ilike.%${q}%,stadt.ilike.%${q}%`);
-  if(tagFilter.size){
-    if(tagModusWert()==='oder'){ query=query.or([...tagFilter].map(t=>`tags.ilike.%;${t};%`).join(',')); }
-    else { tagFilter.forEach(t=>{ query=query.ilike('tags','%;'+t+';%'); }); }
+  const tmod=tagModusWert();
+  if(tmod==='leer'){ query=query.or('tags.is.null,tags.eq.,tags.eq.;;'); }
+  else if(tmod==='nichtleer'){ query=query.not('tags','is',null).neq('tags','').neq('tags',';;'); }
+  else if(tagFilter.size){
+    if(tmod==='oder') query=query.or([...tagFilter].map(t=>`tags.ilike.%;${t};%`).join(','));
+    else if(tmod==='nicht') tagFilter.forEach(t=>{ query=query.not('tags','ilike',`%;${t};%`); });
+    else tagFilter.forEach(t=>{ query=query.ilike('tags','%;'+t+';%'); }); // und
   }
   query=query.order('letzte_aktivitaet',{ascending:false,nullsFirst:false});
   const {data,error}=await query;
   if(error){document.getElementById('kCount').textContent='Fehler: '+error.message;return;}
-  document.getElementById('kCount').textContent=(data.length)+' Kandidaten'+(data.length>=200?' (erste 200)':'')+(tagFilter.size?' · Tags: '+[...tagFilter].join(', ')+' ('+tagModusWert().toUpperCase()+')':'');
+  document.getElementById('kCount').textContent=(data.length)+' Kandidaten'+(data.length>=200?' (erste 200)':'')+tagFilterLabel();
   data.forEach(r=>body.appendChild(zeileKandidat(r,false)));
   if(!data.length) body.innerHTML='<tr><td colspan="5" class="empty">Keine Treffer.</td></tr>';
 }
