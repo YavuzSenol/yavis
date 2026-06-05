@@ -1,0 +1,15 @@
+# Geheimnisse / Zugangsdaten — NIEMALS committen
+logs_dats.txt
+login.local
+*token*.txt
+*Token*.txt
+Management_token.txt
+
+# Lokale Claude-/Editor-Konfiguration
+.claude/
+
+# Backups & lokale Arbeitsdaten (nicht für GitHub Pages)
+zoho backup/
+Python Lebensläufe/
+UEBERGABE_YAVIS.md
+recruiting_app.html
