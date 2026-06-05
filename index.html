@@ -121,6 +121,17 @@
   .edit-actions{display:flex;gap:10px;margin-top:18px}
   .neuBtn{background:var(--ok);color:#0f1115;border:none;padding:10px 16px;font:inherit;font-size:12px;
     font-weight:600;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;border-radius:2px}
+  /* Kandidaten-Foto */
+  .foto-wrap{position:relative;flex-shrink:0}
+  .foto-avatar{width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--line);
+    background:var(--panel2);display:block}
+  .foto-placeholder{width:64px;height:64px;border-radius:50%;border:2px dashed var(--line);
+    background:var(--panel2);display:flex;align-items:center;justify-content:center;
+    color:var(--muted);font-size:22px;cursor:pointer;flex-shrink:0}
+  .foto-upload-btn{position:absolute;bottom:-4px;right:-4px;background:var(--panel2);border:1px solid var(--line);
+    border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;
+    cursor:pointer;font-size:12px;color:var(--muted)}
+  .foto-upload-btn:hover{border-color:var(--accent);color:var(--accent)}
 </style>
 </head>
 <body>
@@ -343,7 +354,6 @@ function zeile(k,v){ if(v===null||v===undefined||v===''||v==='–') return '';
   return `<div class="kvr"><div class="k">${k}</div><div class="v">${v}</div></div>`; }
 
 async function detailKandidat(id){
-  // Hauptdatensatz + verknüpfte Daten parallel laden
   const [k, ausb, erf, notiz, bew, aufg, dok] = await Promise.all([
     sb.from('kandidaten').select('*').eq('id',id).single(),
     sb.from('ausbildung').select('*').eq('kandidat_id',id),
@@ -354,12 +364,16 @@ async function detailKandidat(id){
     sb.from('dokumente').select('*').eq('kandidat_id',id).order('hochgeladen_am',{ascending:false}),
   ]);
   const d=k.data; if(!d) return;
-  zeigeKandidatSeite(d, ausb.data||[], erf.data||[], notiz.data||[], bew.data||[], aufg.data||[], dok.data||[]);
+  // Foto laden (signierte URL, 2h gültig)
+  let fotoUrl=null;
+  const fotoPfad=`kandidat/${id}/foto`;
+  const {data:fotoData}=await sb.storage.from('dokumente').createSignedUrl(fotoPfad,7200);
+  if(fotoData?.signedUrl) fotoUrl=fotoData.signedUrl;
+  zeigeKandidatSeite(d, ausb.data||[], erf.data||[], notiz.data||[], bew.data||[], aufg.data||[], dok.data||[], fotoUrl);
 }
 
-function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok){
+function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl){
   dok = dok || [];
-  // Listen ausblenden, Detailseite zeigen
   ['kandidaten','kunden','kontakte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
 
@@ -367,13 +381,24 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok){
   const adrBerufl=[d.strasse_beruf,[d.plz_beruf,d.stadt_beruf].filter(Boolean).join(' '),d.bundesland_beruf,d.land_beruf].filter(Boolean).join(', ');
   const tags=(d.tags||'').split(',').map(t=>t.trim()).filter(Boolean).map(t=>`<span class="tag">${esc(t)}</span>`).join('');
 
+  const fotoHtml=fotoUrl
+    ?`<div class="foto-wrap">
+        <img class="foto-avatar" src="${fotoUrl}" alt="Foto" onerror="this.parentElement.innerHTML=fotoPlaceholder('${d.id}')">
+        <div class="foto-upload-btn" title="Foto ändern" onclick="fotoHochladen('${d.id}')">✎</div>
+      </div>`
+    :`<div class="foto-placeholder" title="Foto hochladen" onclick="fotoHochladen('${d.id}')">👤</div>`;
+
   page.innerHTML=`
+    <input type="file" id="fotoInput" accept="image/*" style="display:none" onchange="fotoSpeichern('${d.id}')">
     <div class="detail-head">
       <button class="back" onclick="zurueckZurListe()">← Zurück</button>
-      <h2>${d.ist_hot?'🔥 ':''}${esc(d.voller_name)||'Kandidat'}</h2>
+      ${fotoHtml}
+      <div>
+        <h2 style="margin:0 0 2px">${d.ist_hot?'🔥 ':''}${esc(d.voller_name)||'Kandidat'}</h2>
+        <div class="detail-sub" style="margin:0">${esc(d.berufsbezeichnung)||''}${d.arbeitgeber?' · '+esc(d.arbeitgeber):''}${d.status?' · <span class="pill">'+esc(d.status)+'</span>':''}</div>
+      </div>
       <button class="editbtn" onclick="bearbeiteKandidat('${d.id}')">✎ Bearbeiten</button>
     </div>
-    <div class="detail-sub">${esc(d.berufsbezeichnung)||''}${d.arbeitgeber?' · '+esc(d.arbeitgeber):''}${d.status?' · <span class="pill">'+esc(d.status)+'</span>':''}</div>
 
     <div class="dpanels">
 
@@ -524,6 +549,28 @@ function dokumenteHtml(dok){
         <button class="neuBtn cancelbtn" style="padding:6px 12px" onclick="loescheDokument('${d.id}','${esc(d.pfad)}')">×</button>
       </div></div>`;
   }).join('');
+}
+
+// ---- Foto-Funktionen ----
+function fotoPlaceholder(id){
+  return `<div class="foto-placeholder" title="Foto hochladen" onclick="fotoHochladen('${id}')">👤</div>`;
+}
+function fotoHochladen(id){
+  const inp=document.getElementById('fotoInput');
+  if(inp){ inp.dataset.kandidatId=id; inp.click(); }
+}
+async function fotoSpeichern(kandidatId){
+  const inp=document.getElementById('fotoInput');
+  const file=inp?.files[0]; if(!file) return;
+  if(!file.type.startsWith('image/')){ alert('Bitte nur Bilddateien hochladen (JPG, PNG, …)'); return; }
+  if(file.size>10*1024*1024){ alert('Foto zu groß (max. 10 MB).'); return; }
+  const ext=file.name.split('.').pop().toLowerCase()||'jpg';
+  const pfad=`kandidat/${kandidatId}/foto.${ext}`;
+  // altes Foto löschen, neues hochladen (upsert)
+  await sb.storage.from('dokumente').remove([`kandidat/${kandidatId}/foto.jpg`,`kandidat/${kandidatId}/foto.jpeg`,`kandidat/${kandidatId}/foto.png`,`kandidat/${kandidatId}/foto.webp`]);
+  const {error}=await sb.storage.from('dokumente').upload(pfad,file,{upsert:true});
+  if(error){ alert('Fehler beim Hochladen: '+error.message); return; }
+  await detailKandidat(kandidatId);
 }
 
 async function oeffneDokument(pfad){
