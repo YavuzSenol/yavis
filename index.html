@@ -63,15 +63,28 @@
     padding:8px 14px;cursor:pointer;font:inherit;font-size:12px;border-radius:2px}
   .detail-head h2{margin:0;font-size:22px;color:var(--accent)}
   .detail-sub{color:var(--muted);font-size:13px;margin-bottom:10px}
-  /* 4-Spalten Kompakt-Layout */
-  .dcols{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--line);
+  /* 3-Spalten Panel-Layout (Links / Mitte / Rechts) */
+  .dpanels{display:grid;grid-template-columns:210px 1fr 240px;gap:0;border:1px solid var(--line);
     border-radius:6px;background:var(--panel);margin-bottom:10px;overflow:hidden}
-  .dcol{padding:12px 14px;border-right:1px solid var(--line);min-width:0;overflow:hidden}
-  .dcol:last-child{border-right:none}
+  .dpanel{padding:12px 14px;border-right:1px solid var(--line);min-width:0;overflow:hidden}
+  .dpanel:last-child{border-right:none}
+  .dpanel-sub{margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}
+  @media(max-width:880px){.dpanels{grid-template-columns:1fr 1fr}}
+  @media(max-width:560px){.dpanels{grid-template-columns:1fr}}
+  /* Gemeinsamer Spalten-Header */
   .dcol-h{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent2);
     font-weight:700;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--line);display:block}
-  @media(max-width:960px){.dcols{grid-template-columns:repeat(2,1fr)}}
-  @media(max-width:560px){.dcols{grid-template-columns:1fr}}
+  /* Akkordeon-Fenster */
+  details.acc{border:1px solid var(--line);border-radius:4px;margin-bottom:6px;
+    background:var(--panel);overflow:hidden}
+  details.acc summary{padding:9px 14px;cursor:pointer;font-size:10px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--accent2);font-weight:600;user-select:none;
+    display:flex;align-items:center;justify-content:space-between;list-style:none}
+  details.acc summary::-webkit-details-marker{display:none}
+  details.acc summary .acc-cnt{color:var(--muted);font-weight:400;margin-left:6px}
+  details.acc summary .acc-arr{font-size:10px;color:var(--muted);transition:transform .15s}
+  details.acc[open] summary .acc-arr{transform:rotate(90deg)}
+  details.acc .acc-body{padding:10px 14px;border-top:1px solid var(--line)}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px 16px;margin-bottom:10px}
   .card h3{margin:0 0 10px;font-size:9px;letter-spacing:.14em;text-transform:uppercase;
     color:var(--accent2);border-bottom:1px solid var(--line);padding-bottom:6px}
@@ -362,100 +375,129 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok){
     </div>
     <div class="detail-sub">${esc(d.berufsbezeichnung)||''}${d.arbeitgeber?' · '+esc(d.arbeitgeber):''}${d.status?' · <span class="pill">'+esc(d.status)+'</span>':''}</div>
 
-    <div class="dcols">
-      <div class="dcol">
-        <span class="dcol-h">Kontakt</span>
-        ${zeile('Anrede', esc(d.begruessung))}
-        ${zeile('E-Mail', d.email?`<a href="mailto:${esc(d.email)}">${esc(d.email)}</a>`:'')}
-        ${zeile('E-Mail berufl.', d.email_beruflich?`<a href="mailto:${esc(d.email_beruflich)}">${esc(d.email_beruflich)}</a>`:'')}
-        ${zeile('2. E-Mail', d.email_zweit)}
-        ${zeile('Telefon', tel(d.telefon))}
-        ${zeile('Tel. privat', tel(d.telefon_privat))}
-        ${zeile('Mobil', tel(d.mobil))}
-        ${zeile('Mobil privat', tel(d.mobil_privat))}
-      </div>
-      <div class="dcol">
-        <span class="dcol-h">Adresse & Online</span>
-        ${zeile('Adresse priv.', esc(adrPriv))}
+    <div class="dpanels">
+
+      <!-- LINKS: Arbeitgeber & Status -->
+      <div class="dpanel">
+        <span class="dcol-h">Arbeitgeber</span>
+        ${zeile('Firma', esc(d.arbeitgeber))}
+        ${zeile('Bei Firma seit', esc(d.bei_firma_seit))}
+        ${zeile('In Pos. seit', esc(d.in_position_seit))}
         ${zeile('Adresse berufl.', esc(adrBerufl))}
-        ${zeile('Geburtstag', esc(d.geburtstag))}
-        ${zeile('XING', link(d.xing_profil))}
-        ${zeile('LinkedIn', link(d.linkedin_profil))}
+        ${zeile('Firma zuvor', esc(d.firma_zuvor))}
+        <div class="dpanel-sub">
+          <span class="dcol-h">Status & Recruiting</span>
+          ${zeile('Status', d.status?`<span class="pill">${esc(d.status)}</span>`:'')}
+          ${zeile('Kontaktstatus', esc(d.kontaktstatus))}
+          ${zeile('Int. Wertung', esc(d.wertung_intern))}
+          ${zeile('Positionswunsch', esc(d.positionswunsch))}
+          ${zeile('Umzug', esc(d.umzugsbereitschaft))}
+          ${zeile('Wunschregion', esc(d.wunschregion))}
+          ${zeile('Quelle', esc(d.quelle))}
+        </div>
       </div>
-      <div class="dcol">
+
+      <!-- MITTE: Kontakt (2 Unterspalten) -->
+      <div class="dpanel">
+        <span class="dcol-h">Kontakt & Adresse</span>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 20px">
+          <div>
+            ${zeile('Anrede', esc(d.begruessung))}
+            ${zeile('E-Mail', d.email?`<a href="mailto:${esc(d.email)}">${esc(d.email)}</a>`:'')}
+            ${zeile('E-Mail berufl.', d.email_beruflich?`<a href="mailto:${esc(d.email_beruflich)}">${esc(d.email_beruflich)}</a>`:'')}
+            ${zeile('2. E-Mail', d.email_zweit)}
+            ${zeile('Telefon', tel(d.telefon))}
+            ${zeile('Tel. privat', tel(d.telefon_privat))}
+            ${zeile('Mobil', tel(d.mobil))}
+            ${zeile('Mobil privat', tel(d.mobil_privat))}
+          </div>
+          <div>
+            ${zeile('Adresse priv.', esc(adrPriv))}
+            ${zeile('Geburtstag', esc(d.geburtstag))}
+            ${zeile('XING', link(d.xing_profil))}
+            ${zeile('LinkedIn', link(d.linkedin_profil))}
+          </div>
+        </div>
+        ${(d.faehigkeiten||tags)?`<div class="dpanel-sub">
+          ${d.faehigkeiten?`<span class="dcol-h">Fähigkeiten</span>${(d.faehigkeiten||'').split(',').map(s=>s.trim()).filter(Boolean).map(s=>`<span class="tag">${esc(s)}</span>`).join('')}`:''}
+          ${tags?`<span class="dcol-h" style="margin-top:6px">Tags</span>${tags}`:''}
+        </div>`:''}
+        ${d.profil_zusammenfassung||d.bemerkung?`<div class="dpanel-sub">
+          ${d.profil_zusammenfassung?`<span class="dcol-h">Profil</span><div style="font-size:12px;color:var(--muted);margin-top:3px;margin-bottom:6px">${esc(d.profil_zusammenfassung)}</div>`:''}
+          ${d.bemerkung?`<span class="dcol-h">Bemerkung</span><div style="font-size:12px;color:var(--muted);margin-top:3px">${esc(d.bemerkung)}</div>`:''}
+        </div>`:''}
+      </div>
+
+      <!-- RECHTS: Berufliches -->
+      <div class="dpanel">
         <span class="dcol-h">Beruflich</span>
         ${zeile('Tätigkeit', esc(d.berufsbezeichnung))}
         ${d.position_original?zeile('Pos. laut CV', esc(d.position_original)):''}
-        ${zeile('In Pos. seit', esc(d.in_position_seit))}
-        ${zeile('Arbeitgeber', esc(d.arbeitgeber))}
-        ${zeile('Bei Firma seit', esc(d.bei_firma_seit))}
-        ${zeile('Firma zuvor', esc(d.firma_zuvor))}
         ${zeile('Erfahrung', d.erfahrung_jahre?esc(d.erfahrung_jahre)+' J.':'')}
         ${zeile('Qualifikation', esc(d.qualifikation))}
         ${zeile('Studiengang', esc(d.studiengang))}
-        ${zeile('Gehalt aktuell', esc(d.gehalt_aktuell))}
-        ${zeile('Gehalt Wunsch', esc(d.gehalt_erwartet))}
-        ${zeile('Kündigungsfrist', esc(d.kuendigungsfrist))}
+        <div class="dpanel-sub">
+          <span class="dcol-h">Konditionen</span>
+          ${zeile('Gehalt aktuell', esc(d.gehalt_aktuell))}
+          ${zeile('Gehalt Wunsch', esc(d.gehalt_erwartet))}
+          ${zeile('Kündigungsfrist', esc(d.kuendigungsfrist))}
+          ${zeile('Wechselmotiv.', esc(d.wechselmotivation))}
+        </div>
       </div>
-      <div class="dcol">
-        <span class="dcol-h">Recruiting</span>
-        ${zeile('Status', d.status?`<span class="pill">${esc(d.status)}</span>`:'')}
-        ${zeile('Kontaktstatus', esc(d.kontaktstatus))}
-        ${zeile('Int. Wertung', esc(d.wertung_intern))}
-        ${zeile('Positionswunsch', esc(d.positionswunsch))}
-        ${zeile('Wechselmotiv.', esc(d.wechselmotivation))}
-        ${zeile('Umzug', esc(d.umzugsbereitschaft))}
-        ${zeile('Wunschregion', esc(d.wunschregion))}
-        ${zeile('Quelle', esc(d.quelle))}
-      </div>
+
     </div>
 
-    ${(d.faehigkeiten||tags||d.profil_zusammenfassung||d.bemerkung)?`<div class="card">
-      ${d.faehigkeiten?`<div style="margin-bottom:8px"><span class="dcol-h">Fähigkeiten</span>${(d.faehigkeiten||'').split(',').map(s=>s.trim()).filter(Boolean).map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>`:''}
-      ${tags?`<div style="margin-bottom:8px"><span class="dcol-h">Tags</span>${tags}</div>`:''}
-      ${d.profil_zusammenfassung?`<div style="margin-bottom:6px"><span class="dcol-h">Profil</span><div style="font-size:12px;margin-top:4px">${esc(d.profil_zusammenfassung)}</div></div>`:''}
-      ${d.bemerkung?`<div><span class="dcol-h">Bemerkung</span><div style="font-size:12px;margin-top:4px">${esc(d.bemerkung)}</div></div>`:''}
-    </div>`:''}
-
-    ${erf.length?`<div class="card"><h3>Berufserfahrung</h3>${
-      erf.map(e=>`<div class="timeline-item"><div class="t">${esc(e.titel)||'–'}</div>
+    <!-- AUFKLAPPBARE FENSTER -->
+    ${erf.length?`<details class="acc">
+      <summary><span>Berufserfahrung<span class="acc-cnt">(${erf.length})</span></span><span class="acc-arr">▶</span></summary>
+      <div class="acc-body">${erf.map(e=>`<div class="timeline-item">
+        <div class="t">${esc(e.titel)||'–'}</div>
         <div class="m">${esc(e.unternehmen)||''}${(e.von||e.bis)?' · '+esc(e.von||'')+' – '+esc(e.bis||'heute'):''}</div>
-        ${e.uebersicht?`<div style="font-size:12px;color:var(--muted)">${esc(e.uebersicht)}</div>`:''}</div>`).join('')
-    }</div>`:''}
+        ${e.uebersicht?`<div style="font-size:11px;color:var(--muted);margin-top:3px">${esc(e.uebersicht)}</div>`:''}</div>`).join('')}</div>
+    </details>`:''}
 
-    ${ausb.length?`<div class="card"><h3>Ausbildung</h3>${
-      ausb.map(a=>`<div class="timeline-item"><div class="t">${esc(a.institut)||'–'}</div>
-        <div class="m">${esc(a.grad)||''}${a.hauptfach?' · '+esc(a.hauptfach):''}${(a.von||a.bis)?' · '+esc(a.von||'')+' – '+esc(a.bis||''):''}</div></div>`).join('')
-    }</div>`:''}
+    ${ausb.length?`<details class="acc">
+      <summary><span>Ausbildung<span class="acc-cnt">(${ausb.length})</span></span><span class="acc-arr">▶</span></summary>
+      <div class="acc-body">${ausb.map(a=>`<div class="timeline-item">
+        <div class="t">${esc(a.institut)||'–'}</div>
+        <div class="m">${esc(a.grad)||''}${a.hauptfach?' · '+esc(a.hauptfach):''}${(a.von||a.bis)?' · '+esc(a.von||'')+' – '+esc(a.bis||''):''}</div></div>`).join('')}</div>
+    </details>`:''}
 
-    ${bew.length?`<div class="card"><h3>Bewerbungen (${bew.length})</h3>${
-      bew.map(b=>`<div class="note"><strong>${esc(b.jobtitel)||'–'}</strong>
-        <div class="meta">Status: ${esc(b.status)||'–'}${b.stufe?' · Stufe: '+esc(b.stufe):''}${b.erstellt_am?' · '+fmtDat(b.erstellt_am):''}</div></div>`).join('')
-    }</div>`:''}
+    ${bew.length?`<details class="acc">
+      <summary><span>Bewerbungen<span class="acc-cnt">(${bew.length})</span></span><span class="acc-arr">▶</span></summary>
+      <div class="acc-body">${bew.map(b=>`<div class="note"><strong>${esc(b.jobtitel)||'–'}</strong>
+        <div class="meta">Status: ${esc(b.status)||'–'}${b.stufe?' · Stufe: '+esc(b.stufe):''}${b.erstellt_am?' · '+fmtDat(b.erstellt_am):''}</div></div>`).join('')}</div>
+    </details>`:''}
 
-    ${notiz.length?`<div class="card"><h3>Notizen (${notiz.length})</h3>${
-      notiz.slice(0,30).map(n=>`<div class="note">${esc(n.inhalt)||'–'}<div class="meta">${n.erstellt_am?fmtDat(n.erstellt_am):''}</div></div>`).join('')
-    }${notiz.length>30?`<div class="meta" style="color:var(--muted)">… und ${notiz.length-30} weitere</div>`:''}</div>`:''}
+    ${notiz.length?`<details class="acc">
+      <summary><span>Notizen<span class="acc-cnt">(${notiz.length})</span></span><span class="acc-arr">▶</span></summary>
+      <div class="acc-body">${notiz.slice(0,30).map(n=>`<div class="note">${esc(n.inhalt)||'–'}<div class="meta">${n.erstellt_am?fmtDat(n.erstellt_am):''}</div></div>`).join('')}
+      ${notiz.length>30?`<div style="color:var(--muted);font-size:11px;padding:4px 0">… und ${notiz.length-30} weitere</div>`:''}</div>
+    </details>`:''}
 
-    <div class="card"><h3>Dokumente (${dok.length})</h3>
-      <div id="dokListe">${dokumenteHtml(dok)}</div>
-      <div style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        <input type="file" id="dokFile" style="font-size:12px;color:var(--muted)">
-        <button class="neuBtn" onclick="ladeDokumentHoch('${d.id}')">↑ Hochladen</button>
-        <span id="dokMsg" style="font-size:12px"></span>
+    <details class="acc" open>
+      <summary><span>Dokumente<span class="acc-cnt">(${dok.length})</span></span><span class="acc-arr">▶</span></summary>
+      <div class="acc-body">
+        <div id="dokListe">${dokumenteHtml(dok)}</div>
+        <div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <input type="file" id="dokFile" style="font-size:12px;color:var(--muted)">
+          <button class="neuBtn" onclick="ladeDokumentHoch('${d.id}')">↑ Hochladen</button>
+          <span id="dokMsg" style="font-size:12px"></span>
+        </div>
+        <div style="color:var(--muted);font-size:11px;margin-top:6px">PDF, Word, Bilder. Max. 25 MB pro Datei.</div>
       </div>
-      <div class="meta" style="color:var(--muted);font-size:11px;margin-top:8px">PDF, Word, Bilder. Max. 25 MB pro Datei.</div>
-    </div>
+    </details>
 
-    <div class="card"><h3>System</h3>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px 20px">
+    <details class="acc">
+      <summary><span>System</span><span class="acc-arr">▶</span></summary>
+      <div class="acc-body" style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px 20px">
         ${zeile('Kandidat-ID', esc(d.id))}
         ${zeile('Erstellt', d.erstellt_am?fmtDat(d.erstellt_am):'')}
         ${zeile('Geändert', d.geaendert_am?fmtDat(d.geaendert_am):'')}
         ${zeile('Letzte Aktivität', d.letzte_aktivitaet?fmtDat(d.letzte_aktivitaet):'')}
         ${zeile('Quelle', esc(d.quelle))}
       </div>
-    </div>
+    </details>
   `;
   window.scrollTo(0,0);
 }
