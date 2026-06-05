@@ -636,6 +636,12 @@ function nrPasst(a,b){
   if(a.length<6||b.length<6) return false;
   return a===b || a.endsWith(b) || b.endsWith(a);
 }
+// Lockerer für die Suche: Teil-Nummer (zusammenhängender Ausschnitt) reicht
+function nrEnthaelt(gespeichert, such){
+  const a=normNr(gespeichert), b=normNr(such);
+  if(b.length<4||a.length<4) return false;
+  return a.includes(b);
+}
 async function pruefeAnruf(nummer){
   const count=document.getElementById('kCount');
   document.getElementById('kSuche').value=nummer;
@@ -1848,18 +1854,18 @@ async function globaleSuche(){
   const page=document.getElementById('detailPage'); page.style.display='block';
   page.innerHTML=`<div class="detail-head"><button class="back" onclick="zurueckZurListe()">← Zurück</button><h2>🔍 Suche: „${esc(term)}"</h2></div><div style="color:var(--muted);font-size:14px">Suche läuft …</div>`;
   const digits=term.replace(/\D/g,'');
-  const istTelefon = digits.length>=7 && /^[\d\s\-+()\/.]+$/.test(term);
+  const istTelefon = digits.length>=4 && /^[\d\s\-+()\/.]+$/.test(term);
   let kaR, kuR, koR;
   if(istTelefon){
-    // Telefon-Suche: format-unabhängig (wie Anrufererkennung)
+    // Telefon-Suche: format-unabhängig, Teil-Nummer (Ausschnitt) reicht
     const [ka,ku,ko]=await Promise.all([
       sb.from('kandidaten').select('id,voller_name,berufsbezeichnung,stadt,arbeitgeber,telefon,mobil,telefon_privat,mobil_privat').limit(2000),
       sb.from('kunden').select('id,name,typ,branche,stadt,telefon').limit(2000),
       sb.from('kontakte').select('id,voller_name,berufsbezeichnung,email,kunde_id,telefon_beruflich,mobil,mobil_privat').limit(2000),
     ]);
-    kaR=(ka.data||[]).filter(r=>[r.telefon,r.mobil,r.telefon_privat,r.mobil_privat].some(f=>nrPasst(f,term)));
-    kuR=(ku.data||[]).filter(r=>nrPasst(r.telefon,term));
-    koR=(ko.data||[]).filter(r=>[r.telefon_beruflich,r.mobil,r.mobil_privat].some(f=>nrPasst(f,term)));
+    kaR=(ka.data||[]).filter(r=>[r.telefon,r.mobil,r.telefon_privat,r.mobil_privat].some(f=>nrEnthaelt(f,term)));
+    kuR=(ku.data||[]).filter(r=>nrEnthaelt(r.telefon,term));
+    koR=(ko.data||[]).filter(r=>[r.telefon_beruflich,r.mobil,r.mobil_privat].some(f=>nrEnthaelt(f,term)));
   } else {
     const like='%'+term+'%';
     const [ka,ku,ko]=await Promise.all([
