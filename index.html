@@ -259,15 +259,20 @@
       <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="kMitProfil" onchange="nachfassToggle()" style="min-width:auto;width:14px;height:14px;padding:0;margin:0">🔗 nur mit XING/LinkedIn-Profil</label>
       <button class="tab" onclick="toggleTagPanel()">🏷️ Nach Tags filtern <span id="tagFilterCount"></span></button>
       <button class="tab" onclick="toggleSpaltenPanel()">🗂 Spalten</button>
+      <button class="tab" onclick="duplikateFinden()" title="Doppelte Kandidaten nach Name oder E-Mail suchen">🔍 Duplikate</button>
       <span id="tagAktiv"></span>
     </div>
     <div id="tagPanel" style="display:none;border:1px solid var(--line);background:var(--panel);border-radius:4px;padding:14px;margin-bottom:14px"></div>
     <div id="spaltenPanel" style="display:none;border:1px solid var(--line);background:var(--panel);border-radius:4px;padding:14px;margin-bottom:14px"></div>
     <div class="count" id="kCount"></div>
-    <div id="selBar" style="display:none;align-items:center;gap:10px;background:var(--accent);color:#fff;padding:8px 14px;border-radius:6px;margin-bottom:8px;flex-wrap:wrap">
+    <div id="selBar" style="display:none;align-items:center;gap:8px;background:var(--accent);color:#fff;padding:8px 14px;border-radius:6px;margin-bottom:8px;flex-wrap:wrap">
       <span id="selCount" style="font-weight:600"></span>
-      <button onclick="exportiereAuswahl()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 12px;border-radius:4px;cursor:pointer;font-size:13px">📥 CSV Export</button>
-      <button onclick="serienMailAuswahl()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 12px;border-radius:4px;cursor:pointer;font-size:13px">✉️ Serien-E-Mail</button>
+      <button onclick="exportiereAuswahl()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">📥 CSV</button>
+      <button onclick="serienMailAuswahl()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">✉️ E-Mail</button>
+      <button onclick="selTagsModal('hinzu')" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">🏷️ Tags +</button>
+      <button onclick="selTagsModal('entf')" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">🏷️ Tags −</button>
+      <button onclick="selMassenupdate()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">✏️ Aktualisieren</button>
+      <button onclick="selLoeschen()" style="background:rgba(220,38,38,0.7);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">🗑️ Löschen</button>
       <button onclick="selAufheben()" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.4);padding:5px 10px;border-radius:4px;cursor:pointer;font-size:13px;margin-left:auto">✕ Aufheben</button>
     </div>
     <table><thead><tr id="kHead"></tr></thead><tbody id="kBody"></tbody></table>
@@ -573,6 +578,159 @@ async function serienMailAuswahl(){
     <div style="margin-top:14px;text-align:right"><button onclick="this.closest('dialog').close();this.closest('dialog').remove()" style="padding:6px 18px;border-radius:4px;cursor:pointer;background:var(--panel2);border:1px solid var(--line)">Schließen</button></div>`;
   document.body.appendChild(dlg); dlg.showModal();
 }
+// ---- Toast-Meldung ----
+function zeigeMeldung(msg,typ='ok'){
+  let el=document.getElementById('yavisToast');
+  if(!el){el=document.createElement('div');el.id='yavisToast';el.style.cssText='position:fixed;bottom:26px;right:26px;z-index:9999;padding:12px 20px;border-radius:8px;font-size:14px;font-weight:600;box-shadow:0 4px 18px rgba(0,0,0,0.35);transition:opacity 0.5s;pointer-events:none';document.body.appendChild(el);}
+  el.style.background=typ==='err'?'#dc2626':typ==='warn'?'#d97706':'#16a34a';
+  el.style.color='#fff'; el.style.opacity='1'; el.textContent=msg;
+  clearTimeout(el._t); el._t=setTimeout(()=>{el.style.opacity='0';},3200);
+}
+
+// ---- Tags hinzufügen/entfernen ----
+async function selTagsModal(modus){
+  if(!selectedKandIds.size) return;
+  const alle=await ladeAlleTags();
+  const dlg=document.createElement('dialog');
+  dlg.style.cssText='background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:24px;max-width:520px;width:95vw';
+  const farbe=modus==='hinzu'?'var(--accent)':'#dc2626';
+  dlg.innerHTML=`<h3 style="margin:0 0 14px">${modus==='hinzu'?'🏷️ Tags hinzufügen':'🏷️ Tags entfernen'} — ${selectedKandIds.size} Kandidaten</h3>
+    <input id="tagEingabe" list="tagVorschlDL" placeholder="Tag eingeben…" autocomplete="off" style="width:100%;padding:8px 10px;font-size:14px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;box-sizing:border-box">
+    <datalist id="tagVorschlDL">${alle.map(t=>`<option value="${esc(t)}">`).join('')}</datalist>
+    <div id="tagFehler" style="font-size:12px;color:var(--hot);min-height:18px;margin-top:6px"></div>
+    <div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="this.closest('dialog').close();this.closest('dialog').remove()" style="padding:7px 16px;border-radius:4px;cursor:pointer;background:var(--panel2);border:1px solid var(--line)">Abbrechen</button>
+      <button onclick="selTagsAnwenden('${modus}',this.closest('dialog'))" style="padding:7px 20px;border-radius:4px;cursor:pointer;background:${farbe};color:#fff;border:none;font-weight:600">${modus==='hinzu'?'Hinzufügen':'Entfernen'}</button>
+    </div>`;
+  document.body.appendChild(dlg); dlg.showModal();
+  setTimeout(()=>dlg.querySelector('#tagEingabe').focus(),80);
+}
+async function selTagsAnwenden(modus,dlg){
+  const tag=normTag(dlg.querySelector('#tagEingabe').value);
+  if(!tag){dlg.querySelector('#tagFehler').textContent='⚠️ Kein gültiger Tag eingegeben'; return;}
+  const ids=[...selectedKandIds];
+  const {data:rows}=await sb.from('kandidaten').select('id,tags').in('id',ids);
+  let geaendert=0;
+  for(const r of rows||[]){
+    const ts=parseTags(r.tags); let neu;
+    if(modus==='hinzu'){if(ts.includes(tag)) continue; ts.push(tag); neu=ts.join(';');}
+    else{if(!ts.includes(tag)) continue; const n2=ts.filter(t=>t!==tag); neu=n2.length?n2.join(';'):null;}
+    await sb.from('kandidaten').update({tags:neu}).eq('id',r.id); geaendert++;
+  }
+  dlg.close(); dlg.remove();
+  zeigeMeldung(`„${tag}" ${modus==='hinzu'?'hinzugefügt':'entfernt'} bei ${geaendert} Kandidaten`);
+  ladeKandidaten();
+}
+
+// ---- Massenaktualisierung ----
+async function selMassenupdate(){
+  if(!selectedKandIds.size) return;
+  const dlg=document.createElement('dialog');
+  dlg.style.cssText='background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:24px;max-width:500px;width:95vw';
+  dlg.innerHTML=`<h3 style="margin:0 0 14px">✏️ Massenaktualisierung — ${selectedKandIds.size} Kandidaten</h3>
+    <label style="font-size:13px;color:var(--muted)">Feld</label>
+    <select id="massFeld" onchange="massFeldWechseln(this)" style="width:100%;padding:8px;font-size:14px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;margin:6px 0 14px">
+      <option value="">– Feld wählen –</option>
+      <option value="berufsbezeichnung">Berufsbezeichnung</option>
+      <option value="status">Status</option>
+      <option value="arbeitgeber">Arbeitgeber</option>
+      <option value="stadt">Stadt</option>
+      <option value="abwerbeschutz">Abwerbeschutz</option>
+    </select>
+    <div id="massWertBox"></div>
+    <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="this.closest('dialog').close();this.closest('dialog').remove()" style="padding:7px 16px;border-radius:4px;cursor:pointer;background:var(--panel2);border:1px solid var(--line)">Abbrechen</button>
+      <button onclick="selMassenAnwenden(this.closest('dialog'))" style="padding:7px 20px;border-radius:4px;cursor:pointer;background:var(--accent);color:#fff;border:none;font-weight:600">Auf alle anwenden</button>
+    </div>`;
+  document.body.appendChild(dlg); dlg.showModal();
+}
+function massFeldWechseln(sel){
+  const box=sel.closest('dialog').querySelector('#massWertBox');
+  const feld=sel.value; if(!feld){box.innerHTML=''; return;}
+  const st='width:100%;padding:8px;font-size:14px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;margin-top:6px;box-sizing:border-box';
+  if(feld==='berufsbezeichnung') box.innerHTML=`<label style="font-size:13px;color:var(--muted)">Neue Position</label><select id="massWert" style="${st}"><option value="">– wählen –</option>${Object.keys(POSITION_STUFE).map(p=>`<option>${esc(p)}</option>`).join('')}</select>`;
+  else if(feld==='status') box.innerHTML=`<label style="font-size:13px;color:var(--muted)">Neuer Status</label><select id="massWert" style="${st}">${['New','Active','Inactive','Blacklisted','Rejected','Placed'].map(s=>`<option>${s}</option>`).join('')}</select>`;
+  else if(feld==='abwerbeschutz') box.innerHTML=`<select id="massWert" style="${st}"><option value="true">🔒 Abwerbeschutz SETZEN</option><option value="false">🔓 Abwerbeschutz ENTFERNEN</option></select>`;
+  else box.innerHTML=`<label style="font-size:13px;color:var(--muted)">Neuer Wert</label><input id="massWert" style="${st}" placeholder="Wert eingeben…">`;
+}
+async function selMassenAnwenden(dlg){
+  const feld=dlg.querySelector('#massFeld').value;
+  const wertEl=dlg.querySelector('#massWert');
+  if(!feld||!wertEl||!wertEl.value){zeigeMeldung('Feld und Wert wählen','warn'); return;}
+  const ids=[...selectedKandIds];
+  const upd=feld==='abwerbeschutz'?{abwerbeschutz:wertEl.value==='true'}:{[feld]:wertEl.value};
+  for(let i=0;i<ids.length;i+=100){
+    const {error}=await sb.from('kandidaten').update(upd).in('id',ids.slice(i,i+100));
+    if(error){zeigeMeldung('Fehler: '+error.message,'err'); dlg.close(); dlg.remove(); return;}
+  }
+  dlg.close(); dlg.remove();
+  zeigeMeldung(`${ids.length} Kandidaten aktualisiert`);
+  ladeKandidaten();
+}
+
+// ---- Löschen ----
+async function selLoeschen(){
+  if(!selectedKandIds.size) return;
+  const n=selectedKandIds.size;
+  if(!confirm(`⚠️ ${n} Kandidat${n===1?'':'en'} wirklich dauerhaft löschen?\n\nDas kann NICHT rückgängig gemacht werden!`)) return;
+  const ids=[...selectedKandIds];
+  for(let i=0;i<ids.length;i+=50){
+    const {error}=await sb.from('kandidaten').delete().in('id',ids.slice(i,i+50));
+    if(error){zeigeMeldung('Fehler: '+error.message,'err'); return;}
+  }
+  selAufheben(); zeigeMeldung(`${n} Kandidat${n===1?' gelöscht':'en gelöscht'}`);
+  ladeKandidaten();
+}
+
+// ---- Duplikate finden ----
+async function duplikateFinden(){
+  const dlg=document.createElement('dialog');
+  dlg.style.cssText='background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:24px;max-width:780px;width:96vw;max-height:85vh;display:flex;flex-direction:column';
+  dlg.innerHTML='<h3 style="margin:0 0 10px">🔍 Duplikate suchen …</h3><p style="color:var(--muted);font-size:13px;margin:0">Kandidaten werden geladen …</p>';
+  document.body.appendChild(dlg); dlg.showModal();
+  let alle=[];
+  for(let from=0;;from+=1000){
+    const {data}=await sb.from('kandidaten').select('id,voller_name,email,berufsbezeichnung,arbeitgeber,stadt').range(from,from+999);
+    if(!data||!data.length) break; alle.push(...data); if(data.length<1000) break;
+  }
+  const norm=s=>s?s.toLowerCase().replace(/\s+/g,' ').trim():'';
+  const grpName={}, grpMail={};
+  alle.forEach(r=>{
+    const k=norm(r.voller_name); if(k){(grpName[k]=grpName[k]||[]).push(r);}
+    const m=r.email?r.email.toLowerCase().trim():''; if(m){(grpMail[m]=grpMail[m]||[]).push(r);}
+  });
+  const dN=Object.entries(grpName).filter(([,g])=>g.length>1);
+  const dM=Object.entries(grpMail).filter(([,g])=>g.length>1);
+  if(!dN.length&&!dM.length){
+    dlg.innerHTML='<h3 style="margin:0 0 10px">✅ Keine Duplikate gefunden</h3><p style="color:var(--muted)">Keine doppelten Namen oder E-Mail-Adressen.</p><div style="text-align:right;margin-top:16px"><button onclick="this.closest(\'dialog\').close();this.closest(\'dialog\').remove()" style="padding:7px 16px;border-radius:4px;cursor:pointer;background:var(--panel2);border:1px solid var(--line)">Schließen</button></div>';
+    return;
+  }
+  const rg=gr=>gr.map(r=>`<div style="display:flex;align-items:center;gap:10px;padding:5px 8px;border-radius:4px;background:var(--bg);margin-bottom:4px">
+    <input type="checkbox" data-id="${r.id}" style="width:14px;height:14px;cursor:pointer;accent-color:#dc2626">
+    <div style="flex:1"><b>${esc(r.voller_name||'–')}</b> <span style="font-size:12px;color:var(--muted)">${esc(r.berufsbezeichnung||'')}${r.arbeitgeber?' · '+esc(r.arbeitgeber):''}${r.stadt?' · '+esc(r.stadt):''}</span></div>
+    <button onclick="document.getElementById('rechercheDlg')&&document.getElementById('rechercheDlg').close();detailKandidat('${r.id}');this.closest('dialog').close();this.closest('dialog').remove()" style="padding:3px 10px;border-radius:4px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);font-size:12px;white-space:nowrap">Öffnen</button>
+  </div>`).join('');
+  dlg.innerHTML=`<h3 style="margin:0 0 4px">🔍 ${dN.length+dM.length} Duplikat-Gruppen</h3>
+    <p style="font-size:13px;color:var(--muted);margin:0 0 12px">${dN.length} gleiche Namen · ${dM.length} gleiche E-Mails · Markiere die zu löschenden</p>
+    <div style="overflow-y:auto;flex:1">
+      ${dN.map(([n,g])=>`<div style="margin-bottom:12px;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--panel2)"><div style="font-size:12px;color:var(--muted);margin-bottom:6px">👤 <b>${esc(n)}</b> (${g.length}×)</div>${rg(g)}</div>`).join('')}
+      ${dM.map(([m,g])=>`<div style="margin-bottom:12px;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--panel2)"><div style="font-size:12px;color:var(--muted);margin-bottom:6px">📧 <b>${esc(m)}</b> (${g.length}×)</div>${rg(g)}</div>`).join('')}
+    </div>
+    <div style="padding-top:12px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+      <button onclick="dupLoeschenMarkiert(this.closest('dialog'))" style="padding:7px 16px;border-radius:4px;cursor:pointer;background:#dc2626;color:#fff;border:none;font-weight:600">🗑️ Markierte löschen</button>
+      <button onclick="this.closest('dialog').close();this.closest('dialog').remove()" style="padding:7px 16px;border-radius:4px;cursor:pointer;background:var(--panel2);border:1px solid var(--line)">Schließen</button>
+    </div>`;
+}
+async function dupLoeschenMarkiert(dlg){
+  const ids=[...dlg.querySelectorAll('input[type=checkbox]:checked')].map(c=>c.dataset.id);
+  if(!ids.length){zeigeMeldung('Keine markiert','warn'); return;}
+  if(!confirm(`${ids.length} Kandidaten wirklich löschen?`)) return;
+  for(let i=0;i<ids.length;i+=50) await sb.from('kandidaten').delete().in('id',ids.slice(i,i+50));
+  dlg.close(); dlg.remove();
+  zeigeMeldung(`${ids.length} Duplikat${ids.length===1?' gelöscht':'e gelöscht'}`);
+  ladeKandidaten();
+}
+
 let auftraggeberNamen=null; // null=noch nicht geladen; Array mit normalisierten Namen
 // Normalisiert Firmennamen: entfernt Rechtsformen (GmbH, AG…) und Standort-Suffixe (- NL Köln)
 function normFirma(s){
