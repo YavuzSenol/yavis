@@ -949,7 +949,7 @@ async function ladeWiedervorlagen(){
 function telLink(nr){ if(!nr) return '–'; const c=String(nr).replace(/[^\d+]/g,'');
   return `<a class="calllink" href="tel:${c}" onclick="event.stopPropagation()">${esc(nr)}</a>`; }
 const SPALTEN_DEF=[
-  {key:'voller_name', label:'Name', render:r=>`${r.ist_hot?'<span class="pill hot">HOT</span> ':''}${esc(r.voller_name)||'–'}`},
+  {key:'voller_name', label:'Name', render:r=>`${r.abwerbeschutz?'🔒 ':''}${r.ist_hot?'<span class="pill hot">HOT</span> ':''}${esc(r.voller_name)||'–'}`},
   {key:'nachname', label:'Nachname', render:r=>esc(r.nachname)||'–'},
   {key:'vorname', label:'Vorname', render:r=>esc(r.vorname)||'–'},
   {key:'berufsbezeichnung', label:'Berufsbezeichnung', render:r=>esc(r.berufsbezeichnung)||'–'},
@@ -1028,6 +1028,13 @@ function tel(nr){ if(!nr) return ''; const clean=String(nr).replace(/[^\d+]/g,''
 function zeile(k,v){ if(v===null||v===undefined||v===''||v==='–') return '';
   return `<div class="kvr"><div class="k">${k}</div><div class="v">${v}</div></div>`; }
 
+async function abwerbeschutzToggle(id, aktuell){
+  const neu = !aktuell;
+  const {error} = await sb.from('kandidaten').update({abwerbeschutz: neu}).eq('id', id);
+  if(error){ alert('Fehler: '+error.message); return; }
+  detailKandidat(id); // Seite neu laden
+}
+
 async function detailKandidat(id){
   const [k, ausb, erf, notiz, bew, aufg, dok] = await Promise.all([
     sb.from('kandidaten').select('*').eq('id',id).single(),
@@ -1087,14 +1094,19 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl){
       <button class="back" onclick="zurueckZurListe()">← Zurück</button>
       ${fotoHtml}
       <div>
-        <h2 style="margin:0 0 2px">${d.ist_hot?'🔥 ':''}${esc(d.voller_name)||'Kandidat'}</h2>
+        <h2 style="margin:0 0 2px">${d.abwerbeschutz?'🔒 ':''}${d.ist_hot?'🔥 ':''}${esc(d.voller_name)||'Kandidat'}</h2>
         <div class="detail-sub" style="margin:0">${esc(d.berufsbezeichnung)||''}${d.arbeitgeber?' · '+esc(d.arbeitgeber):''}${d.status?' · <span class="pill">'+esc(d.status)+'</span>':''}</div>
       </div>
       <div style="display:flex;gap:8px;margin-left:auto">
         <button class="cvbtn" id="cvBtn" onclick="cvAuslesen('${d.id}')">📄 CV einlesen</button>
+        <button class="editbtn" style="margin-left:0;background:${d.abwerbeschutz?'var(--hot)':'var(--panel2)'};color:${d.abwerbeschutz?'#fff':'inherit'}" title="${d.abwerbeschutz?'Abwerbeschutz aufheben':'Abwerbeschutz aktivieren'}" onclick="abwerbeschutzToggle('${d.id}',${d.abwerbeschutz?'true':'false'})">${d.abwerbeschutz?'🔒 Geschützt':'🔓 Schützen'}</button>
         <button class="editbtn" style="margin-left:0" onclick="bearbeiteKandidat('${d.id}')">✎ Bearbeiten</button>
       </div>
     </div>
+
+    ${d.abwerbeschutz?`<div style="background:#c0392b;color:#fff;border-radius:6px;padding:12px 18px;margin-bottom:14px;font-size:14px;font-weight:600">
+      🔒 Abwerbeschutz aktiv — dieser Kandidat ist bei einem Auftraggeber beschäftigt und darf <u>nicht</u> kontaktiert oder für Stellen vorgeschlagen werden.
+    </div>`:''}
 
     <div class="dpanels">
 
