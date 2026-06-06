@@ -28,6 +28,16 @@
     align-self:flex-start;max-height:calc(100vh - 55px);overflow:auto}
   .sidebar .tab{text-align:left;width:100%}
   .wrap{flex:1;min-width:0;max-width:1280px;padding:22px}
+  .kacheln{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px}
+  .kachel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px 20px;cursor:pointer;transition:border-color .15s,transform .1s}
+  .kachel:hover{border-color:var(--accent)}
+  .kachel:active{transform:scale(.99)}
+  .kachel .k-ic{font-size:26px;line-height:1}
+  .kachel .k-zahl{font-size:30px;font-weight:600;color:var(--ink);margin:8px 0 2px}
+  .kachel .k-tit{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.09em}
+  .kachel .k-sub{font-size:12px;color:var(--muted);margin-top:6px}
+  .kachel.platz{cursor:default;opacity:.65}
+  .kachel.platz:hover{border-color:var(--line)}
   .bar{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:18px}
   .field{display:flex;flex-direction:column;gap:4px}
   .field label{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
@@ -188,7 +198,8 @@
 
 <div class="layout">
 <nav class="sidebar">
-  <button class="tab active" data-view="kandidaten">Kandidaten</button>
+  <button class="tab active" data-view="start">🏠 Start</button>
+  <button class="tab" data-view="kandidaten">Kandidaten</button>
   <button class="tab" data-view="kunden">Firmen</button>
   <button class="tab" data-view="kontakte">Ansprechpartner</button>
   <button class="tab" data-view="wiedervorlagen">📋 Wiedervorlagen</button>
@@ -208,8 +219,11 @@
     </div>
   </div>
 
+  <!-- Startseite -->
+  <div id="view-start" style="display:none"></div>
+
   <!-- Kandidaten -->
-  <div id="view-kandidaten">
+  <div id="view-kandidaten" style="display:none">
     <div class="bar">
       <div class="field"><label>Suche (Name, Beruf, Skills, Ort)</label>
         <input id="kSuche" placeholder="z.B. TGA Projektleiter" style="min-width:260px"></div>
@@ -414,7 +428,13 @@ function zeigeApp(){
   document.getElementById('logoutBtn').style.display='inline-block';
   const p=new URLSearchParams(location.search);
   const anruf=p.get('anruf')||p.get('caller')||p.get('nummer')||p.get('number');
-  if(anruf){ pruefeAnruf(anruf); } else { ladeKandidaten(); }
+  if(anruf){
+    document.getElementById('view-start').style.display='none';
+    document.getElementById('view-kandidaten').style.display='block';
+    document.querySelectorAll('.tab[data-view]').forEach(x=>x.classList.remove('active'));
+    const kt=document.querySelector('.tab[data-view="kandidaten"]'); if(kt) kt.classList.add('active');
+    pruefeAnruf(anruf);
+  } else { zeigeStart(); }
 }
 
 async function login(){
@@ -444,8 +464,9 @@ document.querySelectorAll('.tab[data-view]').forEach(t=>t.onclick=()=>{
   document.getElementById('detailPage').style.display='none';
   document.querySelectorAll('.tab[data-view]').forEach(x=>x.classList.remove('active'));
   t.classList.add('active');
-  ['kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>
+  ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>
     document.getElementById('view-'+v).style.display = v===t.dataset.view?'block':'none');
+  if(t.dataset.view==='start') zeigeStart();
   if(t.dataset.view==='kunden') ladeKunden();
   if(t.dataset.view==='kontakte') ladeKontakte();
   if(t.dataset.view==='wiedervorlagen') ladeWiedervorlagen();
@@ -560,12 +581,53 @@ function zurStartseite(){
   tagFilter.clear();
   const tp=document.getElementById('tagPanel'); if(tp) tp.style.display='none';
   aktualisiereTagAktiv();
-  // Zurück auf Kandidaten-Tab
+  // Zurück auf die Startseite
+  zeigeStart();
+  window.scrollTo(0,0);
+}
+
+// ===== Startseite (Kacheln) =====
+function geheZuTab(v){ const t=document.querySelector('.tab[data-view="'+v+'"]'); if(t) t.click(); }
+function kachel(ic,titel,zahl,view,sub){
+  return `<div class="kachel" onclick="geheZuTab('${view}')">
+    <div class="k-ic">${ic}</div><div class="k-zahl">${zahl??'–'}</div><div class="k-tit">${titel}</div>
+    ${sub?`<div class="k-sub">${sub}</div>`:''}</div>`;
+}
+function kachelPlatz(ic,titel){
+  return `<div class="kachel platz"><div class="k-ic">${ic}</div><div class="k-tit" style="margin-top:14px">${titel}</div><div class="k-sub">bald</div></div>`;
+}
+async function zeigeStart(){
+  if(!sb) return;
   document.getElementById('detailPage').style.display='none';
   document.querySelectorAll('.tab[data-view]').forEach(x=>x.classList.remove('active'));
-  const kt=document.querySelector('.tab[data-view="kandidaten"]'); if(kt) kt.classList.add('active');
-  ['kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display = v==='kandidaten'?'block':'none');
-  ladeKandidaten();
+  const st=document.querySelector('.tab[data-view="start"]'); if(st) st.classList.add('active');
+  ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>{const el=document.getElementById('view-'+v); if(el) el.style.display = v==='start'?'block':'none';});
+  const view=document.getElementById('view-start');
+  view.innerHTML='<div style="color:var(--muted);font-size:14px">Lade Übersicht …</div>';
+  const [ka,ku,ko,auf]=await Promise.all([
+    sb.from('kandidaten').select('*',{count:'exact',head:true}),
+    sb.from('kunden').select('*',{count:'exact',head:true}),
+    sb.from('kontakte').select('*',{count:'exact',head:true}),
+    sb.from('aufgaben').select('faelligkeitsdatum,status').neq('status','Completed').limit(2000),
+  ]);
+  const heute=heuteISO();
+  const offen=(auf.data||[]).length;
+  const faellig=(auf.data||[]).filter(t=>t.faelligkeitsdatum&&t.faelligkeitsdatum<=heute).length;
+  view.innerHTML=`
+    <h2 style="color:var(--accent);font-size:20px;margin:0 0 4px">Startseite</h2>
+    <div style="color:var(--muted);font-size:13px;margin-bottom:18px">Y.A.V.I.S. CRM — dein Überblick</div>
+    <div class="kacheln">
+      <div class="kachel" onclick="geheZuTab('wiedervorlagen')">
+        <div class="k-ic">📋</div><div class="k-zahl" style="${faellig?'color:var(--hot)':''}">${faellig}</div>
+        <div class="k-tit">Fällige Wiedervorlagen</div><div class="k-sub">${offen} offen insgesamt</div></div>
+      ${kachel('👤','Kandidaten',ka.count,'kandidaten')}
+      ${kachel('🏢','Firmen',ku.count,'kunden')}
+      ${kachel('📇','Ansprechpartner',ko.count,'kontakte')}
+      ${kachelPlatz('📅','Termine / Kalender')}
+      ${kachelPlatz('✉️','Newsletter')}
+      ${kachelPlatz('📁','Projekte')}
+      ${kachelPlatz('ℹ️','Infos')}
+    </div>`;
   window.scrollTo(0,0);
 }
 
@@ -953,7 +1015,7 @@ async function zeigeDublettenHinweis(eigenerTyp, name){
 function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl){
   dok = dok || [];
   kontextDatensatz={typ:'Kandidat',id:d.id,name:d.voller_name};
-  ['kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
 
   const adrPriv=[d.strasse,[d.plz,d.stadt].filter(Boolean).join(' '),d.bundesland,d.land].filter(Boolean).join(', ');
@@ -1232,7 +1294,7 @@ function neuerKandidat(){
 }
 
 function zeigeFormular(d){
-  ['kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
   const neu = !d.id;
   page.innerHTML=`
@@ -1387,7 +1449,7 @@ async function detailKunde(id){
   ]);
   const d=k.data; if(!d) return;
   kontextDatensatz={typ:'Kunde',id:d.id,name:d.name};
-  ['kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
   const adresse=[d.strasse,[d.plz,d.stadt].filter(Boolean).join(' '),d.bundesland,d.land].filter(Boolean).join(', ');
   const kont_=kont.data||[], stel_=stel.data||[], notiz_=notiz.data||[], aufg_=aufg.data||[];
@@ -1437,7 +1499,7 @@ function bearbeiteKunde(id){ sb.from('kunden').select('*').eq('id',id).single().
 function neuerKunde(){ zeigeKundeFormular({id:null}); }
 
 function zeigeKundeFormular(d){
-  ['kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
   const neu=!d.id;
   page.innerHTML=`
@@ -1502,7 +1564,7 @@ async function detailKontakt(id){
   const {data:aufgTab}=await sb.from('aufgaben').select('*').eq('verknuepft_mit',id).order('faelligkeitsdatum',{ascending:true,nullsFirst:false});
   const aufg_=aufgTab||[];
   kontextDatensatz={typ:'Kontakt',id:d.id,name:d.voller_name};
-  ['kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
   const adresse=[d.strasse,[d.plz,d.stadt].filter(Boolean).join(' '),d.bundesland,d.land].filter(Boolean).join(', ');
   page.innerHTML=`
@@ -1548,7 +1610,7 @@ function bearbeiteKontakt(id){ sb.from('kontakte').select('*').eq('id',id).singl
 function neuerKontakt(){ zeigeKontaktFormular({id:null}); }
 
 function zeigeKontaktFormular(d){
-  ['kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
   const neu=!d.id;
   page.innerHTML=`
@@ -1870,7 +1932,7 @@ async function globaleSuche(){
   const term=document.getElementById('globalSuche').value.trim();
   if(term.length<2) return;
   sucheVerlaufHinzufuegen(term);
-  ['kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
   page.innerHTML=`<div class="detail-head"><button class="back" onclick="zurueckZurListe()">← Zurück</button><h2>🔍 Suche: „${esc(term)}"</h2></div><div style="color:var(--muted);font-size:14px">Suche läuft …</div>`;
   const digits=term.replace(/\D/g,'');
