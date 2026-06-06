@@ -255,6 +255,7 @@
     </div>
     <div style="margin:-4px 0 12px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="kPosUnter" onchange="ladeKandidaten()" style="min-width:auto;width:14px;height:14px;padding:0;margin:0">Position ＋ niedrigere einbeziehen</label>
+      <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="kMitProfil" onchange="nachfassToggle()" style="min-width:auto;width:14px;height:14px;padding:0;margin:0">🔗 nur mit XING/LinkedIn-Profil</label>
       <button class="tab" onclick="toggleTagPanel()">🏷️ Nach Tags filtern <span id="tagFilterCount"></span></button>
       <button class="tab" onclick="toggleSpaltenPanel()">🗂 Spalten</button>
       <span id="tagAktiv"></span>
@@ -584,6 +585,7 @@ function zurStartseite(){
   document.getElementById('kSuche').value='';
   document.getElementById('kPosition').value='';
   const kl=document.getElementById('kLuecke'); if(kl) kl.value='';
+  const mp=document.getElementById('kMitProfil'); if(mp) mp.checked=false;
   const pu=document.getElementById('kPosUnter'); if(pu) pu.checked=false;
   document.getElementById('kPlz').value='';
   document.getElementById('kRadius').value='50';
@@ -657,6 +659,15 @@ function lueckeQuery(query,m){
   return query;
 }
 const LUECKE_LABEL={ohne_handy:'ohne Handynr.',ohne_email:'ohne E-Mail',ohne_telefon:'ohne Telefonnr.',ohne_position:'ohne Position'};
+function hatProfil(r){ return (r.xing_profil&&/http/i.test(r.xing_profil))||(r.linkedin_profil&&/http/i.test(r.linkedin_profil)); }
+// Nachfass-Modus: beim Anhaken die Profil-Spalte automatisch einblenden
+function nachfassToggle(){
+  if(document.getElementById('kMitProfil').checked && !sichtbareSpalten.includes('profil')){
+    sichtbareSpalten=[...sichtbareSpalten,'profil']; spaltenSpeichern();
+    if(document.getElementById('spaltenPanel').style.display!=='none') renderSpaltenPanel();
+  }
+  ladeKandidaten();
+}
 
 async function ladeKandidaten(){
   const q=document.getElementById('kSuche').value.trim();
@@ -666,6 +677,8 @@ async function ladeKandidaten(){
   const posLabel=position?(' · '+position+(posUnter?' & darunter':'')):'';
   const luecke=document.getElementById('kLuecke').value;
   const lueckeLabel=luecke?(' · '+(LUECKE_LABEL[luecke]||luecke)):'';
+  const mitProfil=document.getElementById('kMitProfil').checked;
+  const profilLabel=mitProfil?' · mit Profil':'';
   const plz=document.getElementById('kPlz').value.trim();
   const radius=document.getElementById('kRadius').value;
   const body=document.getElementById('kBody'); body.innerHTML='';
@@ -681,7 +694,7 @@ async function ladeKandidaten(){
     if(posListe) rows=rows.filter(r=>posListe.includes(r.berufsbezeichnung));
     // Die Umkreis-Funktion liefert nur Basisfelder → volle Datensätze nachladen,
     // wenn Tag-Filter aktiv ist ODER Spalten angezeigt werden, die sie nicht enthält.
-    if(rows.length && (tagFilterAktiv() || brauchtVolleDaten() || luecke)){
+    if(rows.length && (tagFilterAktiv() || brauchtVolleDaten() || luecke || mitProfil)){
       const ids=rows.map(r=>r.id); const map={};
       for(let i=0;i<ids.length;i+=300){ const teil=ids.slice(i,i+300);
         const {data:td}=await sb.from('kandidaten').select('*').in('id',teil);
@@ -690,7 +703,8 @@ async function ladeKandidaten(){
     }
     if(tagFilterAktiv()) rows=rows.filter(r=>tagsMatchFilter(r.tags));
     if(luecke) rows=rows.filter(r=>lueckeMatch(r,luecke));
-    document.getElementById('kCount').textContent=rows.length+' Kandidaten im Umkreis von '+radius+' km um '+plz+posLabel+lueckeLabel+tagFilterLabel();
+    if(mitProfil) rows=rows.filter(r=>hatProfil(r));
+    document.getElementById('kCount').textContent=rows.length+' Kandidaten im Umkreis von '+radius+' km um '+plz+posLabel+lueckeLabel+profilLabel+tagFilterLabel();
     rows.forEach(r=>body.appendChild(zeileKandidat(r,true)));
     if(!rows.length) body.innerHTML='<tr><td colspan="'+spaltenAnzahl()+'" class="empty">Keine Treffer.</td></tr>';
     return;
@@ -700,6 +714,7 @@ async function ladeKandidaten(){
   let query=sb.from('kandidaten').select('*').limit(200);
   if(posListe) query=query.in('berufsbezeichnung',posListe);
   if(luecke) query=lueckeQuery(query,luecke);
+  if(mitProfil) query=query.or('xing_profil.ilike.%http%,linkedin_profil.ilike.%http%');
   if(q) query=query.or(`voller_name.ilike.%${q}%,berufsbezeichnung.ilike.%${q}%,faehigkeiten.ilike.%${q}%,stadt.ilike.%${q}%`);
   const tmod=tagModusWert();
   if(tmod==='leer'){ query=query.or('tags.is.null,tags.eq.,tags.eq.;;'); }
@@ -712,7 +727,7 @@ async function ladeKandidaten(){
   query=query.order('letzte_aktivitaet',{ascending:false,nullsFirst:false});
   const {data,error}=await query;
   if(error){document.getElementById('kCount').textContent='Fehler: '+error.message;return;}
-  document.getElementById('kCount').textContent=(data.length)+' Kandidaten'+(data.length>=200?' (erste 200)':'')+posLabel+lueckeLabel+tagFilterLabel();
+  document.getElementById('kCount').textContent=(data.length)+' Kandidaten'+(data.length>=200?' (erste 200)':'')+posLabel+lueckeLabel+profilLabel+tagFilterLabel();
   data.forEach(r=>body.appendChild(zeileKandidat(r,false)));
   if(!data.length) body.innerHTML='<tr><td colspan="'+spaltenAnzahl()+'" class="empty">Keine Treffer.</td></tr>';
 }
@@ -944,10 +959,16 @@ const SPALTEN_DEF=[
   {key:'email', label:'E-Mail', render:r=>r.email?`<a class="calllink" href="mailto:${esc(r.email)}" onclick="event.stopPropagation()">${esc(r.email)}</a>`:'–'},
   {key:'telefon', label:'Telefon', render:r=>telLink(r.telefon||r.telefon_privat)},
   {key:'mobil', label:'Mobil', render:r=>telLink(r.mobil||r.mobil_privat)},
+  {key:'profil', label:'Profil', render:r=>{
+    var l=[];
+    if(r.xing_profil&&/http/i.test(r.xing_profil)) l.push('<a class="calllink" href="'+esc(r.xing_profil)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">XING ↗</a>');
+    if(r.linkedin_profil&&/http/i.test(r.linkedin_profil)) l.push('<a class="calllink" href="'+esc(r.linkedin_profil)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">LinkedIn ↗</a>');
+    return l.length?l.join(' · '):'–';
+  }},
   {key:'status', label:'Status', render:r=>`<span class="pill">${esc(r.status)||'–'}</span>`},
 ];
 // Spalten, die NICHT in der PLZ-Umkreis-Funktion enthalten sind (Nachladen nötig)
-const SPALTEN_VOLL=['nachname','vorname','arbeitgeber','email','telefon','mobil'];
+const SPALTEN_VOLL=['nachname','vorname','arbeitgeber','email','telefon','mobil','profil'];
 const SPALTEN_MAP=Object.fromEntries(SPALTEN_DEF.map(c=>[c.key,c]));
 let sichtbareSpalten = (()=>{ try{ const s=JSON.parse(localStorage.getItem('kand_spalten')); if(Array.isArray(s)&&s.length) return s.filter(k=>SPALTEN_MAP[k]); }catch(e){} return ['voller_name','berufsbezeichnung','stadt','telefon']; })();
 function spaltenSpeichern(){ localStorage.setItem('kand_spalten', JSON.stringify(sichtbareSpalten)); }
