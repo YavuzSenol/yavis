@@ -185,7 +185,7 @@
   <datalist id="sucheVerlauf"></datalist>
   <button class="go" onclick="globaleSuche()" style="padding:9px 16px;margin-left:6px">Suchen</button>
   <button class="go" onclick="oeffneRecherche()" title="Erweiterte KI-Recherche (Strg+R)" style="padding:9px 14px;margin-left:4px;background:var(--accent2,#7c3aed)">🔍 Recherche</button>
-  <button id="themeBtn" onclick="toggleTheme()" title="Hell/Dunkel wechseln" style="background:none;border:none;cursor:pointer;font-size:18px;padding:4px 8px;line-height:1;margin-left:4px">🌙</button>
+  <button id="themeBtn" onclick="toggleTheme()" class="tab" style="margin-left:4px">🌙 Dunkel</button>
   <button class="tab" id="logoutBtn" style="display:none;margin-left:6px" onclick="logout()">Abmelden</button>
 </header>
 
@@ -455,14 +455,14 @@ let sb=null;
 function toggleTheme(){
   const hell=document.body.classList.toggle('hell');
   const btn=document.getElementById('themeBtn');
-  if(btn) btn.textContent=hell?'☀️':'🌙';
+  if(btn) btn.textContent=hell?'☀️ Hell':'🌙 Dunkel';
   localStorage.setItem('yavis_theme',hell?'hell':'dunkel');
 }
 (function(){
   if(localStorage.getItem('yavis_theme')==='hell'){
     document.body.classList.add('hell');
     const btn=document.getElementById('themeBtn');
-    if(btn) btn.textContent='☀️';
+    if(btn) btn.textContent='☀️ Hell';
   }
 })();
 
