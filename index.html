@@ -408,6 +408,7 @@
     <div style="display:flex;flex-direction:column;gap:8px">
       <textarea id="rechercheText" rows="3" placeholder="z.B.: Projektleiter in Köln mit HKLS-Erfahrung, nicht bei ENGIE, mit LinkedIn-Profil" style="width:100%;resize:vertical;font-size:14px;padding:10px 12px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:6px;font-family:inherit;box-sizing:border-box"></textarea>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button id="micBtn" onclick="rechercheMic()" title="Spracheingabe (Deutsch)" style="padding:8px 14px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;cursor:pointer;font-size:16px">🎤</button>
         <button onclick="rechercheInterpretieren()" style="padding:8px 20px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600">✨ KI interpretieren</button>
         <button onclick="rechercheSuchen()" style="padding:8px 18px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;cursor:pointer;font-size:14px">🔍 Direkt suchen</button>
         <span style="font-size:11px;color:var(--muted)">Strg+R öffnet · Esc schließt</span>
@@ -2402,6 +2403,57 @@ async function rechercheKontaktQuery(f){
   if(f.position) q=q.ilike('berufsbezeichnung',`%${f.position}%`);
   q=q.order('letzte_aktivitaet',{ascending:false,nullsFirst:false}).limit(100);
   const {data}=await q; return data||[];
+}
+
+// ===== SPRACHEINGABE für Recherche =====
+let micRecognition=null; let micAktiv=false;
+function rechercheMic(){
+  if(!('SpeechRecognition' in window||'webkitSpeechRecognition' in window)){
+    alert('Spracheingabe wird von diesem Browser nicht unterstützt.\nBitte Chrome oder Edge verwenden.');
+    return;
+  }
+  const btn=document.getElementById('micBtn');
+  if(micAktiv){ micRecognition&&micRecognition.stop(); return; }
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  micRecognition=new SR();
+  micRecognition.lang='de-DE';
+  micRecognition.interimResults=true;
+  micRecognition.continuous=false;
+  micAktiv=true;
+  btn.style.cssText='padding:8px 14px;background:#c0392b;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:16px;animation:pulse 1s infinite';
+  btn.title='Aufnahme läuft – klicken zum Stoppen';
+  // Pulsierende Animation
+  if(!document.getElementById('micStyle')){
+    const s=document.createElement('style'); s.id='micStyle';
+    s.textContent='@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}';
+    document.head.appendChild(s);
+  }
+  const ta=document.getElementById('rechercheText');
+  let interim='';
+  micRecognition.onresult=e=>{
+    let final='', int='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      if(e.results[i].isFinal) final+=e.results[i][0].transcript;
+      else int+=e.results[i][0].transcript;
+    }
+    if(final) ta.value=(ta.value+' '+final).trim();
+    interim=int;
+    if(int) ta.placeholder='… '+int+' …';
+  };
+  micRecognition.onend=()=>{
+    micAktiv=false;
+    btn.style.cssText='padding:8px 14px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;cursor:pointer;font-size:16px';
+    btn.title='Spracheingabe (Deutsch)';
+    ta.placeholder='z.B.: Projektleiter in Köln mit HKLS-Erfahrung, nicht bei ENGIE, mit LinkedIn-Profil';
+    // Automatisch interpretieren wenn Text vorhanden
+    if(ta.value.trim()) rechercheInterpretieren();
+  };
+  micRecognition.onerror=e=>{
+    micAktiv=false;
+    btn.style.cssText='padding:8px 14px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;cursor:pointer;font-size:16px';
+    if(e.error!=='aborted') alert('Mikrofon-Fehler: '+e.error);
+  };
+  micRecognition.start();
 }
 
 // Ctrl+R → Recherche öffnen
