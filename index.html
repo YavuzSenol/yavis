@@ -179,6 +179,7 @@
   <input id="globalSuche" list="sucheVerlauf" autocomplete="off" placeholder="🔍 Alles durchsuchen – Name, Firma, Telefon …" onkeydown="if(event.key==='Enter')globaleSuche()" style="margin-left:auto;flex:0 1 360px;min-width:200px;font-size:13px">
   <datalist id="sucheVerlauf"></datalist>
   <button class="go" onclick="globaleSuche()" style="padding:9px 16px;margin-left:6px">Suchen</button>
+  <button class="go" onclick="oeffneRecherche()" title="Erweiterte KI-Recherche (Strg+R)" style="padding:9px 14px;margin-left:4px;background:var(--accent2,#7c3aed)">🔍 Recherche</button>
   <button class="tab" id="logoutBtn" style="display:none;margin-left:6px" onclick="logout()">Abmelden</button>
 </header>
 
@@ -396,6 +397,27 @@
       <span id="tdMsg" style="font-size:13px;margin-left:4px"></span>
     </div>
   </div></dialog>
+
+<!-- ===== RECHERCHE MODAL (Ctrl+R) ===== -->
+<dialog id="rechercheDlg" style="width:min(860px,96vw);max-height:92vh;overflow-y:auto;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;padding:0">
+  <div style="padding:22px 26px;display:flex;flex-direction:column;gap:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2 style="margin:0;font-size:20px">🔍 Recherche</h2>
+      <button onclick="document.getElementById('rechercheDlg').close()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);line-height:1">✕</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <textarea id="rechercheText" rows="3" placeholder="z.B.: Projektleiter in Köln mit HKLS-Erfahrung, nicht bei ENGIE, mit LinkedIn-Profil" style="width:100%;resize:vertical;font-size:14px;padding:10px 12px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:6px;font-family:inherit;box-sizing:border-box"></textarea>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button onclick="rechercheInterpretieren()" style="padding:8px 20px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600">✨ KI interpretieren</button>
+        <button onclick="rechercheSuchen()" style="padding:8px 18px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;cursor:pointer;font-size:14px">🔍 Direkt suchen</button>
+        <span style="font-size:11px;color:var(--muted)">Strg+R öffnet · Esc schließt</span>
+      </div>
+    </div>
+    <div id="rechercheStatus" style="display:none;font-size:13px;padding:8px 12px;border-radius:4px"></div>
+    <div id="rechercheFilter" style="display:none"></div>
+    <div id="rechercheErgebnis" style="display:none"></div>
+  </div>
+</dialog>
 
 <dialog id="profilDlg" style="width:min(640px,94vw);border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:6px;padding:0">
   <div class="dlg-head" style="display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line)">
@@ -2117,6 +2139,277 @@ async function globaleSuche(){
   page.innerHTML=html;
   window.scrollTo(0,0);
 }
+
+// ===== RECHERCHE (Ctrl+R) =====
+let rechercheFilter = {};
+
+function oeffneRecherche(){
+  const dlg=document.getElementById('rechercheDlg');
+  if(!dlg.open) dlg.showModal();
+  setTimeout(()=>document.getElementById('rechercheText').focus(),80);
+}
+
+async function rechercheInterpretieren(){
+  const text=document.getElementById('rechercheText').value.trim();
+  if(!text) return;
+  const status=document.getElementById('rechercheStatus');
+  const filterDiv=document.getElementById('rechercheFilter');
+  const erg=document.getElementById('rechercheErgebnis');
+  status.style.cssText='display:block;background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:8px 12px;font-size:13px';
+  status.innerHTML='<span style="color:var(--muted)">⏳ Claude interpretiert …</span>';
+  filterDiv.style.display='none'; erg.style.display='none';
+  try{
+    const resp=await fetch('https://afbyqrwqnccgudpqxziv.supabase.co/functions/v1/recherche-nlp',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({text})
+    });
+    const data=await resp.json();
+    if(!data.ok) throw new Error(data.error||'Fehler');
+    rechercheFilter=data.filter||{};
+    status.innerHTML='<span style="color:var(--ok)">✓ Verstanden — Filter prüfen und bei Bedarf anpassen, dann Suchen:</span>';
+    renderRecherchePanel(rechercheFilter);
+    filterDiv.style.display='block';
+  }catch(e){
+    status.innerHTML='<span style="color:var(--hot)">❌ '+esc(String(e.message))+'</span>';
+  }
+}
+
+function renderRecherchePanel(f){
+  rechercheFilter=f;
+  const div=document.getElementById('rechercheFilter');
+  const positionen=Object.keys(POSITION_STUFE);
+  const sucheIn=f.suche_in||['kandidaten'];
+  const istKand=sucheIn.includes('kandidaten');
+  const istKunde=sucheIn.includes('kunden');
+  const istKontakt=sucheIn.includes('kontakte');
+
+  div.innerHTML=`<div style="background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:18px;display:flex;flex-direction:column;gap:16px">
+
+    <!-- SUCHE IN -->
+    <div>
+      <div style="font-size:11px;letter-spacing:.05em;color:var(--muted);margin-bottom:8px;font-weight:600">SUCHE IN</div>
+      <div style="display:flex;gap:8px">
+        ${['kandidaten','kunden','kontakte'].map(t=>{
+          const on=sucheIn.includes(t);
+          return `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 14px;border:1px solid ${on?'var(--accent)':'var(--line)'};border-radius:20px;background:${on?'var(--accent)':'var(--panel)'};color:${on?'#fff':'inherit'};font-size:13px;transition:.15s">
+            <input type="checkbox" ${on?'checked':''} onchange="rechercheToggleSucheIn('${t}')" style="display:none">
+            ${t==='kandidaten'?'👤 Kandidaten':t==='kunden'?'🏢 Kunden':'📇 Kontakte'}</label>`;
+        }).join('')}
+      </div>
+    </div>
+
+    ${istKand?`
+    <!-- KANDIDATEN-FILTER -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600">POSITION</div>
+        <select id="rPos" style="width:100%">
+          <option value="">alle</option>
+          ${positionen.map(p=>`<option value="${p}" ${f.position===p?'selected':''}>${p}</option>`).join('')}
+        </select>
+        <label style="font-size:12px;margin-top:5px;display:flex;align-items:center;gap:5px;cursor:pointer">
+          <input type="checkbox" id="rPosUnter" ${f.posUnter?'checked':''}> und alle darunter
+        </label>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600">PLZ + RADIUS</div>
+        <div style="display:flex;gap:6px">
+          <input id="rPlz" value="${esc(f.plz||'')}" placeholder="PLZ" style="width:90px">
+          <select id="rRadius" style="flex:1">
+            ${[10,25,50,75,100,200].map(r=>`<option value="${r}" ${(f.radius||50)==r?'selected':''}>${r} km</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600">ARBEITGEBER (enthält)</div>
+        <input id="rArbeitgeber" value="${esc(f.arbeitgeber||'')}" placeholder="z.B. ENGIE" style="width:100%">
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600">NICHT BEI FIRMA</div>
+        <input id="rArbeitgeberNicht" value="${esc(f.arbeitgeberNicht||'')}" placeholder="ausschließen …" style="width:100%">
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600">FREITEXT (Name, Stadt, Skills)</div>
+        <input id="rName" value="${esc(f.name||'')}" placeholder="Name, Stadt, Fähigkeit …" style="width:100%">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;justify-content:flex-end">
+        <label style="font-size:13px;display:flex;align-items:center;gap:7px;cursor:pointer">
+          <input type="checkbox" id="rMitProfil" ${f.mitProfil?'checked':''}> Nur mit XING / LinkedIn
+        </label>
+        <label style="font-size:13px;display:flex;align-items:center;gap:7px;cursor:pointer">
+          <input type="checkbox" id="rKeinSchutz" ${f.abwerbeschutz===false?'checked':''}> Kein Abwerbeschutz
+        </label>
+      </div>
+    </div>
+
+    <!-- TAGS -->
+    <div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <div style="font-size:11px;color:var(--muted);font-weight:600">TAGS</div>
+        <select id="rTagModus" style="font-size:12px;padding:3px 8px">
+          <option value="und" ${(f.tagModus||'und')==='und'?'selected':''}>alle (UND)</option>
+          <option value="oder" ${f.tagModus==='oder'?'selected':''}>mindestens einer (ODER)</option>
+          <option value="nicht" ${f.tagModus==='nicht'?'selected':''}>keiner davon (NICHT)</option>
+        </select>
+      </div>
+      <div id="rTagsBox" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+        ${(f.tags||[]).map(t=>`<span class="tag" style="cursor:pointer;display:flex;align-items:center;gap:4px" onclick="rechercheTagRemove('${esc(t)}')">${esc(t)} <span style="font-size:10px;opacity:.7">✕</span></span>`).join('')}
+        <select onchange="rechercheTagAdd(this.value);this.value=''" style="font-size:12px;padding:3px 8px;border-radius:4px">
+          <option value="">+ Tag …</option>
+          ${Object.entries(TAG_KATEGORIEN).map(([k,v])=>`<optgroup label="${k}">${v.map(t=>`<option value="${t}">${t}</option>`).join('')}</optgroup>`).join('')}
+        </select>
+      </div>
+    </div>`:''}
+
+    ${istKunde?`
+    <!-- KUNDEN-FILTER -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-weight:600">FIRMEN-TYP</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          ${['Auftraggeber','Auftraggeber-Potenzial','Dienstleister','Lieferant','Sonstige'].map(t=>{
+            const on=(f.kundenTyp||[]).includes(t);
+            return `<label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;padding:4px 10px;border:1px solid ${on?'var(--accent)':'var(--line)'};border-radius:12px;background:${on?'var(--accent)':'var(--panel)'};color:${on?'#fff':'inherit'}">
+              <input type="checkbox" class="rKTyp" value="${t}" ${on?'checked':''} style="display:none" onchange="rechercheToggleKundenTyp()"> ${t}</label>`;
+          }).join('')}
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600">FIRMENNAME</div>
+        <input id="rKundenName" value="${esc(f.kundenName||'')}" placeholder="enthält …" style="width:100%">
+        <div style="font-size:11px;color:var(--muted);margin:8px 0 4px;font-weight:600">PLZ-GEBIET</div>
+        <input id="rKundenPlz" value="${esc(f.plz||'')}" placeholder="PLZ (erste 2 Ziffern)" style="width:100%">
+      </div>
+    </div>`:''}
+
+    <!-- SUCHEN-BUTTON -->
+    <div style="display:flex;justify-content:flex-end;border-top:1px solid var(--line);padding-top:14px">
+      <button onclick="rechercheSuchen()" style="padding:10px 28px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:15px;font-weight:600">🔍 Suchen</button>
+    </div>
+  </div>`;
+}
+
+function rechercheToggleSucheIn(typ){
+  if(!rechercheFilter.suche_in) rechercheFilter.suche_in=['kandidaten'];
+  if(rechercheFilter.suche_in.includes(typ)) rechercheFilter.suche_in=rechercheFilter.suche_in.filter(x=>x!==typ);
+  else rechercheFilter.suche_in.push(typ);
+  renderRecherchePanel(rechercheFilter);
+}
+function rechercheTagAdd(tag){ if(!tag) return; if(!rechercheFilter.tags) rechercheFilter.tags=[]; if(!rechercheFilter.tags.includes(tag)) rechercheFilter.tags.push(tag); renderRecherchePanel(rechercheFilter); }
+function rechercheTagRemove(tag){ rechercheFilter.tags=(rechercheFilter.tags||[]).filter(t=>t!==tag); renderRecherchePanel(rechercheFilter); }
+function rechercheToggleKundenTyp(){ rechercheFilter.kundenTyp=[...(document.querySelectorAll('.rKTyp:checked')||[])].map(x=>x.value); renderRecherchePanel(rechercheFilter); }
+
+function rechercheLeseFilter(){
+  const f={...rechercheFilter};
+  const pos=document.getElementById('rPos'); if(pos) f.position=pos.value||null;
+  const pu=document.getElementById('rPosUnter'); if(pu) f.posUnter=pu.checked;
+  const plz=document.getElementById('rPlz'); if(plz) f.plz=plz.value.trim()||null;
+  const rad=document.getElementById('rRadius'); if(rad) f.radius=parseInt(rad.value)||50;
+  const arb=document.getElementById('rArbeitgeber'); if(arb) f.arbeitgeber=arb.value.trim()||null;
+  const arbN=document.getElementById('rArbeitgeberNicht'); if(arbN) f.arbeitgeberNicht=arbN.value.trim()||null;
+  const nam=document.getElementById('rName'); if(nam) f.name=nam.value.trim()||null;
+  const mp=document.getElementById('rMitProfil'); if(mp) f.mitProfil=mp.checked;
+  const ks=document.getElementById('rKeinSchutz'); if(ks) f.abwerbeschutz=ks.checked?false:null;
+  const tm=document.getElementById('rTagModus'); if(tm) f.tagModus=tm.value;
+  const kn=document.getElementById('rKundenName'); if(kn) f.kundenName=kn.value.trim()||null;
+  const kp=document.getElementById('rKundenPlz'); if(kp) f.plz=f.plz||kp.value.trim()||null;
+  f.kundenTyp=[...(document.querySelectorAll('.rKTyp:checked')||[])].map(x=>x.value);
+  return f;
+}
+
+async function rechercheSuchen(){
+  const f=rechercheLeseFilter();
+  const erg=document.getElementById('rechercheErgebnis');
+  erg.style.display='block';
+  erg.innerHTML='<div style="color:var(--muted);padding:14px;text-align:center">⏳ Suche läuft …</div>';
+  const sucheIn=f.suche_in||['kandidaten'];
+  const results=[];
+  if(sucheIn.includes('kandidaten')){ const r=await rechercheKandQuery(f); results.push(...r.map(d=>({typ:'Kandidat',d}))); }
+  if(sucheIn.includes('kunden')){ const r=await rechercheKundQuery(f); results.push(...r.map(d=>({typ:'Kunde',d}))); }
+  if(sucheIn.includes('kontakte')){ const r=await rechercheKontaktQuery(f); results.push(...r.map(d=>({typ:'Kontakt',d}))); }
+  if(!results.length){ erg.innerHTML='<div style="color:var(--muted);padding:14px;text-align:center;border-top:1px solid var(--line)">Keine Treffer.</div>'; return; }
+  erg.innerHTML=`<div style="border-top:1px solid var(--line);padding-top:12px">
+    <div style="font-size:13px;color:var(--muted);margin-bottom:8px;font-weight:600">${results.length} Treffer</div>
+    <div style="display:flex;flex-direction:column;gap:3px;max-height:340px;overflow-y:auto">
+      ${results.map(({typ,d})=>{
+        const icon=typ==='Kandidat'?'👤':typ==='Kunde'?'🏢':'📇';
+        const name=esc(d.voller_name||d.name||'–');
+        const sub=esc(d.berufsbezeichnung||d.branche||d.typ||'');
+        const ort=esc(d.stadt||'');
+        const ag=typ==='Kandidat'&&d.arbeitgeber?' · '+esc(d.arbeitgeber):'';
+        const schutz=typ==='Kandidat'&&istGeschuetzt(d)?'🔒 ':'';
+        const fn=typ==='Kandidat'?`detailKandidat('${d.id}')`:typ==='Kunde'?`detailKunde('${d.id}')`:`detailKontakt('${d.id}')`;
+        return `<div onclick="document.getElementById('rechercheDlg').close();${fn}" style="padding:9px 13px;border-radius:5px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line)" onmouseover="this.style.background='var(--panel2)'" onmouseout="this.style.background='var(--panel)'">
+          <div><span style="margin-right:6px">${icon}</span><b>${schutz}${name}</b>${sub?' <span style="color:var(--muted);font-size:12px">· '+sub+'</span>':''}</div>
+          <div style="font-size:12px;color:var(--muted);white-space:nowrap">${ort}${ag}</div>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+
+async function rechercheKandQuery(f){
+  if(f.plz){
+    const {data,error}=await sb.rpc('kandidaten_im_umkreis',{such_plz:f.plz,radius_km:f.radius||50});
+    if(error) return [];
+    let rows=data||[];
+    if(rows.length){ const ids=rows.map(r=>r.id); const {data:full}=await sb.from('kandidaten').select('*').in('id',ids); const map=Object.fromEntries((full||[]).map(r=>[r.id,r])); rows=rows.map(r=>({...(map[r.id]||r)})); }
+    return rechercheKandLokal(rows,f).slice(0,100);
+  }
+  let q=sb.from('kandidaten').select('*');
+  if(f.name) q=q.or(`voller_name.ilike.%${f.name}%,berufsbezeichnung.ilike.%${f.name}%,stadt.ilike.%${f.name}%,arbeitgeber.ilike.%${f.name}%,faehigkeiten.ilike.%${f.name}%`);
+  if(f.position){ const pl=f.posUnter?positionenUndDarunter(f.position):[f.position]; q=q.in('berufsbezeichnung',pl); }
+  if(f.arbeitgeber) q=q.ilike('arbeitgeber',`%${f.arbeitgeber}%`);
+  if(f.arbeitgeberNicht) q=q.not('arbeitgeber','ilike',`%${f.arbeitgeberNicht}%`);
+  if(f.mitProfil) q=q.or('xing_profil.ilike.%http%,linkedin_profil.ilike.%http%');
+  if(f.abwerbeschutz===false) q=q.or('abwerbeschutz.is.null,abwerbeschutz.eq.false');
+  if(f.abwerbeschutz===true) q=q.eq('abwerbeschutz',true);
+  if(f.tags&&f.tags.length){
+    if(f.tagModus==='oder') q=q.or(f.tags.map(t=>`tags.ilike.%;${t};%`).join(','));
+    else if(f.tagModus==='nicht') f.tags.forEach(t=>{q=q.not('tags','ilike',`%;${t};%`);});
+    else f.tags.forEach(t=>{q=q.ilike('tags',`%;${t};%`);});
+  }
+  if(f.luecke) q=lueckeQuery(q,f.luecke);
+  q=q.order('letzte_aktivitaet',{ascending:false,nullsFirst:false}).limit(100);
+  const {data}=await q; return data||[];
+}
+function rechercheKandLokal(rows,f){
+  if(f.name){const nl=f.name.toLowerCase(); rows=rows.filter(r=>[r.voller_name,r.berufsbezeichnung,r.stadt,r.arbeitgeber].join(' ').toLowerCase().includes(nl));}
+  if(f.position){const pl=f.posUnter?positionenUndDarunter(f.position):[f.position]; rows=rows.filter(r=>pl.includes(r.berufsbezeichnung));}
+  if(f.arbeitgeber){const al=f.arbeitgeber.toLowerCase(); rows=rows.filter(r=>(r.arbeitgeber||'').toLowerCase().includes(al));}
+  if(f.arbeitgeberNicht){const al=f.arbeitgeberNicht.toLowerCase(); rows=rows.filter(r=>!(r.arbeitgeber||'').toLowerCase().includes(al));}
+  if(f.mitProfil) rows=rows.filter(r=>hatProfil(r));
+  if(f.abwerbeschutz===false) rows=rows.filter(r=>!istGeschuetzt(r));
+  if(f.tags&&f.tags.length){ const tl=f.tags.map(x=>x.toLowerCase());
+    rows=rows.filter(r=>{ const t=parseTags(r.tags).map(x=>x.toLowerCase());
+      if(f.tagModus==='oder') return tl.some(x=>t.includes(x));
+      if(f.tagModus==='nicht') return !tl.some(x=>t.includes(x));
+      return tl.every(x=>t.includes(x)); }); }
+  return rows;
+}
+async function rechercheKundQuery(f){
+  let q=sb.from('kunden').select('*');
+  if(f.kundenName) q=q.ilike('name',`%${f.kundenName}%`);
+  if(f.kundenTyp&&f.kundenTyp.length) q=q.in('typ',f.kundenTyp);
+  if(f.plz) q=q.ilike('plz',f.plz.slice(0,2)+'%');
+  if(f.name) q=q.ilike('name',`%${f.name}%`);
+  q=q.order('letzte_aktivitaet',{ascending:false,nullsFirst:false}).limit(100);
+  const {data}=await q; return data||[];
+}
+async function rechercheKontaktQuery(f){
+  let q=sb.from('kontakte').select('*');
+  if(f.name) q=q.or(`voller_name.ilike.%${f.name}%,stadt.ilike.%${f.name}%,berufsbezeichnung.ilike.%${f.name}%`);
+  if(f.position) q=q.ilike('berufsbezeichnung',`%${f.position}%`);
+  q=q.order('letzte_aktivitaet',{ascending:false,nullsFirst:false}).limit(100);
+  const {data}=await q; return data||[];
+}
+
+// Ctrl+R → Recherche öffnen
+document.addEventListener('keydown',e=>{
+  if(e.ctrlKey&&e.key==='r'&&!e.target.matches('input,textarea,select')){
+    e.preventDefault(); oeffneRecherche();
+  }
+});
 
 init();
 renderSucheVerlauf();
