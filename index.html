@@ -1575,9 +1575,9 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails)
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 20px">
           <div>
             ${zeile('Anrede', esc(d.begruessung))}
-            ${zeile('E-Mail', d.email?`<a href="mailto:${esc(d.email)}">${esc(d.email)}</a>`:'')}
-            ${zeile('E-Mail berufl.', d.email_beruflich?`<a href="mailto:${esc(d.email_beruflich)}">${esc(d.email_beruflich)}</a>`:'')}
-            ${zeile('2. E-Mail', d.email_zweit)}
+            ${zeile('E-Mail', d.email?`<a href="#" onclick="event.preventDefault();mailtoMitLog('${esc(d.email)}','${d.id}','${esc(d.voller_name)}')" style="color:var(--accent2)">${esc(d.email)}</a>`:'')}
+            ${zeile('E-Mail berufl.', d.email_beruflich?`<a href="#" onclick="event.preventDefault();mailtoMitLog('${esc(d.email_beruflich)}','${d.id}','${esc(d.voller_name)}')" style="color:var(--accent2)">${esc(d.email_beruflich)}</a>`:'')}
+            ${zeile('2. E-Mail', d.email_zweit?`<a href="#" onclick="event.preventDefault();mailtoMitLog('${esc(d.email_zweit)}','${d.id}','${esc(d.voller_name)}')" style="color:var(--accent2)">${esc(d.email_zweit)}</a>`:'')}
             ${zeile('Telefon', tel(d.telefon))}
             ${zeile('Tel. privat', tel(d.telefon_privat))}
             ${zeile('Mobil', tel(d.mobil))}
@@ -3112,10 +3112,17 @@ function serienMailDialog(rows, vorlage){
       </div>`:''}
 
       <!-- Outlook öffnen -->
-      <div style="border-top:1px solid var(--line);padding-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+      <div style="border-top:1px solid var(--line);padding-top:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
         <button onclick="outlookOeffnen(this)" style="padding:9px 20px;border-radius:6px;cursor:pointer;background:#0078d4;color:#fff;border:none;font-weight:700;font-size:14px">📨 In Outlook öffnen</button>
         <button onclick="this.closest('dialog').close();this.closest('dialog').remove()" style="padding:9px 18px;border-radius:6px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);color:var(--ink)">Schließen</button>
-        <span style="font-size:12px;color:var(--muted);align-self:center">Öffnet Outlook mit BCC + Betreff vorausgefüllt</span>
+        <span style="font-size:12px;color:var(--muted)">Öffnet Outlook mit BCC + Betreff vorausgefüllt</span>
+      </div>
+
+      <!-- Protokollieren (erscheint nach Outlook-Klick) -->
+      <div id="smProtokollBox" style="display:none;margin-top:12px;padding:12px 14px;background:var(--panel2);border:1px solid var(--ok);border-radius:7px">
+        <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--ok)">✅ Outlook geöffnet — E-Mail protokollieren?</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Einen Klick — dann ist die Mail bei allen ${mitMail.length} Empfängern in YAVIS protokolliert.</div>
+        <button onclick="serienMailProtokollieren(this)" style="padding:7px 18px;border-radius:5px;cursor:pointer;background:var(--ok);color:#fff;border:none;font-weight:700;font-size:13px">📝 Für alle ${mitMail.length} Kandidaten protokollieren</button>
       </div>
     </div>`;
   document.body.appendChild(dlg);
@@ -3130,8 +3137,6 @@ function outlookOeffnen(btn){
   const meinBccEl=document.getElementById('smMeinBcc');
   const meinBcc=meinBccEl?meinBccEl.value:'';
 
-  // mailto: aufbauen
-  // TO: leer (oder mein BCC damit Outlook nicht meckert)
   const to=meinBcc||'';
   let mailto=`mailto:${encodeURIComponent(to)}?`;
   const params=[];
@@ -3140,23 +3145,61 @@ function outlookOeffnen(btn){
   if(text) params.push('body='+encodeURIComponent(text));
   mailto+=params.join('&');
 
-  // mailto: hat Zeichenlimit (~2000) — warnen wenn zu lang
   if(mailto.length>2000){
-    // Nur BCC + Betreff, Text separat
     let kurz=`mailto:${encodeURIComponent(to)}?`;
     const kParams=[];
     if(bcc) kParams.push('bcc='+encodeURIComponent(bcc));
     if(betreff) kParams.push('subject='+encodeURIComponent(betreff));
     kurz+=kParams.join('&');
     window.location.href=kurz;
-    // Text in Clipboard
     navigator.clipboard.writeText(text).then(()=>{
       zeigeMeldung('Outlook geöffnet — Text in Zwischenablage (Strg+V im E-Mail-Body)','ok');
     });
   } else {
     window.location.href=mailto;
-    zeigeMeldung('Outlook wird geöffnet …','ok');
   }
+
+  // Button-Status ändern
+  btn.textContent='✅ Outlook geöffnet';
+  btn.style.background='var(--ok)';
+  btn.disabled=true;
+
+  // Protokollieren-Block einblenden
+  const protokollBox=dlg.querySelector('#smProtokollBox');
+  if(protokollBox) protokollBox.style.display='block';
+}
+
+async function serienMailProtokollieren(btn){
+  if(!_serienMailKandidaten||!_serienMailKandidaten.length) return;
+  const dlg=btn.closest('dialog');
+  const betreff=document.getElementById('smBetreff').value.trim()||'Serien-E-Mail';
+  btn.disabled=true; btn.textContent='⏳ Läuft…';
+  const {data:user}=await sb.auth.getUser();
+  const ts=new Date().toISOString();
+  const eintraege=_serienMailKandidaten.filter(r=>r.email).map(r=>({
+    id:'yavis_sm_'+Date.now()+'_'+r.email.replace(/[^a-z0-9]/gi,'').slice(0,8),
+    betreff:'📤 '+betreff,
+    entity_id:r.id||r.kandidat_id,
+    besitzer_id:user?.user?.id||null,
+    erstellt_am:ts,
+  }));
+  // In Batches von 50 einfügen
+  let ok=0;
+  for(let i=0;i<eintraege.length;i+=50){
+    const batch=eintraege.slice(i,i+50);
+    const {error}=await sb.from('emails').insert(batch);
+    if(!error) ok+=batch.length;
+  }
+  btn.textContent='✅ '+ok+' Kandidaten protokolliert';
+  btn.style.background='var(--ok)';
+  zeigeMeldung(ok+' E-Mails protokolliert ✓','ok');
+}
+
+// Einzelne E-Mail aus Kandidaten-Detailseite öffnen + Protokollieren anbieten
+function mailtoMitLog(email, kandidatId, kandidatName){
+  window.location.href='mailto:'+encodeURIComponent(email);
+  // Kurz warten, dann Log-Dialog zeigen
+  setTimeout(()=>mailProtokollieren(kandidatId, kandidatName), 600);
 }
 
 
