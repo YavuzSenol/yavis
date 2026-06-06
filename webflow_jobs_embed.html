@@ -1,0 +1,40 @@
+<!-- ===========================================================
+     YAVIS Jobs-Widget für Webflow
+     In Webflow: ein "Embed"-Element (HTML-Code) an die Stelle des
+     alten Zoho-Widgets setzen und diesen kompletten Code einfügen.
+     Zieht die Stellen aus deiner Supabase (Edge Function "jobs").
+     =========================================================== -->
+<div id="yavis-jobs" style="max-width:920px;margin:0 auto;font-family:inherit"></div>
+<script>
+(function(){
+  var EP = "https://afbyqrwqnccgudpqxziv.supabase.co/functions/v1/jobs";
+  var box = document.getElementById("yavis-jobs");
+  function esc(s){ return (s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+  box.innerHTML = '<p style="color:#888;text-align:center;padding:24px">Stellen werden geladen …</p>';
+  fetch(EP).then(function(r){ return r.json(); }).then(function(res){
+    var jobs = (res && res.jobs) || [];
+    if(!jobs.length){ box.innerHTML = '<p style="text-align:center;padding:24px">Aktuell sind keine Stellen ausgeschrieben.</p>'; return; }
+    box.innerHTML =
+      '<p style="color:#888;font-size:14px;margin:0 0 14px">'+jobs.length+' offene Stellen</p>' +
+      jobs.map(function(j){
+        var ort = [j.stadt, j.bundesland].filter(Boolean).join(", ");
+        var meta = [ort, j.stellentyp, (String(j.remote)==="true" ? "Remote möglich" : null), j.berufserfahrung]
+                     .filter(Boolean).join("  ·  ");
+        return ''
+          + '<div style="border:1px solid #e3e3e3;border-radius:10px;margin:0 0 14px;overflow:hidden;background:#fff">'
+          +   '<div onclick="var b=this.parentNode.querySelector(\'.yj-body\');var a=this.querySelector(\'.yj-arr\');var o=b.style.display===\'block\';b.style.display=o?\'none\':\'block\';a.textContent=o?\'▾\':\'▴\';" '
+          +        'style="padding:18px 22px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:16px">'
+          +     '<div><div style="font-size:18px;font-weight:600;color:#1a1a1a">'+esc(j.jobtitel)+'</div>'
+          +       (meta ? '<div style="font-size:13px;color:#777;margin-top:5px">'+esc(meta)+'</div>' : '')
+          +     '</div><span class="yj-arr" style="color:#999;font-size:18px">▾</span>'
+          +   '</div>'
+          +   '<div class="yj-body" style="display:none;padding:4px 22px 22px;line-height:1.65;color:#333;white-space:pre-line;font-size:15px">'
+          +     esc(j.beschreibung || "")
+          +   '</div>'
+          + '</div>';
+      }).join("");
+  }).catch(function(e){
+    box.innerHTML = '<p style="color:#c0392b;text-align:center;padding:24px">Die Stellen konnten gerade nicht geladen werden.</p>';
+  });
+})();
+</script>
