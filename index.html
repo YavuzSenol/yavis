@@ -9,7 +9,12 @@
   :root{
     --bg:#0f1115; --panel:#171a21; --panel2:#1d2129; --line:#2a2f3a;
     --ink:#e8eaf0; --muted:#9aa3b2; --accent:#d7b46a; --accent2:#6aa9d7;
-    --hot:#e0683c; --ok:#5bbf8a;
+    --hot:#e0683c; --ok:#5bbf8a; --fg:#e8eaf0;
+  }
+  body.hell{
+    --bg:#f0f2f5; --panel:#ffffff; --panel2:#f5f7fa; --line:#dde1ea;
+    --ink:#1a1d24; --fg:#1a1d24; --muted:#6b7280; --accent:#b8914a; --accent2:#3d87b8;
+    --hot:#c0402a; --ok:#3a9e6a;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);
@@ -180,6 +185,7 @@
   <datalist id="sucheVerlauf"></datalist>
   <button class="go" onclick="globaleSuche()" style="padding:9px 16px;margin-left:6px">Suchen</button>
   <button class="go" onclick="oeffneRecherche()" title="Erweiterte KI-Recherche (Strg+R)" style="padding:9px 14px;margin-left:4px;background:var(--accent2,#7c3aed)">🔍 Recherche</button>
+  <button id="themeBtn" onclick="toggleTheme()" title="Hell/Dunkel wechseln" style="background:none;border:none;cursor:pointer;font-size:18px;padding:4px 8px;line-height:1;margin-left:4px">🌙</button>
   <button class="tab" id="logoutBtn" style="display:none;margin-left:6px" onclick="logout()">Abmelden</button>
 </header>
 
@@ -445,6 +451,21 @@
 
 <script>
 let sb=null;
+// ---- Hell/Dunkel-Umschalter ----
+function toggleTheme(){
+  const hell=document.body.classList.toggle('hell');
+  const btn=document.getElementById('themeBtn');
+  if(btn) btn.textContent=hell?'☀️':'🌙';
+  localStorage.setItem('yavis_theme',hell?'hell':'dunkel');
+}
+(function(){
+  if(localStorage.getItem('yavis_theme')==='hell'){
+    document.body.classList.add('hell');
+    const btn=document.getElementById('themeBtn');
+    if(btn) btn.textContent='☀️';
+  }
+})();
+
 const cfg = { url: localStorage.getItem('sb_url'), key: localStorage.getItem('sb_key') };
 
 async function init(){
