@@ -19,6 +19,8 @@
   body.hell #logoDunkel{display:none!important}
   body.hell #logoHell{display:block!important}
   #logoHell{display:none}
+  body.kompakt td{padding:2px 8px!important;font-size:12px!important}
+  body.kompakt .kachel{padding:10px 14px!important}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);
     font-family:"Calibri","Segoe UI",Candara,Optima,sans-serif;}
@@ -188,8 +190,7 @@
   <datalist id="sucheVerlauf"></datalist>
   <button class="go" onclick="globaleSuche()" style="padding:9px 16px;margin-left:6px">Suchen</button>
   <button class="go" onclick="oeffneRecherche()" title="Erweiterte KI-Recherche (Strg+R)" style="padding:9px 14px;margin-left:4px;background:var(--accent2,#7c3aed)">🔍 Recherche</button>
-  <button id="themeBtn" onclick="toggleTheme()" class="tab" style="margin-left:4px">🌙 Dunkel</button>
-  <button class="tab" id="logoutBtn" style="display:none;margin-left:6px" onclick="logout()">Abmelden</button>
+  <button class="tab" id="einstellungenBtn" onclick="oeffneEinstellungen()" style="display:none;margin-left:6px;font-size:17px;padding:6px 11px" title="Einstellungen">⚙️</button>
 </header>
 
 <div id="login" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:100;display:none;align-items:center;justify-content:center">
@@ -452,6 +453,112 @@
     </div>
   </div></dialog>
 
+<dialog id="einstellungenDlg" style="width:min(720px,96vw);max-height:90vh;overflow-y:auto;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;padding:0">
+  <div style="padding:24px 28px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;border-bottom:1px solid var(--line);padding-bottom:14px">
+      <h2 style="margin:0;font-size:19px;font-weight:700">⚙️ Einstellungen</h2>
+      <button onclick="document.getElementById('einstellungenDlg').close()" style="background:none;border:none;cursor:pointer;font-size:22px;color:var(--muted);line-height:1">×</button>
+    </div>
+
+    <!-- Darstellung -->
+    <div style="margin-bottom:20px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">🎨 Darstellung</div>
+      <div style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;overflow:hidden">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--line)">
+          <div><b>Farbschema</b><div style="font-size:12px;color:var(--muted)">Zwischen hellem und dunklem Design wechseln</div></div>
+          <button id="themeBtn" onclick="toggleTheme()" style="padding:6px 16px;border-radius:6px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:13px;min-width:110px">🌙 Dunkel</button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px">
+          <div><b>Kompakt-Modus</b><div style="font-size:12px;color:var(--muted)">Tabellenzeilen enger — mehr Kandidaten auf einen Blick</div></div>
+          <button id="kompaktBtn" onclick="toggleKompakt()" style="padding:6px 16px;border-radius:6px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:13px;min-width:110px">⬜ Aus</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Meine Angaben -->
+    <div style="margin-bottom:20px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">👤 Meine Angaben</div>
+      <div style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;overflow:hidden">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--line)">
+          <div><b>Mein Name</b><div style="font-size:12px;color:var(--muted)">Für Begrüßungen und Signaturen</div></div>
+          <input id="einsMeinName" placeholder="z.B. Yavuz Senol" style="width:220px;padding:6px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px">
+          <div><b>Mein Standort</b><div style="font-size:12px;color:var(--muted)">Standard-PLZ + Radius für Umkreissuche in der Recherche</div></div>
+          <div style="display:flex;gap:8px">
+            <input id="einsMeinePlz" placeholder="PLZ" maxlength="5" style="width:78px;padding:6px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
+            <select id="einsRadius" style="padding:6px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
+              <option value="25">25 km</option>
+              <option value="50">50 km</option>
+              <option value="75">75 km</option>
+              <option value="100">100 km</option>
+              <option value="150">150 km</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- E-Mail -->
+    <div style="margin-bottom:20px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">✉️ E-Mail</div>
+      <div style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;overflow:hidden">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--line)">
+          <div><b>Standard-BCC</b><div style="font-size:12px;color:var(--muted)">Automatisch in Serien-E-Mail vorausgefüllt</div></div>
+          <input id="einsBcc" type="email" placeholder="deine@email.de" style="width:220px;padding:6px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
+        </div>
+        <div style="padding:11px 16px">
+          <div style="margin-bottom:6px"><b>E-Mail-Signatur</b> <span style="font-size:12px;color:var(--muted)">— wird in Serien-E-Mail angezeigt</span></div>
+          <textarea id="einsSignatur" rows="4" placeholder="Mit freundlichen Grüßen&#10;Yavuz Senol&#10;Senol Consulting · Köln" style="width:100%;padding:8px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;resize:vertical;font-family:inherit;box-sizing:border-box"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Datenverwaltung -->
+    <div style="margin-bottom:20px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">📋 Datenverwaltung</div>
+      <div style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;overflow:hidden">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--line)">
+          <div><b>Cache leeren</b><div style="font-size:12px;color:var(--muted)">Tags und Auftraggeber-Namen neu aus der Datenbank laden</div></div>
+          <button onclick="cacheLeeren()" style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:13px">🔄 Leeren</button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--line)">
+          <div><b>Duplikate finden</b><div style="font-size:12px;color:var(--muted)">Doppelte Kandidaten nach Name oder E-Mail suchen</div></div>
+          <button onclick="document.getElementById('einstellungenDlg').close();duplikateFinden()" style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:13px">🔍 Suchen</button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px">
+          <div><b>Alle Kandidaten exportieren</b><div style="font-size:12px;color:var(--muted)">Vollständige Kandidatenliste als CSV-Datei</div></div>
+          <button onclick="exportAlleKandidaten()" style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:13px">📥 CSV</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- System -->
+    <div style="margin-bottom:20px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">🔧 System</div>
+      <div style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;overflow:hidden">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--line)">
+          <div><b>Datenbankverbindung</b></div>
+          <span style="font-size:12px;color:var(--muted)">Supabase · afbyqrwqnccgudpqxziv.supabase.co</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--line)">
+          <div><b>Version</b></div>
+          <span style="font-size:12px;color:var(--muted)">YAVIS CRM · 2026-06</span>
+        </div>
+        <div style="padding:11px 16px">
+          <button onclick="logout()" style="padding:7px 16px;border-radius:5px;cursor:pointer;background:#dc2626;color:#fff;border:none;font-size:13px;font-weight:600">🚪 Abmelden</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="border-top:1px solid var(--line);padding-top:14px;display:flex;justify-content:flex-end;gap:10px">
+      <button onclick="document.getElementById('einstellungenDlg').close()" style="padding:8px 20px;border-radius:6px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);color:var(--ink)">Abbrechen</button>
+      <button onclick="einstellungenSpeichern()" style="padding:8px 24px;border-radius:6px;cursor:pointer;background:var(--accent);color:#0f1115;border:none;font-weight:700;font-size:14px">💾 Speichern</button>
+    </div>
+  </div>
+</dialog>
+
+
 <script>
 let sb=null;
 // ---- Hell/Dunkel-Umschalter ----
@@ -492,7 +599,7 @@ async function pruefeLogin(){
 
 function zeigeApp(){
   document.getElementById('login').style.display='none';
-  document.getElementById('logoutBtn').style.display='inline-block';
+  document.getElementById('einstellungenBtn').style.display='inline-block';
   const p=new URLSearchParams(location.search);
   const anruf=p.get('anruf')||p.get('caller')||p.get('nummer')||p.get('number');
   if(anruf){
@@ -590,16 +697,27 @@ async function serienMailAuswahl(){
   const mitMail=rows.filter(r=>r.email); const ohneMail=rows.filter(r=>!r.email);
   const adressen=mitMail.map(r=>r.email).join('; ');
   const liste=rows.map(r=>`${r.begruessung||''} ${r.voller_name||''}`.trim()+' — '+(r.email||'⚠️ keine E-Mail')+(r.mobil?' · '+r.mobil:'')).join('\n');
+  const bccSaved=localStorage.getItem('yavis_bcc')||'';
+  const sigSaved=localStorage.getItem('yavis_signatur')||'';
   const dlg=document.createElement('dialog');
   dlg.style.cssText='background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:24px;max-width:640px;width:95vw';
   dlg.innerHTML=`<h3 style="margin:0 0 14px">✉️ Serien-E-Mail — ${rows.length} Kandidaten</h3>
-    <p style="font-size:13px;color:var(--muted);margin:0 0 8px">E-Mail-Adressen (für BCC in Outlook einfügen):</p>
-    <textarea id="mailAddrBox" style="width:100%;height:60px;resize:vertical;font-size:13px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:8px" readonly>${adressen}</textarea>
-    <button onclick="navigator.clipboard.writeText(document.getElementById('mailAddrBox').value);this.textContent='✓ Kopiert!'" style="margin:6px 0 16px;padding:5px 14px;border-radius:4px;cursor:pointer;background:var(--accent);color:#fff;border:none">📋 Adressen kopieren</button>
-    ${ohneMail.length?`<p style="font-size:12px;color:var(--hot);margin:0 0 10px">⚠️ ${ohneMail.length} Kandidaten ohne E-Mail: ${ohneMail.map(r=>r.voller_name).join(', ')}</p>`:''}
-    <p style="font-size:13px;color:var(--muted);margin:0 0 6px">Alle Empfänger (Name · E-Mail · Mobil):</p>
-    <pre style="font-size:12px;max-height:200px;overflow-y:auto;background:var(--bg);padding:10px;border-radius:4px;border:1px solid var(--line);white-space:pre-wrap">${esc(liste)}</pre>
-    <div style="margin-top:14px;text-align:right"><button onclick="this.closest('dialog').close();this.closest('dialog').remove()" style="padding:6px 18px;border-radius:4px;cursor:pointer;background:var(--panel2);border:1px solid var(--line)">Schließen</button></div>`;
+    <p style="font-size:13px;color:var(--muted);margin:0 0 4px">An / BCC (alle Adressen, für Outlook):</p>
+    <textarea id="mailAddrBox" style="width:100%;height:60px;resize:vertical;font-size:13px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:8px;box-sizing:border-box" readonly>${adressen}</textarea>
+    <div style="display:flex;gap:8px;align-items:center;margin:6px 0 10px">
+      <button onclick="navigator.clipboard.writeText(document.getElementById('mailAddrBox').value);this.textContent='✓ Kopiert!'" style="padding:5px 14px;border-radius:4px;cursor:pointer;background:var(--accent);color:#0f1115;border:none;font-weight:600">📋 Adressen kopieren</button>
+      <span style="font-size:12px;color:var(--muted)">${mitMail.length} mit Adresse${ohneMail.length?' · ⚠️ '+ohneMail.length+' ohne':''}</span>
+    </div>
+    ${ohneMail.length?`<p style="font-size:12px;color:var(--hot);margin:0 0 10px">Ohne E-Mail: ${ohneMail.map(r=>r.voller_name).join(', ')}</p>`:''}
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
+      <label style="font-size:13px;color:var(--muted);white-space:nowrap">BCC an mich:</label>
+      <input id="mailBccBox" type="email" value="${esc(bccSaved)}" placeholder="deine@email.de" style="flex:1;padding:6px 10px;font-size:13px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px">
+      <button onclick="if(document.getElementById('mailBccBox').value){navigator.clipboard.writeText(document.getElementById('mailBccBox').value);this.textContent='✓';setTimeout(()=>this.textContent='📋 BCC',1200);}" style="padding:5px 10px;border-radius:4px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);font-size:12px">📋 BCC</button>
+    </div>
+    ${sigSaved?`<div style="margin-bottom:10px"><p style="font-size:13px;color:var(--muted);margin:0 0 4px">Signatur:</p><pre style="font-size:12px;background:var(--bg);padding:8px;border-radius:4px;border:1px solid var(--line);white-space:pre-wrap;margin:0">${esc(sigSaved)}</pre></div>`:''}
+    <p style="font-size:13px;color:var(--muted);margin:0 0 4px">Alle Empfänger (Name · E-Mail · Mobil):</p>
+    <pre style="font-size:12px;max-height:160px;overflow-y:auto;background:var(--bg);padding:10px;border-radius:4px;border:1px solid var(--line);white-space:pre-wrap;margin:0 0 14px">${esc(liste)}</pre>
+    <div style="text-align:right"><button onclick="this.closest('dialog').close();this.closest('dialog').remove()" style="padding:6px 18px;border-radius:4px;cursor:pointer;background:var(--panel2);border:1px solid var(--line)">Schließen</button></div>`;
   document.body.appendChild(dlg); dlg.showModal();
 }
 // ---- Toast-Meldung ----
@@ -2328,6 +2446,12 @@ let rechercheFilter = {};
 
 function oeffneRecherche(){
   const dlg=document.getElementById('rechercheDlg');
+  // Standard-PLZ+Radius aus Einstellungen vorbelegen (nur wenn kein Filter aktiv)
+  if(!rechercheFilter){
+    const plzDef=localStorage.getItem('yavis_meine_plz')||'';
+    const radDef=parseInt(localStorage.getItem('yavis_radius')||'50')||50;
+    if(plzDef) rechercheFilter={plz:plzDef,radius:radDef};
+  }
   if(!dlg.open) dlg.showModal();
   setTimeout(()=>document.getElementById('rechercheText').focus(),80);
 }
@@ -2658,6 +2782,80 @@ document.addEventListener('keydown',e=>{
 
 init();
 renderSucheVerlauf();
+
+// ---- Einstellungen ----
+function oeffneEinstellungen(){
+  // Felder vorausfuellen
+  document.getElementById('einsMeinName').value=localStorage.getItem('yavis_mein_name')||'';
+  document.getElementById('einsMeinePlz').value=localStorage.getItem('yavis_meine_plz')||'';
+  const radSel=document.getElementById('einsRadius');
+  const radVal=localStorage.getItem('yavis_radius')||'50';
+  Array.from(radSel.options).forEach(o=>o.selected=(o.value===radVal));
+  document.getElementById('einsBcc').value=localStorage.getItem('yavis_bcc')||'';
+  document.getElementById('einsSignatur').value=localStorage.getItem('yavis_signatur')||'';
+  // Theme-Button-Label aktualisieren
+  const hell=document.body.classList.contains('hell');
+  const tb=document.getElementById('themeBtn');
+  if(tb) tb.textContent=hell?'☀️ Hell':'🌙 Dunkel';
+  // Kompakt-Button-Label
+  const kb=document.getElementById('kompaktBtn');
+  if(kb) kb.textContent=document.body.classList.contains('kompakt')?'✅ An':'⬜ Aus';
+  document.getElementById('einstellungenDlg').showModal();
+}
+
+function einstellungenSpeichern(){
+  localStorage.setItem('yavis_mein_name',document.getElementById('einsMeinName').value.trim());
+  localStorage.setItem('yavis_meine_plz',document.getElementById('einsMeinePlz').value.trim());
+  localStorage.setItem('yavis_radius',document.getElementById('einsRadius').value);
+  localStorage.setItem('yavis_bcc',document.getElementById('einsBcc').value.trim());
+  localStorage.setItem('yavis_signatur',document.getElementById('einsSignatur').value);
+  document.getElementById('einstellungenDlg').close();
+  zeigeMeldung('Einstellungen gespeichert ✓','ok');
+}
+
+function toggleKompakt(){
+  const an=document.body.classList.toggle('kompakt');
+  const kb=document.getElementById('kompaktBtn');
+  if(kb) kb.textContent=an?'✅ An':'⬜ Aus';
+  localStorage.setItem('yavis_kompakt',an?'1':'0');
+}
+
+function cacheLeeren(){
+  // Gecachte Tag- und Kundenlisten loeschen -> werden beim naechsten Laden neu abgerufen
+  delete window._alleTagsCache;
+  delete window._kundenCache;
+  zeigeMeldung('Cache geleert — Daten werden neu geladen ✓','ok');
+}
+
+async function exportAlleKandidaten(){
+  zeigeMeldung('Export läuft …','ok');
+  const {data,error}=await sb.from('kandidaten').select('*').order('nachname',{ascending:true});
+  if(error||!data){zeigeMeldung('Fehler beim Laden: '+(error?.message||'?'),'err');return;}
+  if(!data.length){zeigeMeldung('Keine Kandidaten gefunden','warn');return;}
+  const felder=Object.keys(data[0]);
+  const esc=v=>{
+    if(v===null||v===undefined)return'';
+    const s=String(v);
+    if(s.includes(',')||s.includes('"')||s.includes('\n'))return'"'+s.replace(/"/g,'""')+'"';
+    return s;
+  };
+  const csv=[felder.join(','),...data.map(r=>felder.map(f=>esc(r[f])).join(','))].join('\r\n');
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download='YAVIS_Kandidaten_Export.csv';
+  document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},1000);
+  zeigeMeldung(`${data.length} Kandidaten exportiert ✓`,'ok');
+}
+
+// Kompakt-Modus beim Start wiederherstellen
+(function(){
+  if(localStorage.getItem('yavis_kompakt')==='1'){
+    document.body.classList.add('kompakt');
+  }
+})();
+
 </script>
 </body>
 </html>
