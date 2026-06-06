@@ -237,6 +237,14 @@
           <option>Bauleitung</option><option>Objektüberwachung</option><option>Kalkulator</option>
           <option>BIM Konstrukteur</option><option>Techniker</option><option>Arbeitssicherheit</option>
         </select></div>
+      <div class="field"><label>Datenlücken</label>
+        <select id="kLuecke" onchange="ladeKandidaten()">
+          <option value="">alle</option>
+          <option value="ohne_handy">ohne Handynr.</option>
+          <option value="ohne_email">ohne E-Mail</option>
+          <option value="ohne_telefon">ohne jede Telefonnr.</option>
+          <option value="ohne_position">ohne Position</option>
+        </select></div>
       <div class="field"><label>Umkreis um PLZ</label>
         <input id="kPlz" placeholder="z.B. 50667" style="min-width:110px"></div>
       <div class="field"><label>Radius km</label>
@@ -575,6 +583,7 @@ function zurStartseite(){
   const gs=document.getElementById('globalSuche'); if(gs) gs.value='';
   document.getElementById('kSuche').value='';
   document.getElementById('kPosition').value='';
+  const kl=document.getElementById('kLuecke'); if(kl) kl.value='';
   const pu=document.getElementById('kPosUnter'); if(pu) pu.checked=false;
   document.getElementById('kPlz').value='';
   document.getElementById('kRadius').value='50';
@@ -631,12 +640,32 @@ async function zeigeStart(){
   window.scrollTo(0,0);
 }
 
+// ===== Datenlücken-Filter =====
+function feldLeer(...vals){ return vals.every(v=>!(v&&String(v).trim()&&String(v).trim()!=='–')); }
+function lueckeMatch(r,m){
+  if(m==='ohne_handy') return feldLeer(r.mobil,r.mobil_privat);
+  if(m==='ohne_email') return feldLeer(r.email,r.email_beruflich,r.email_zweit);
+  if(m==='ohne_telefon') return feldLeer(r.mobil,r.mobil_privat,r.telefon,r.telefon_privat);
+  if(m==='ohne_position') return feldLeer(r.berufsbezeichnung);
+  return true;
+}
+function lueckeQuery(query,m){
+  if(m==='ohne_handy') return query.or('mobil.is.null,mobil.eq.').or('mobil_privat.is.null,mobil_privat.eq.');
+  if(m==='ohne_email') return query.or('email.is.null,email.eq.').or('email_beruflich.is.null,email_beruflich.eq.').or('email_zweit.is.null,email_zweit.eq.');
+  if(m==='ohne_telefon') return query.or('mobil.is.null,mobil.eq.').or('mobil_privat.is.null,mobil_privat.eq.').or('telefon.is.null,telefon.eq.').or('telefon_privat.is.null,telefon_privat.eq.');
+  if(m==='ohne_position') return query.or('berufsbezeichnung.is.null,berufsbezeichnung.eq.');
+  return query;
+}
+const LUECKE_LABEL={ohne_handy:'ohne Handynr.',ohne_email:'ohne E-Mail',ohne_telefon:'ohne Telefonnr.',ohne_position:'ohne Position'};
+
 async function ladeKandidaten(){
   const q=document.getElementById('kSuche').value.trim();
   const position=document.getElementById('kPosition').value;
   const posUnter=document.getElementById('kPosUnter').checked;
   const posListe=position?(posUnter?positionenUndDarunter(position):[position]):null;
   const posLabel=position?(' · '+position+(posUnter?' & darunter':'')):'';
+  const luecke=document.getElementById('kLuecke').value;
+  const lueckeLabel=luecke?(' · '+(LUECKE_LABEL[luecke]||luecke)):'';
   const plz=document.getElementById('kPlz').value.trim();
   const radius=document.getElementById('kRadius').value;
   const body=document.getElementById('kBody'); body.innerHTML='';
@@ -652,7 +681,7 @@ async function ladeKandidaten(){
     if(posListe) rows=rows.filter(r=>posListe.includes(r.berufsbezeichnung));
     // Die Umkreis-Funktion liefert nur Basisfelder → volle Datensätze nachladen,
     // wenn Tag-Filter aktiv ist ODER Spalten angezeigt werden, die sie nicht enthält.
-    if(rows.length && (tagFilterAktiv() || brauchtVolleDaten())){
+    if(rows.length && (tagFilterAktiv() || brauchtVolleDaten() || luecke)){
       const ids=rows.map(r=>r.id); const map={};
       for(let i=0;i<ids.length;i+=300){ const teil=ids.slice(i,i+300);
         const {data:td}=await sb.from('kandidaten').select('*').in('id',teil);
@@ -660,7 +689,8 @@ async function ladeKandidaten(){
       rows=rows.map(r=>({...(map[r.id]||{}), ...r})); // volle Daten + entfernung_km aus RPC
     }
     if(tagFilterAktiv()) rows=rows.filter(r=>tagsMatchFilter(r.tags));
-    document.getElementById('kCount').textContent=rows.length+' Kandidaten im Umkreis von '+radius+' km um '+plz+posLabel+tagFilterLabel();
+    if(luecke) rows=rows.filter(r=>lueckeMatch(r,luecke));
+    document.getElementById('kCount').textContent=rows.length+' Kandidaten im Umkreis von '+radius+' km um '+plz+posLabel+lueckeLabel+tagFilterLabel();
     rows.forEach(r=>body.appendChild(zeileKandidat(r,true)));
     if(!rows.length) body.innerHTML='<tr><td colspan="'+spaltenAnzahl()+'" class="empty">Keine Treffer.</td></tr>';
     return;
@@ -669,6 +699,7 @@ async function ladeKandidaten(){
   // Normale Suche
   let query=sb.from('kandidaten').select('*').limit(200);
   if(posListe) query=query.in('berufsbezeichnung',posListe);
+  if(luecke) query=lueckeQuery(query,luecke);
   if(q) query=query.or(`voller_name.ilike.%${q}%,berufsbezeichnung.ilike.%${q}%,faehigkeiten.ilike.%${q}%,stadt.ilike.%${q}%`);
   const tmod=tagModusWert();
   if(tmod==='leer'){ query=query.or('tags.is.null,tags.eq.,tags.eq.;;'); }
@@ -681,7 +712,7 @@ async function ladeKandidaten(){
   query=query.order('letzte_aktivitaet',{ascending:false,nullsFirst:false});
   const {data,error}=await query;
   if(error){document.getElementById('kCount').textContent='Fehler: '+error.message;return;}
-  document.getElementById('kCount').textContent=(data.length)+' Kandidaten'+(data.length>=200?' (erste 200)':'')+posLabel+tagFilterLabel();
+  document.getElementById('kCount').textContent=(data.length)+' Kandidaten'+(data.length>=200?' (erste 200)':'')+posLabel+lueckeLabel+tagFilterLabel();
   data.forEach(r=>body.appendChild(zeileKandidat(r,false)));
   if(!data.length) body.innerHTML='<tr><td colspan="'+spaltenAnzahl()+'" class="empty">Keine Treffer.</td></tr>';
 }
