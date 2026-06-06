@@ -499,6 +499,15 @@
       </div>
     </div>
 
+    <!-- Outlook-Verbindung -->
+    <div style="margin-bottom:20px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">📧 Outlook-Verbindung</div>
+      <div style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:12px 16px">
+        <div id="msVerbindungBox"></div>
+        <div style="margin-top:10px;font-size:12px;color:var(--muted)">Nach dem Verbinden: ⚙️ → <b>🔄 Sync</b> drücken — YAVIS liest die letzten 50 gesendeten Outlook-Mails ein und ordnet sie automatisch den richtigen Kandidaten zu.</div>
+      </div>
+    </div>
+
     <!-- E-Mail -->
     <div style="margin-bottom:20px">
       <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">✉️ E-Mail</div>
@@ -662,6 +671,17 @@ function zeigeApp(){
   document.getElementById('login').style.display='none';
   document.getElementById('einstellungenBtn').style.display='inline-block';
   const p=new URLSearchParams(location.search);
+
+  // Microsoft OAuth Callback abarbeiten
+  if(window._msPendingCallback){
+    window._msPendingCallback=false;
+    msHandleCallback().then(ok=>{
+      if(ok) zeigeMeldung('Outlook erfolgreich verbunden! ✅','ok');
+      else zeigeMeldung('Outlook-Verbindung fehlgeschlagen','err');
+      window.history.replaceState({},document.title,location.pathname);
+    });
+  }
+
   const anruf=p.get('anruf')||p.get('caller')||p.get('nummer')||p.get('number');
   if(anruf){
     document.getElementById('view-start').style.display='none';
@@ -2845,6 +2865,7 @@ function oeffneEinstellungen(){
   const kb=document.getElementById('kompaktBtn');
   if(kb) kb.textContent=document.body.classList.contains('kompakt')?'✅ An':'⬜ Aus';
   document.getElementById('einstellungenDlg').showModal();
+  msEinstellungenUI();
 }
 
 function einstellungenSpeichern(){
@@ -3854,6 +3875,258 @@ async function mailProtokollierenSpeichern(kandidatId, dlg){
     acc.open=true;
   }
 }
+
+
+
+// ================================================================
+//  MICROSOFT GRAPH — OUTLOOK-INTEGRATION (OAuth PKCE)
+// ================================================================
+const MS_CLIENT_ID = '3b720301-85dc-48c7-9033-b6e0805c378c';
+const MS_TENANT_ID = '308cccc9-d663-4179-a78c-69fdfbec1565';
+const MS_REDIRECT_URI = 'https://yavuzsenol.github.io/yavis';
+const MS_SCOPES = 'https://graph.microsoft.com/Mail.Read https://graph.microsoft.com/Mail.Send offline_access';
+
+// ---- PKCE Hilfsfunktionen ----
+async function msPKCEErzeugen(){
+  const arr=new Uint8Array(32);
+  crypto.getRandomValues(arr);
+  const verifier=btoa(String.fromCharCode(...arr)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+  const data=new TextEncoder().encode(verifier);
+  const digest=await crypto.subtle.digest('SHA-256',data);
+  const challenge=btoa(String.fromCharCode(...new Uint8Array(digest))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+  return {verifier,challenge};
+}
+
+// ---- Login (Weiterleitung zu Microsoft) ----
+async function msLogin(){
+  const {verifier,challenge}=await msPKCEErzeugen();
+  const state=Math.random().toString(36).slice(2);
+  localStorage.setItem('ms_pkce_verifier',verifier);
+  localStorage.setItem('ms_oauth_state',state);
+  const params=new URLSearchParams({
+    client_id:MS_CLIENT_ID,
+    response_type:'code',
+    redirect_uri:MS_REDIRECT_URI,
+    scope:MS_SCOPES,
+    state,
+    code_challenge:challenge,
+    code_challenge_method:'S256',
+    prompt:'select_account',
+  });
+  window.location.href=`https://login.microsoftonline.com/${MS_TENANT_ID}/oauth2/v2.0/authorize?${params}`;
+}
+
+// ---- Callback verarbeiten (nach Weiterleitung von Microsoft) ----
+async function msHandleCallback(){
+  const p=new URLSearchParams(window.location.search);
+  const code=p.get('code');
+  const state=p.get('state');
+  if(!code) return false;
+  const savedState=localStorage.getItem('ms_oauth_state');
+  if(state!==savedState){console.error('OAuth State-Fehler');return false;}
+  const verifier=localStorage.getItem('ms_pkce_verifier');
+  try{
+    const resp=await fetch(`https://login.microsoftonline.com/${MS_TENANT_ID}/oauth2/v2.0/token`,{
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:new URLSearchParams({client_id:MS_CLIENT_ID,grant_type:'authorization_code',code,redirect_uri:MS_REDIRECT_URI,code_verifier:verifier})
+    });
+    const tok=await resp.json();
+    if(tok.error){console.error('Token-Fehler:',tok.error_description);return false;}
+    localStorage.setItem('ms_access_token',tok.access_token);
+    if(tok.refresh_token) localStorage.setItem('ms_refresh_token',tok.refresh_token);
+    localStorage.setItem('ms_token_expiry',Date.now()+(tok.expires_in*1000));
+    localStorage.removeItem('ms_pkce_verifier');
+    localStorage.removeItem('ms_oauth_state');
+    return true;
+  }catch(e){console.error('Token-Tausch fehlgeschlagen:',e);return false;}
+}
+
+// ---- Gültiges Token holen (ggf. per Refresh) ----
+async function msGetToken(){
+  const expiry=localStorage.getItem('ms_token_expiry');
+  const tok=localStorage.getItem('ms_access_token');
+  if(tok&&expiry&&Date.now()<parseInt(expiry)-60000) return tok;
+  const refresh=localStorage.getItem('ms_refresh_token');
+  if(!refresh) return null;
+  try{
+    const resp=await fetch(`https://login.microsoftonline.com/${MS_TENANT_ID}/oauth2/v2.0/token`,{
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:new URLSearchParams({client_id:MS_CLIENT_ID,grant_type:'refresh_token',refresh_token:refresh,scope:MS_SCOPES})
+    });
+    const tok2=await resp.json();
+    if(tok2.error) return null;
+    localStorage.setItem('ms_access_token',tok2.access_token);
+    if(tok2.refresh_token) localStorage.setItem('ms_refresh_token',tok2.refresh_token);
+    localStorage.setItem('ms_token_expiry',Date.now()+(tok2.expires_in*1000));
+    return tok2.access_token;
+  }catch(e){return null;}
+}
+
+function msIstVerbunden(){
+  return !!(localStorage.getItem('ms_access_token'));
+}
+
+function msTrennen(){
+  ['ms_access_token','ms_refresh_token','ms_token_expiry','ms_pkce_verifier','ms_oauth_state'].forEach(k=>localStorage.removeItem(k));
+  // Einstellungen-Button aktualisieren
+  const btn=document.getElementById('msVerbindenBtn');
+  if(btn){btn.textContent='🔗 Mit Outlook verbinden';btn.style.background='var(--panel)';btn.onclick=msLogin;}
+  zeigeMeldung('Outlook getrennt','ok');
+}
+
+// ---- Gesendete Mails aus Outlook laden und mit Kandidaten abgleichen ----
+async function msSyncOutlook(){
+  const token=await msGetToken();
+  if(!token){zeigeMeldung('Nicht mit Outlook verbunden','warn');return;}
+  zeigeMeldung('Lade gesendete E-Mails aus Outlook …','ok');
+  try{
+    const resp=await fetch(
+      'https://graph.microsoft.com/v1.0/me/mailFolders/SentItems/messages?$top=50&$select=id,subject,toRecipients,ccRecipients,bccRecipients,sentDateTime&$orderby=sentDateTime desc',
+      {headers:{'Authorization':'Bearer '+token}}
+    );
+    if(!resp.ok){
+      const err=await resp.json();
+      zeigeMeldung('Graph-Fehler: '+(err.error?.message||resp.status),'err');
+      return;
+    }
+    const data=await resp.json();
+    const messages=data.value||[];
+    if(!messages.length){zeigeMeldung('Keine gesendeten E-Mails gefunden','warn');return;}
+
+    // Alle Empfänger-Adressen sammeln
+    const emailMap=new Map(); // email.lower → {subject, sentAt}
+    for(const msg of messages){
+      const empfaenger=[...(msg.toRecipients||[]),...(msg.ccRecipients||[]),...(msg.bccRecipients||[])]
+        .map(r=>r.emailAddress?.address?.toLowerCase()).filter(Boolean);
+      for(const email of empfaenger){
+        if(!emailMap.has(email)) emailMap.set(email,{subject:msg.subject,sentAt:msg.sentDateTime,msgId:msg.id});
+      }
+    }
+
+    // Kandidaten mit passenden E-Mails suchen
+    const emailListe=[...emailMap.keys()];
+    const {data:kands1}=await sb.from('kandidaten').select('id,voller_name,email,email_beruflich')
+      .in('email',emailListe.slice(0,100));
+    const {data:kands2}=await sb.from('kandidaten').select('id,voller_name,email,email_beruflich')
+      .in('email_beruflich',emailListe.slice(0,100));
+
+    const alleKands=[...((kands1||[])), ...((kands2||[]))];
+    // Duplikate entfernen
+    const seen=new Set();
+    const kands=alleKands.filter(k=>{if(seen.has(k.id))return false;seen.add(k.id);return true;});
+
+    if(!kands.length){
+      zeigeMeldung(`${messages.length} E-Mails geprüft — keine passenden Kandidaten gefunden`,'warn');
+      return;
+    }
+
+    // Treffer mit Mail-Daten anreichern
+    const treffer=kands.map(k=>{
+      const email=(k.email||k.email_beruflich||'').toLowerCase();
+      const mailInfo=emailMap.get(email)||emailMap.get((k.email_beruflich||'').toLowerCase())||{};
+      return{...k,mailSubject:mailInfo.subject||'',mailSentAt:mailInfo.sentAt||''};
+    });
+
+    msSyncDialog(treffer,messages.length);
+  }catch(e){zeigeMeldung('Fehler: '+e.message,'err');}
+}
+
+function msSyncDialog(treffer,totalMessages){
+  const dlg=document.createElement('dialog');
+  dlg.style.cssText='background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:0;max-width:620px;width:95vw;max-height:88vh;display:flex;flex-direction:column';
+  dlg.innerHTML=`
+    <div style="padding:18px 22px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
+      <div>
+        <div style="font-size:16px;font-weight:700">🔄 Outlook-Sync</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">${totalMessages} gesendete E-Mails geprüft — ${treffer.length} passende Kandidaten gefunden</div>
+      </div>
+      <button onclick="this.closest('dialog').close();this.closest('dialog').remove()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--muted)">×</button>
+    </div>
+    <div style="overflow-y:auto;flex:1">
+      ${treffer.map(k=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 22px;border-bottom:1px solid var(--line)">
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;font-size:13px">${esc(k.voller_name)}</div>
+            <div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(k.mailSubject||'(kein Betreff)')}</div>
+            <div style="font-size:11px;color:var(--muted)">${k.mailSentAt?new Date(k.mailSentAt).toLocaleDateString('de-DE'):''}</div>
+          </div>
+          <input type="checkbox" data-kid="${k.id}" data-betreff="${esc(k.mailSubject)}" data-datum="${k.mailSentAt}" checked style="width:18px;height:18px;cursor:pointer;flex-shrink:0;margin-left:12px">
+        </div>`).join('')}
+    </div>
+    <div style="padding:14px 22px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:space-between;align-items:center;flex-shrink:0">
+      <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type="checkbox" id="msAlleCheck" checked onchange="dlg.querySelectorAll('input[data-kid]').forEach(c=>c.checked=this.checked)">
+        Alle
+      </label>
+      <div style="display:flex;gap:10px">
+        <button onclick="this.closest('dialog').close();this.closest('dialog').remove()" style="padding:7px 16px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line)">Abbrechen</button>
+        <button onclick="msSyncSpeichern(this.closest('dialog'))" style="padding:7px 20px;border-radius:5px;cursor:pointer;background:var(--accent);color:#0f1115;border:none;font-weight:700">📝 Protokollieren</button>
+      </div>
+    </div>`;
+  document.body.appendChild(dlg);
+  dlg.showModal();
+}
+
+async function msSyncSpeichern(dlg){
+  const auswahl=[...dlg.querySelectorAll('input[data-kid]:checked')];
+  if(!auswahl.length){zeigeMeldung('Nichts ausgewählt','warn');return;}
+  const {data:user}=await sb.auth.getUser();
+  const eintraege=auswahl.map(cb=>({
+    id:'ms_'+Date.now()+'_'+cb.dataset.kid.replace(/[^a-z0-9]/gi,'').slice(-6)+'_'+Math.random().toString(36).slice(2,6),
+    betreff:'📤 '+(cb.dataset.betreff||'E-Mail via Outlook'),
+    entity_id:cb.dataset.kid,
+    besitzer_id:user?.user?.id||null,
+    erstellt_am:cb.dataset.datum||new Date().toISOString(),
+  }));
+  let ok=0;
+  for(let i=0;i<eintraege.length;i+=50){
+    const{error}=await sb.from('emails').insert(eintraege.slice(i,i+50));
+    if(!error) ok+=Math.min(50,eintraege.length-i);
+  }
+  dlg.close();dlg.remove();
+  zeigeMeldung(ok+' E-Mails aus Outlook protokolliert ✓','ok');
+}
+
+// ---- Einstellungen-UI für Outlook-Verbindung aktualisieren ----
+function msEinstellungenUI(){
+  const box=document.getElementById('msVerbindungBox');
+  if(!box) return;
+  if(msIstVerbunden()){
+    const expiry=localStorage.getItem('ms_token_expiry');
+    const ablauf=expiry?new Date(parseInt(expiry)).toLocaleString('de-DE'):'';
+    box.innerHTML=`
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-weight:600;color:var(--ok)">✅ Outlook verbunden</div>
+          <div style="font-size:12px;color:var(--muted)">Token gültig bis ca. ${ablauf}</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button onclick="msSyncOutlook()" style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--accent2);color:#fff;border:none;font-size:13px;font-weight:600">🔄 Sync</button>
+          <button onclick="msTrennen();msEinstellungenUI()" style="padding:6px 12px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--hot);font-size:13px">Trennen</button>
+        </div>
+      </div>`;
+  } else {
+    box.innerHTML=`
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-weight:600">Nicht verbunden</div>
+          <div style="font-size:12px;color:var(--muted)">Gesendete Mails automatisch den Kandidaten zuordnen</div>
+        </div>
+        <button id="msVerbindenBtn" onclick="msLogin()" style="padding:6px 14px;border-radius:5px;cursor:pointer;background:#0078d4;color:#fff;border:none;font-size:13px;font-weight:600">🔗 Verbinden</button>
+      </div>`;
+  }
+}
+
+// ---- Callback beim Start prüfen ----
+(function(){
+  const p=new URLSearchParams(window.location.search);
+  if(p.has('code')&&p.has('state')){
+    // Microsoft OAuth Callback — Token tauschen sobald App bereit ist
+    window._msPendingCallback=true;
+  }
+})();
 
 </script>
 </body>
