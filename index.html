@@ -3146,6 +3146,515 @@ function outlookOeffnen(btn){
   }
 }
 
+
+
+// ================================================================
+//  DEFAULT-VORLAGEN — beim ersten Start automatisch laden
+// ================================================================
+const YAVIS_DEFAULT_VORLAGEN = [
+
+// ─── 🎯 DIREKTANSPRACHE ─────────────────────────────────────────
+
+{ id: 1000, name: "🎯 Erstkontakt – Allgemein",
+  betreff: "Interessante Vakanz in der TGA – passt das zu Ihnen?",
+  text: `mein Name ist Yavuz Senol — ich bin seit über 10 Jahren auf die Vermittlung von Fach- und Führungskräften in der technischen Gebäudeausstattung spezialisiert.
+
+Aktuell suche ich für ein renommiertes Unternehmen einen {{Stelle}} (m/w/d) am Standort {{Stadt}}.
+
+Die vollständige Stellenbeschreibung finden Sie hier:
+{{Link}}
+
+Passt das zu Ihnen? Ich freue mich auf Ihre Rückmeldung!
+
+Viele Grüße
+{{MeinName}}` },
+
+{ id: 1001, name: "🎯 Erstkontakt – Konkrete Stelle mit Benefits",
+  betreff: "{{Stelle}} (m/w/d) in {{Stadt}} – das erwartet Sie",
+  text: `aktuell suche ich für {{Firma}} einen {{Stelle}} (m/w/d) am Standort {{Stadt}}.
+
+Das erwartet Sie:
+• Attraktives Gehalt + leistungsorientierte Prämie
+• Firmenwagen und Fahrradleasing
+• Mobiles Arbeiten / Homeoffice-Option
+• Betriebliche Altersvorsorge & Gesundheitsvorsorge
+• Umfangreiche Fort- und Weiterbildungsmöglichkeiten
+
+Alle Details hier: {{Link}}
+
+Ist das etwas für Sie? Ich freue mich auf Ihre Rückmeldung!
+
+Viele Grüße
+{{MeinName}}` },
+
+{ id: 1002, name: "🎯 Follow-up – Keine Rückmeldung",
+  betreff: "Kurze Nachfrage",
+  text: `gerne erkundige ich mich nach Ihrem Feedback zur unten stehenden Stelle.
+
+Ist die Position interessant für Sie? Wann darf ich mit Ihrer Rückmeldung rechnen?
+
+Viele Grüße
+{{MeinName}}` },
+
+{ id: 1003, name: "🎯 Reaktivierung – Lange kein Kontakt",
+  betreff: "Schon eine Weile her – neue Chancen in der TGA?",
+  text: `ich hoffe, es geht Ihnen gut!
+
+Eine ganze Weile ist vergangen, seit wir zuletzt in Kontakt standen.
+
+Sind Sie aktuell offen für neue Möglichkeiten? Ich habe interessante Vakanzen in der TGA & Bautechnik — gerne in Ihrer Region.
+
+Ich freue mich auf Ihre Rückmeldung!
+
+Viele Grüße
+{{MeinName}}` },
+
+{ id: 1004, name: "🎯 Reaktivierung – Via Kollegin / ex-Kontakt",
+  betreff: "Neue Impulse aus der TGA?",
+  text: `ich hoffe, es geht Ihnen gut!
+
+Sie standen zuletzt mit meiner Kollegin in Kontakt und haben uns Ihren Lebenslauf zur Verfügung gestellt — herzlichen Dank dafür.
+
+Ich melde mich, weil ich aktuell eine interessante Vakanz in Ihrer Nähe habe.
+
+Sind Sie offen für ein kurzes Gespräch?
+
+Viele Grüße
+{{MeinName}}` },
+
+// ─── 📋 KANDIDATEN-PROZESS ───────────────────────────────────────
+
+{ id: 2000, name: "📋 CV erhalten → Telefonat (Calendly)",
+  betreff: "Ihr Lebenslauf – nächster Schritt",
+  text: `vielen Dank für Ihren Lebenslauf — das war schnell, Respekt!
+
+Im nächsten Schritt bereite ich Ihre Unterlagen auf und erstelle ein ansprechendes Kandidatenprofil, das Sie bei unseren Partnern optimal präsentiert.
+
+Dafür brauche ich kurz Ihre Zeit — ca. 15–20 Minuten am Telefon.
+
+Hier können Sie direkt einen Termin buchen:
+https://calendly.com/senol-2
+
+Ich freue mich auf unser Gespräch!
+
+Viele Grüße
+{{MeinName}}` },
+
+{ id: 2001, name: "📋 CV erhalten → Kennenlerntermin (fester Vorschlag)",
+  betreff: "Ihr Lebenslauf – nächster Schritt",
+  text: `vielen Dank für Ihren Lebenslauf!
+
+Im nächsten Schritt bereite ich Ihre Unterlagen auf und erstelle Ihr Kandidatenprofil.
+
+Dafür würde ich gerne kurz mit Ihnen telefonieren — ca. 15–20 Minuten.
+
+Wie wäre es am {{Datum}}? Alternativ schlagen Sie mir gerne einen Termin vor.
+
+Ich freue mich auf unser Gespräch!
+
+Viele Grüße
+{{MeinName}}` },
+
+{ id: 2002, name: "📋 CV erhalten → Freigabe Profil",
+  betreff: "Ihr Kandidatenprofil – bitte um Freigabe",
+  text: `vielen Dank für Ihren Lebenslauf und das damit verbundene Vertrauen.
+
+Anbei erhalten Sie Ihr Kandidatenprofil. Bitte prüfen Sie es kurz, ergänzen Sie fehlende Punkte und geben Sie mir grünes Licht zur Weitergabe an:
+
+{{Firma}}
+
+Ich freue mich auf Ihre Rückmeldung!
+
+Viele Grüße
+{{MeinName}}` },
+
+{ id: 2003, name: "📋 CV ausstehend – Status erfragen",
+  betreff: "Kurze Nachfrage – Ihr Lebenslauf",
+  text: `ich hoffe, es geht Ihnen gut.
+
+Wann darf ich mit Ihrem Lebenslauf rechnen?
+
+Viele Grüße
+{{MeinName}}` },
+
+{ id: 2004, name: "📋 CV ausstehend – Letzte Kontaktaufnahme",
+  betreff: "Unser Kontakt",
+  text: `leider habe ich auf meine bisherigen Nachrichten keine Rückmeldung erhalten.
+
+Sollten Sie noch Interesse an der Position haben, melden Sie sich gerne. Ansonsten gehe ich davon aus, dass das Thema für Sie vorerst nicht aktuell ist.
+
+Alles Gute für Sie!
+
+Viele Grüße
+{{MeinName}}` },
+
+{ id: 2005, name: "📋 Absage von Kandidat → erbitte Unterlagen",
+  betreff: "Ihre Rückmeldung",
+  text: `vielen Dank für Ihre Rückmeldung.
+
+Sobald sich beruflich etwas ändert, biete ich Ihnen gerne passende Vakanzen an.
+
+Damit ich Sie dann gezielt ansprechen kann: Würden Sie mir einmalig Ihren Lebenslauf zusenden? Ich melde mich dann mit der richtigen Funktion.
+
+Viele Grüße
+{{MeinName}}` },
+
+{ id: 2006, name: "📋 Kontaktdaten senden (nach Telefonat)",
+  betreff: "Schön gesprochen – meine Kontaktdaten",
+  text: `vielen Dank für das angenehme Gespräch!
+
+Anbei meine Kontaktdaten. Bei Interesse melden Sie sich jederzeit gerne.
+
+Ich freue mich auf Ihren Lebenslauf!
+
+Viele Grüße
+{{MeinName}}` },
+
+// ─── 🤝 KANDIDAT VORSTELLEN ──────────────────────────────────────
+
+{ id: 3000, name: "🤝 Kandidat anonym – kurz (Kurzprofil im Anhang)",
+  betreff: "{{Stelle}} aus {{Stadt}} – interessant für Sie?",
+  text: `ich hoffe, es geht Ihnen gut.
+
+Ich stehe aktuell mit einem {{Stelle}} ({{Jahre}} Jahre Berufserfahrung) aus {{Stadt}} in Kontakt, der über einen Wechsel nachdenkt.
+
+Das Kurzprofil finden Sie im Anhang — bei Interesse stelle ich das vollständige Profil gerne nach Rücksprache zur Verfügung.
+
+Falls dieser Kandidat nicht passt, Sie aber Vakanzen in dem Bereich haben: Ich kann Ihnen in der Regel innerhalb von 1–2 Wochen passende Profile vorstellen.
+
+Ich freue mich auf Ihr Feedback!
+
+Viele Grüße
+{{MeinName}}` },
+
+{ id: 3001, name: "🤝 Kandidat anonym – ausführlich (mit Stichpunkten)",
+  betreff: "{{Stelle}} für die Festanstellung – {{Stadt}}",
+  text: `ich hoffe, es geht Ihnen gut.
+
+Ich habe einen erfahrenen {{Stelle}} ({{Jahre}} Jahre Berufserfahrung) kennengelernt, der über einen Wechsel nachdenkt.
+
+Könnte dieser Kandidat für Sie interessant sein?
+
+Auszug aus seinem Profil:
+• {{Punkt1}}
+• {{Punkt2}}
+• {{Punkt3}}
+
+Gehaltswunsch: {{Gehalt}} € p. a.
+
+Bei Interesse sende ich gerne das vollständige Kandidatenprofil zu.
+
+Unser Honorar: 30 % des ersten Jahresbruttozielgehalts — fällig bei unterschriebenem Arbeitsvertrag.
+
+Ich freue mich auf Ihr Feedback!
+
+Viele Grüße
+{{MeinName}}` },
+
+{ id: 3002, name: "🤝 CV + Honorar vorstellen (neuer Kunde)",
+  betreff: "Kandidatenprofil {{Vorname}} {{Name}} – {{Stelle}}",
+  text: `anbei erhalten Sie das Profil von {{Vorname}} {{Name}} für die Position {{Stelle}}.
+
+Unser Honorar: 30 % des ersten Jahresbruttozielgehalts — Mindesthonorar 15.000 €, fällig bei unterschriebenem Arbeitsvertrag.
+
+Ich freue mich auf Ihr Feedback!
+
+Viele Grüße
+{{MeinName}}` },
+
+{ id: 3003, name: "🤝 CV an Partner (gewohnter Ablauf / mit AGB)",
+  betreff: "Kandidatenprofil {{Vorname}} {{Name}} – {{Stelle}}",
+  text: `ich habe {{Vorname}} {{Name}} als {{Stelle}} kennengelernt ({{Jahre}} Jahre Berufserfahrung).
+
+Den CV finden Sie wie gewohnt im Anhang.
+
+Ich freue mich auf Ihr Feedback!
+
+Viele Grüße
+{{MeinName}}` },
+
+// ─── 🏢 KUNDENAKQUISE ────────────────────────────────────────────
+
+{ id: 4000, name: "🏢 Selbstvorstellung – Erste Mail",
+  betreff: "Fach- und Führungskräfte in der TGA – Ihre Vakanzen?",
+  text: `mein Name ist Yavuz Senol — ich bin seit über 10 Jahren ausschließlich auf die Vermittlung von Kandidaten in der technischen Gebäudeausstattung und Bautechnik spezialisiert.
+
+Darf ich Ihnen passende Kandidatenprofile zusenden?
+
+Im Anhang finden Sie eine kurze Vorstellung meiner Arbeitsweise.
+
+Ich freue mich auf Ihre Rückmeldung!
+
+Viele Grüße
+{{MeinName}}` },
+
+{ id: 4001, name: "🏢 Firmenvorstellung nach Telefonat",
+  betreff: "Wie eben besprochen – nächste Schritte",
+  text: `vielen Dank für das spontane Gespräch!
+
+Anbei meine Kontaktdaten, unseren Rekrutierungsvertrag sowie eine kurze Übersicht meiner Arbeit.
+
+Wie wäre es, wenn wir nächste Woche kurz telefonieren — für eine Bedarfsanalyse? Bis dahin schaue ich mir bereits passende Kandidatenprofile für Sie an.
+
+Ich freue mich auf Ihre Rückmeldung!
+
+Viele Grüße
+{{MeinName}}` },
+
+{ id: 4002, name: "🏢 Rekrutierungsvertrag nach Zusage",
+  betreff: "Wie eben besprochen – Rekrutierungsvertrag & Start",
+  text: `herzlichen Dank für Ihr Vertrauen — ich freue mich auf die Zusammenarbeit!
+
+Die Stellenbeschreibung habe ich entnommen und starte umgehend mit der Suche.
+
+Anbei der Rekrutierungsvertrag — bitte unterschrieben als PDF zurücksenden.
+
+Kurz zusammengefasst:
+✔ 30 % des vertraglich geregelten Jahresbruttozielgehalts
+✔ Fällig bei unterschriebenem Arbeitsvertrag (Zahlungsziel 30 Tage)
+✔ Tritt der Kandidat nicht an — kostenlose Nachbesetzung
+✔ Rein erfolgsbasiert — kein Risiko für Sie
+
+Eine Unternehmensvorstellung erleichtert die Kandidatenansprache enorm. Haben Sie eine Präsentation, die ich verwenden darf?
+
+Ich melde mich bald mit ersten Kandidatenprofilen!
+
+Viele Grüße
+{{MeinName}}` },
+
+{ id: 4003, name: "🏢 Akquise – Gibt es Vakanzen?",
+  betreff: "Vakanzen in der TGA?",
+  text: `ich bin spezialisierter Personalberater und beschäftige mich ausschließlich mit der Vermittlung von Kandidaten in der technischen Gebäudeausstattung und Bautechnik für die Festanstellung.
+
+Gibt es derzeit eine Vakanz, bei der ich Sie unterstützen darf?
+
+Ich freue mich auf Ihr Feedback!
+
+Viele Grüße
+{{MeinName}}` },
+
+{ id: 4004, name: "🏢 Akquise – Reaktivierung (Anfang Jahr)",
+  betreff: "Frohes neues Jahr – Vakanzen in der TGA?",
+  text: `ich wünsche Ihnen und Ihrer Familie ein frohes und vor allem gesundes neues Jahr!
+
+Jetzt ist schon eine Weile vergangen, seit wir das letzte Mal in Kontakt standen.
+
+Gibt es aktuell Vakanzen in der TGA oder Bautechnik, bei denen ich Sie unterstützen darf?
+
+Ich freue mich auf Ihre Rückmeldung!
+
+Viele Grüße
+{{MeinName}}` },
+
+{ id: 4005, name: "🏢 Akquise – Vakanz auf Homepage gefunden",
+  betreff: "Ihre Vakanz – passende Kandidaten innerhalb von 1–2 Wochen",
+  text: `ich habe Ihre Ausschreibung auf Ihrer Karriereseite gefunden.
+
+Ich bin spezialisierter Personalberater in der TGA und Bautechnik.
+
+Wenn Sie Interesse haben, kann ich Ihnen 1–3 passende Kandidaten vorstellen.
+
+Ich freue mich auf Ihr Feedback!
+
+Viele Grüße
+{{MeinName}}` },
+
+// ─── 📝 ABSAGEN ─────────────────────────────────────────────────
+
+{ id: 5000, name: "📝 Absage an Kandidat – allgemein",
+  betreff: "Rückmeldung zur Position {{Stelle}}",
+  text: `vielen Dank für Ihr Interesse und den Versand Ihrer Unterlagen.
+
+Für die Position {{Stelle}} muss ich Ihnen leider eine Absage erteilen — die Entscheidung ist uns nicht leichtgefallen.
+
+Ich behalte Ihr Profil im Kopf und melde mich gerne, sobald eine passende Stelle auftaucht.
+
+Alles Gute für Sie!
+
+Viele Grüße
+{{MeinName}}` },
+
+{ id: 5001, name: "📝 Absage an Kandidat – nach interner Bewerbung",
+  betreff: "Ihre Bewerbung",
+  text: `vielen Dank für Ihr Interesse und Ihre Unterlagen.
+
+Es gab mehrere starke Bewerber — die Entscheidung ist uns nicht leichtgefallen. Leider ist die Wahl diesmal nicht auf Sie gefallen.
+
+Ihr Werdegang ist dennoch sehr interessant. Ich würde gerne den Kontakt halten und mich melden, sobald eine passende Vakanz entsteht.
+
+Alles Gute für Sie!
+
+Viele Grüße
+{{MeinName}}` },
+
+{ id: 5002, name: "📝 Nach Absage – Alles Gute + Empfehlung erbitten",
+  betreff: "Alles Gute für Sie!",
+  text: `vielen Dank für Ihre Rückmeldung.
+
+Sobald sich beruflich etwas ändert, stehe ich Ihnen gerne mit interessanten Vakanzen zur Seite.
+
+Kennen Sie jemanden aus Ihrem Umfeld in der TGA, der eine neue Herausforderung sucht? Ich freue mich über jede Empfehlung!
+
+Alles Gute!
+
+Viele Grüße
+{{MeinName}}` },
+
+{ id: 5003, name: "📝 Absage – Future Business (Kunde)",
+  betreff: "Für die Zukunft – gerne in Kontakt bleiben",
+  text: `vielen Dank für Ihre Rückmeldung.
+
+Sollten Sie in Zukunft Unterstützung bei der Suche in der TGA & Bautechnik benötigen, stehe ich gerne zur Verfügung — ich habe ein breites Kandidatennetzwerk in Ihrer Region.
+
+Gerne bleiben wir in losem Kontakt.
+
+Alles Gute für Sie!
+
+Viele Grüße
+{{MeinName}}` },
+
+// ─── ✅ PROZESS-BEGLEITUNG ────────────────────────────────────────
+
+{ id: 6000, name: "✅ Vorbereitung – Finales Gespräch",
+  betreff: "Vorbereitung auf das finale Gespräch",
+  text: `herzlichen Glückwunsch — Sie haben es ins Finale geschafft!
+
+Beim zweiten Gespräch nehmen sich weitere Führungskräfte Zeit für Sie. Bitte nutzen Sie diese Chance nur, wenn ein Wechsel für Sie wirklich in Frage kommt.
+
+Bitte prüfen Sie vorab noch einmal in Ruhe:
+☑ Ist alles vorbereitet?
+☑ Passt der Standort / die Mobilität?
+☑ Überzeugt Sie die Aufgabe?
+☑ Stimmt das Gehalt (Fix + Bonus)?
+☑ Ist Ihre Familie mit an Bord?
+
+Sammeln Sie offene Fragen und schicken Sie sie mir vorab — dann gehen wir gemeinsam rein.
+
+Ich drücke Ihnen die Daumen!
+
+Viele Grüße
+{{MeinName}}` },
+
+{ id: 6001, name: "✅ Terminbestätigung – an Kandidat",
+  betreff: "Terminbestätigung Vorstellungsgespräch",
+  text: `gerne bestätige ich Ihnen den Termin bei {{Firma}} wie folgt:
+
+📅 {{Datum}} um {{Uhrzeit}} Uhr
+
+📍 {{Adresse}}
+
+Gesprächspartner: {{Ansprechpartner}}
+
+Bitte bringen Sie Ihre vollständigen Bewerbungsunterlagen mit (Lebenslauf, Zeugnisse, Zertifikate).
+
+Ich wünsche Ihnen viel Erfolg!
+
+Viele Grüße
+{{MeinName}}` },
+
+{ id: 6002, name: "✅ Terminbestätigung – an Kunden/Partner",
+  betreff: "Terminbestätigung {{Vorname}} {{Name}}",
+  text: `zu Ihrer Information: {{Vorname}} {{Name}} hat den Termin bestätigt.
+
+Ich wünsche Ihnen ein erfolgreiches Gespräch!
+
+Viele Grüße
+{{MeinName}}` },
+
+{ id: 6003, name: "✅ Viel Erfolg vor dem Vorstellungsgespräch",
+  betreff: "Viel Erfolg heute!",
+  text: `für Ihr Vorstellungsgespräch heute wünsche ich Ihnen viel Erfolg!
+
+Zur Vorbereitung erhalten Sie anbei unseren Business-Knigge — bei Fragen stehe ich jederzeit zur Verfügung.
+
+Außerdem finden Sie im Anhang Ihr Kandidatenprofil, mit dem wir Sie vorgestellt haben — inklusive Ihrer Gehaltsvorstellung als Verhandlungsgrundlage.
+
+Sie schaffen das!
+
+Viele Grüße
+{{MeinName}}` },
+
+{ id: 6004, name: "✅ Rückruf",
+  betreff: "Rückruf",
+  text: `leider habe ich Sie telefonisch nicht erreicht.
+
+Rufen Sie mich gerne zurück — ich bin gut erreichbar.
+
+Viele Grüße
+{{MeinName}}` },
+
+// ─── 💰 ABSCHLUSS & RECHNUNG ────────────────────────────────────
+
+{ id: 7000, name: "💰 Rechnungsstellung 1 – Rechnungsdaten anfragen",
+  betreff: "Herzlichen Glückwunsch – Rechnungsdetails {{Kandidat}}",
+  text: `herzlichen Glückwunsch zum neu gewonnenen Mitarbeiter!
+
+Für die korrekte Rechnungslegung benötige ich von Ihnen:
+• Jahresbruttozielgehalt (Fix + Bonus)
+• Rechnungsempfänger
+• Rechnungsadresse
+
+Ich wünsche einen tollen Start in die neue Zusammenarbeit!
+
+Viele Grüße
+{{MeinName}}` },
+
+{ id: 7001, name: "💰 Rechnungsstellung 2 – Bestätigung Betrag",
+  betreff: "Rechnungsdetails – kurze Bestätigung",
+  text: `herzlichen Dank für die Info!
+
+Die Rechnung würde sich wie folgt zusammensetzen:
+
+Kandidat: {{Kandidat}}
+Position: {{Stelle}}
+Rechnungsempfänger: {{Rechnungsempfaenger}}
+Rechnungsanschrift: {{Rechnungsadresse}}
+Vermittlungshonorar: {{Honorar}} €
+
+Kurze Bestätigung genügt — dann stelle ich die Rechnung aus.
+
+Viele Grüße und ein schönes Wochenende!
+{{MeinName}}` },
+
+{ id: 7002, name: "💰 Rechnungsstellung 3 – Rechnung anbei",
+  betreff: "Rechnung Vermittlung {{Kandidat}}",
+  text: `anbei erhalten Sie die Rechnung für die Vermittlung von {{Kandidat}}.
+
+Ich freue mich auf die weitere Zusammenarbeit!
+
+Viele Grüße
+{{MeinName}}` },
+
+// ─── 📰 NEWSLETTER ──────────────────────────────────────────────
+
+{ id: 8000, name: "📰 TGA Newsletter",
+  betreff: "Aktuelle TGA-Jobs – für Sie oder Ihr Netzwerk",
+  text: `„Habe keine Angst, das Gute aufzugeben, um das Großartige zu erreichen." — John D. Rockefeller
+
+Hier unsere aktuellen TGA-Positionen:
+
+→ {{Stelle1}} | {{Stadt1}}
+→ {{Stelle2}} | {{Stadt2}}
+→ {{Stelle3}} | {{Stadt3}}
+
+Ist eine dieser Positionen interessant? Dann einfach Lebenslauf zusenden — ich melde mich innerhalb von 24 Stunden.
+
+Kein Interesse mehr? Kurze Nachricht genügt.
+
+Viele Grüße
+{{MeinName}}` }
+
+];
+
+// Default-Vorlagen beim ersten Start laden
+(function(){
+  const existing = localStorage.getItem('yavis_vorlagen');
+  if(!existing || existing === '[]'){
+    localStorage.setItem('yavis_vorlagen', JSON.stringify(YAVIS_DEFAULT_VORLAGEN));
+    _vorlagenData = null; // Cache zurücksetzen
+  }
+})();
+
 </script>
 </body>
 </html>
