@@ -2330,7 +2330,7 @@ async function rechercheSuchen(){
   if(sucheIn.includes('kontakte')){ const r=await rechercheKontaktQuery(f); results.push(...r.map(d=>({typ:'Kontakt',d}))); }
   if(!results.length){ erg.innerHTML='<div style="color:var(--muted);padding:14px;text-align:center;border-top:1px solid var(--line)">Keine Treffer.</div>'; return; }
   erg.innerHTML=`<div style="border-top:1px solid var(--line);padding-top:12px">
-    <div style="font-size:13px;color:var(--muted);margin-bottom:8px;font-weight:600">${results.length} Treffer</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:8px;font-weight:600">${results.length} Treffer${f._plzHinweis?` <span style="font-weight:400;color:#d97706">· ${esc(f._plzHinweis)}</span>`:''}</div>
     <div style="display:flex;flex-direction:column;gap:3px;max-height:340px;overflow-y:auto">
       ${results.map(({typ,d})=>{
         const icon=typ==='Kandidat'?'👤':typ==='Kunde'?'🏢':'📇';
@@ -2354,6 +2354,17 @@ async function rechercheKandQuery(f){
     const {data,error}=await sb.rpc('kandidaten_im_umkreis',{such_plz:f.plz,radius_km:f.radius||50});
     if(error) return [];
     let rows=data||[];
+    // PLZ nicht in plz_geo → Fallback auf nächste bekannte PLZ im selben Gebiet
+    if(!rows.length){
+      const pre=f.plz.slice(0,3);
+      const {data:nahe}=await sb.from('plz_geo').select('plz').ilike('plz',pre+'%').limit(100);
+      if(nahe&&nahe.length){
+        const n=parseInt(f.plz);
+        const fb=nahe.sort((a,b)=>Math.abs(parseInt(a.plz)-n)-Math.abs(parseInt(b.plz)-n))[0].plz;
+        const {data:data2,error:err2}=await sb.rpc('kandidaten_im_umkreis',{such_plz:fb,radius_km:f.radius||50});
+        if(!err2&&data2&&data2.length){ rows=data2; f._plzHinweis=`PLZ ${f.plz} nicht bekannt → Umkreis ab ${fb}`; }
+      }
+    }
     if(rows.length){ const ids=rows.map(r=>r.id); const {data:full}=await sb.from('kandidaten').select('*').in('id',ids); const map=Object.fromEntries((full||[]).map(r=>[r.id,r])); rows=rows.map(r=>({...(map[r.id]||r)})); }
     return rechercheKandLokal(rows,f).slice(0,100);
   }
