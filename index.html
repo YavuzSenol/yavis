@@ -502,6 +502,18 @@ function normTag(raw){ if(!raw) return null; let t=String(raw).trim().replace(/^
 function parseTags(raw){ if(!raw) return []; const out=[]; String(raw).split(/[;,]/).forEach(p=>{ const t=normTag(p); if(t&&!out.includes(t)) out.push(t); }); return out; }
 function kategorieVon(tag){ for(const k in TAG_KATEGORIEN){ if(TAG_KATEGORIEN[k].includes(tag)) return k; } return 'Sonstige'; }
 let tagFilter=new Set();
+let auftraggeberNamen=null; // null=noch nicht geladen; Array mit Kleinbuchstaben-Namen der Auftraggeber-Firmen
+async function ladeAuftraggeberNamen(){
+  if(auftraggeberNamen!==null) return;
+  const {data}=await sb.from('kunden').select('name').in('typ',['Auftraggeber','Auftraggeber Potenzial']);
+  auftraggeberNamen=(data||[]).map(k=>(k.name||'').toLowerCase()).filter(Boolean);
+}
+function istGeschuetzt(r){
+  if(r.abwerbeschutz) return true;
+  if(!r.arbeitgeber||!auftraggeberNamen||!auftraggeberNamen.length) return false;
+  const ag=r.arbeitgeber.toLowerCase();
+  return auftraggeberNamen.some(n=>n&&(ag.includes(n)||n.includes(ag)));
+}
 let alleTagsCache=null;
 function tagModusWert(){ const el=document.getElementById('tagModus'); return el?el.value:'und'; }
 async function ladeAlleTags(){
@@ -670,6 +682,7 @@ function nachfassToggle(){
 }
 
 async function ladeKandidaten(){
+  await ladeAuftraggeberNamen();
   const q=document.getElementById('kSuche').value.trim();
   const position=document.getElementById('kPosition').value;
   const posUnter=document.getElementById('kPosUnter').checked;
@@ -949,7 +962,7 @@ async function ladeWiedervorlagen(){
 function telLink(nr){ if(!nr) return '–'; const c=String(nr).replace(/[^\d+]/g,'');
   return `<a class="calllink" href="tel:${c}" onclick="event.stopPropagation()">${esc(nr)}</a>`; }
 const SPALTEN_DEF=[
-  {key:'voller_name', label:'Name', render:r=>`${r.abwerbeschutz?'🔒 ':''}${r.ist_hot?'<span class="pill hot">HOT</span> ':''}${esc(r.voller_name)||'–'}`},
+  {key:'voller_name', label:'Name', render:r=>`${istGeschuetzt(r)?'🔒 ':''}${r.ist_hot?'<span class="pill hot">HOT</span> ':''}${esc(r.voller_name)||'–'}`},
   {key:'nachname', label:'Nachname', render:r=>esc(r.nachname)||'–'},
   {key:'vorname', label:'Vorname', render:r=>esc(r.vorname)||'–'},
   {key:'berufsbezeichnung', label:'Berufsbezeichnung', render:r=>esc(r.berufsbezeichnung)||'–'},
@@ -1036,6 +1049,7 @@ async function abwerbeschutzToggle(id, aktuell){
 }
 
 async function detailKandidat(id){
+  await ladeAuftraggeberNamen();
   const [k, ausb, erf, notiz, bew, aufg, dok] = await Promise.all([
     sb.from('kandidaten').select('*').eq('id',id).single(),
     sb.from('ausbildung').select('*').eq('kandidat_id',id),
@@ -1074,6 +1088,8 @@ async function zeigeDublettenHinweis(eigenerTyp, name){
 function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl){
   dok = dok || [];
   kontextDatensatz={typ:'Kandidat',id:d.id,name:d.voller_name};
+  const geschuetzt = istGeschuetzt(d);
+  const autoSchutz = !d.abwerbeschutz && geschuetzt; // true = Schutz kommt automatisch vom Arbeitgeber
   ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
 
@@ -1094,18 +1110,21 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl){
       <button class="back" onclick="zurueckZurListe()">← Zurück</button>
       ${fotoHtml}
       <div>
-        <h2 style="margin:0 0 2px">${d.abwerbeschutz?'🔒 ':''}${d.ist_hot?'🔥 ':''}${esc(d.voller_name)||'Kandidat'}</h2>
+        <h2 style="margin:0 0 2px">${geschuetzt?'🔒 ':''}${d.ist_hot?'🔥 ':''}${esc(d.voller_name)||'Kandidat'}</h2>
         <div class="detail-sub" style="margin:0">${esc(d.berufsbezeichnung)||''}${d.arbeitgeber?' · '+esc(d.arbeitgeber):''}${d.status?' · <span class="pill">'+esc(d.status)+'</span>':''}</div>
       </div>
       <div style="display:flex;gap:8px;margin-left:auto">
         <button class="cvbtn" id="cvBtn" onclick="cvAuslesen('${d.id}')">📄 CV einlesen</button>
-        <button class="editbtn" style="margin-left:0;background:${d.abwerbeschutz?'var(--hot)':'var(--panel2)'};color:${d.abwerbeschutz?'#fff':'inherit'}" title="${d.abwerbeschutz?'Abwerbeschutz aufheben':'Abwerbeschutz aktivieren'}" onclick="abwerbeschutzToggle('${d.id}',${d.abwerbeschutz?'true':'false'})">${d.abwerbeschutz?'🔒 Geschützt':'🔓 Schützen'}</button>
+        ${autoSchutz
+          ? `<button class="editbtn" style="margin-left:0;background:var(--hot);color:#fff;cursor:default" title="Automatisch geschützt: ${esc(d.arbeitgeber)} ist ein Auftraggeber">🔒 Auto-Schutz</button>`
+          : `<button class="editbtn" style="margin-left:0;background:${d.abwerbeschutz?'var(--hot)':'var(--panel2)'};color:${d.abwerbeschutz?'#fff':'inherit'}" title="${d.abwerbeschutz?'Abwerbeschutz manuell aufheben':'Abwerbeschutz manuell aktivieren'}" onclick="abwerbeschutzToggle('${d.id}',${d.abwerbeschutz?'true':'false'})">${d.abwerbeschutz?'🔒 Manuell':'🔓 Schützen'}</button>`
+        }
         <button class="editbtn" style="margin-left:0" onclick="bearbeiteKandidat('${d.id}')">✎ Bearbeiten</button>
       </div>
     </div>
 
-    ${d.abwerbeschutz?`<div style="background:#c0392b;color:#fff;border-radius:6px;padding:12px 18px;margin-bottom:14px;font-size:14px;font-weight:600">
-      🔒 Abwerbeschutz aktiv — dieser Kandidat ist bei einem Auftraggeber beschäftigt und darf <u>nicht</u> kontaktiert oder für Stellen vorgeschlagen werden.
+    ${geschuetzt?`<div style="background:#c0392b;color:#fff;border-radius:6px;padding:12px 18px;margin-bottom:14px;font-size:14px;font-weight:600">
+      🔒 Abwerbeschutz aktiv${autoSchutz?' (automatisch — Arbeitgeber ist Auftraggeber)':' (manuell gesetzt)'} — dieser Kandidat darf <u>nicht</u> kontaktiert oder für Stellen vorgeschlagen werden.
     </div>`:''}
 
     <div class="dpanels">
@@ -1613,6 +1632,7 @@ async function speichereKunde(id){
   if(id){ res=await sb.from('kunden').update(obj).eq('id',id); }
   else{ obj.id='kde_'+Date.now()+'_'+Math.random().toString(36).slice(2,7); obj.erstellt_am=new Date().toISOString(); res=await sb.from('kunden').insert(obj); }
   if(res.error){ msg.style.color='var(--hot)'; msg.textContent='Fehler: '+res.error.message; return; }
+  auftraggeberNamen=null; // Cache leeren — Auftraggeber-Liste könnte sich geändert haben
   msg.style.color='var(--ok)'; msg.textContent='✓ Gespeichert.';
   setTimeout(()=>detailKunde(id||obj.id), 600);
 }
