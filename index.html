@@ -263,6 +263,12 @@
     <div id="tagPanel" style="display:none;border:1px solid var(--line);background:var(--panel);border-radius:4px;padding:14px;margin-bottom:14px"></div>
     <div id="spaltenPanel" style="display:none;border:1px solid var(--line);background:var(--panel);border-radius:4px;padding:14px;margin-bottom:14px"></div>
     <div class="count" id="kCount"></div>
+    <div id="selBar" style="display:none;align-items:center;gap:10px;background:var(--accent);color:#fff;padding:8px 14px;border-radius:6px;margin-bottom:8px;flex-wrap:wrap">
+      <span id="selCount" style="font-weight:600"></span>
+      <button onclick="exportiereAuswahl()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 12px;border-radius:4px;cursor:pointer;font-size:13px">📥 CSV Export</button>
+      <button onclick="serienMailAuswahl()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 12px;border-radius:4px;cursor:pointer;font-size:13px">✉️ Serien-E-Mail</button>
+      <button onclick="selAufheben()" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.4);padding:5px 10px;border-radius:4px;cursor:pointer;font-size:13px;margin-left:auto">✕ Aufheben</button>
+    </div>
     <table><thead><tr id="kHead"></tr></thead><tbody id="kBody"></tbody></table>
   </div>
 
@@ -502,6 +508,48 @@ function normTag(raw){ if(!raw) return null; let t=String(raw).trim().replace(/^
 function parseTags(raw){ if(!raw) return []; const out=[]; String(raw).split(/[;,]/).forEach(p=>{ const t=normTag(p); if(t&&!out.includes(t)) out.push(t); }); return out; }
 function kategorieVon(tag){ for(const k in TAG_KATEGORIEN){ if(TAG_KATEGORIEN[k].includes(tag)) return k; } return 'Sonstige'; }
 let tagFilter=new Set();
+let selectedKandIds=new Set();
+function updateSelBar(){
+  const bar=document.getElementById('selBar'); if(!bar) return;
+  const n=selectedKandIds.size;
+  bar.style.display=n?'flex':'none';
+  document.getElementById('selCount').textContent=n+' ausgewählt';
+  const allCb=document.getElementById('selAll');
+  if(allCb){ const alle=document.querySelectorAll('.kand-cb').length; allCb.checked=n>0&&n===alle; allCb.indeterminate=n>0&&n<alle; }
+}
+function kandSelToggle(id,cb){ if(cb.checked) selectedKandIds.add(id); else selectedKandIds.delete(id); updateSelBar(); }
+function kandSelAll(checked){ document.querySelectorAll('.kand-cb').forEach(cb=>{ cb.checked=checked; if(checked) selectedKandIds.add(cb.dataset.id); else selectedKandIds.delete(cb.dataset.id); }); updateSelBar(); }
+function selAufheben(){ selectedKandIds.clear(); document.querySelectorAll('.kand-cb').forEach(cb=>cb.checked=false); const allCb=document.getElementById('selAll'); if(allCb){allCb.checked=false;allCb.indeterminate=false;} updateSelBar(); }
+async function exportiereAuswahl(){
+  if(!selectedKandIds.size) return;
+  const ids=[...selectedKandIds]; const rows=[];
+  for(let i=0;i<ids.length;i+=200){ const {data}=await sb.from('kandidaten').select('voller_name,berufsbezeichnung,arbeitgeber,stadt,plz,email,mobil,telefon,xing_profil,linkedin_profil,tags').in('id',ids.slice(i,i+200)); rows.push(...(data||[])); }
+  const cols=['voller_name','berufsbezeichnung','arbeitgeber','stadt','plz','email','mobil','telefon','xing_profil','linkedin_profil','tags'];
+  const header='Name;Berufsbezeichnung;Arbeitgeber;Stadt;PLZ;E-Mail;Mobil;Telefon;XING;LinkedIn;Tags';
+  const csv=header+'\n'+rows.map(r=>cols.map(c=>`"${(r[c]||'').toString().replace(/"/g,'""')}"`).join(';')).join('\n');
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='yavis_export_'+new Date().toISOString().slice(0,10)+'.csv'; a.click();
+}
+async function serienMailAuswahl(){
+  if(!selectedKandIds.size) return;
+  const ids=[...selectedKandIds];
+  const {data}=await sb.from('kandidaten').select('voller_name,begruessung,email,mobil,berufsbezeichnung').in('id',ids);
+  const rows=(data||[]);
+  const mitMail=rows.filter(r=>r.email); const ohneMail=rows.filter(r=>!r.email);
+  const adressen=mitMail.map(r=>r.email).join('; ');
+  const liste=rows.map(r=>`${r.begruessung||''} ${r.voller_name||''}`.trim()+' — '+(r.email||'⚠️ keine E-Mail')+(r.mobil?' · '+r.mobil:'')).join('\n');
+  const dlg=document.createElement('dialog');
+  dlg.style.cssText='background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:24px;max-width:640px;width:95vw';
+  dlg.innerHTML=`<h3 style="margin:0 0 14px">✉️ Serien-E-Mail — ${rows.length} Kandidaten</h3>
+    <p style="font-size:13px;color:var(--muted);margin:0 0 8px">E-Mail-Adressen (für BCC in Outlook einfügen):</p>
+    <textarea id="mailAddrBox" style="width:100%;height:60px;resize:vertical;font-size:13px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:8px" readonly>${adressen}</textarea>
+    <button onclick="navigator.clipboard.writeText(document.getElementById('mailAddrBox').value);this.textContent='✓ Kopiert!'" style="margin:6px 0 16px;padding:5px 14px;border-radius:4px;cursor:pointer;background:var(--accent);color:#fff;border:none">📋 Adressen kopieren</button>
+    ${ohneMail.length?`<p style="font-size:12px;color:var(--hot);margin:0 0 10px">⚠️ ${ohneMail.length} Kandidaten ohne E-Mail: ${ohneMail.map(r=>r.voller_name).join(', ')}</p>`:''}
+    <p style="font-size:13px;color:var(--muted);margin:0 0 6px">Alle Empfänger (Name · E-Mail · Mobil):</p>
+    <pre style="font-size:12px;max-height:200px;overflow-y:auto;background:var(--bg);padding:10px;border-radius:4px;border:1px solid var(--line);white-space:pre-wrap">${esc(liste)}</pre>
+    <div style="margin-top:14px;text-align:right"><button onclick="this.closest('dialog').close();this.closest('dialog').remove()" style="padding:6px 18px;border-radius:4px;cursor:pointer;background:var(--panel2);border:1px solid var(--line)">Schließen</button></div>`;
+  document.body.appendChild(dlg); dlg.showModal();
+}
 let auftraggeberNamen=null; // null=noch nicht geladen; Array mit normalisierten Namen
 // Normalisiert Firmennamen: entfernt Rechtsformen (GmbH, AG…) und Standort-Suffixe (- NL Köln)
 function normFirma(s){
@@ -695,6 +743,7 @@ function nachfassToggle(){
 
 async function ladeKandidaten(){
   await ladeAuftraggeberNamen();
+  selectedKandIds.clear(); updateSelBar();
   const q=document.getElementById('kSuche').value.trim();
   const position=document.getElementById('kPosition').value;
   const posUnter=document.getElementById('kPosUnter').checked;
@@ -1002,7 +1051,8 @@ function spaltenAnzahl(){ return spaltenListe().length+1; }
 function brauchtVolleDaten(){ return sichtbareSpalten.some(k=>SPALTEN_VOLL.includes(k)); }
 function spaltenHeaderRender(plz){
   const head=document.getElementById('kHead'); if(!head) return;
-  head.innerHTML = spaltenListe().map(c=>`<th>${c.label}</th>`).join('')
+  head.innerHTML = `<th style="width:32px;text-align:center" onclick="event.stopPropagation()"><input type="checkbox" id="selAll" title="Alle auswählen" onchange="kandSelAll(this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></th>`
+    + spaltenListe().map(c=>`<th>${c.label}</th>`).join('')
     + `<th class="kmcol" style="display:${plz?'table-cell':'none'}">Entfernung</th>`;
 }
 function toggleSpaltenPanel(){
@@ -1040,7 +1090,8 @@ function moveSpalte(key,dir){
 }
 function zeileKandidat(r,mitKm){
   const tr=document.createElement('tr'); tr.className='row-click';
-  let tds = spaltenListe().map(c=>`<td>${c.render(r)}</td>`).join('');
+  const cbTd=`<td onclick="event.stopPropagation()" style="width:32px;text-align:center"><input type="checkbox" class="kand-cb" data-id="${r.id}" ${selectedKandIds.has(r.id)?'checked':''} onchange="kandSelToggle('${r.id}',this)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></td>`;
+  let tds = cbTd + spaltenListe().map(c=>`<td>${c.render(r)}</td>`).join('');
   tds += mitKm?`<td class="km">${r.entfernung_km} km</td>`:'<td class="kmcol" style="display:none"></td>';
   tr.innerHTML=tds;
   tr.onclick=()=>detailKandidat(r.id);
