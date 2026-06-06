@@ -1467,7 +1467,7 @@ async function abwerbeschutzToggle(id, aktuell){
 
 async function detailKandidat(id){
   await ladeAuftraggeberNamen();
-  const [k, ausb, erf, notiz, bew, aufg, dok] = await Promise.all([
+  const [k, ausb, erf, notiz, bew, aufg, dok, mailRes] = await Promise.all([
     sb.from('kandidaten').select('*').eq('id',id).single(),
     sb.from('ausbildung').select('*').eq('kandidat_id',id),
     sb.from('erfahrung').select('*').eq('kandidat_id',id),
@@ -1475,6 +1475,7 @@ async function detailKandidat(id){
     sb.from('bewerbungen').select('*').eq('kandidat_id',id),
     sb.from('aufgaben').select('*').eq('verknuepft_mit',id).order('faelligkeitsdatum',{ascending:true,nullsFirst:false}),
     sb.from('dokumente').select('*').eq('kandidat_id',id).order('hochgeladen_am',{ascending:false}),
+    sb.from('emails').select('*').eq('entity_id',id).order('erstellt_am',{ascending:false}).limit(100),
   ]);
   const d=k.data; if(!d) return;
   // Foto laden (signierte URL, 2h gültig)
@@ -1482,7 +1483,7 @@ async function detailKandidat(id){
   const fotoPfad=`kandidat/${id}/foto`;
   const {data:fotoData}=await sb.storage.from('dokumente').createSignedUrl(fotoPfad,7200);
   if(fotoData?.signedUrl) fotoUrl=fotoData.signedUrl;
-  zeigeKandidatSeite(d, ausb.data||[], erf.data||[], notiz.data||[], bew.data||[], aufg.data||[], dok.data||[], fotoUrl);
+  zeigeKandidatSeite(d, ausb.data||[], erf.data||[], notiz.data||[], bew.data||[], aufg.data||[], dok.data||[], fotoUrl, mailRes.data||[]);
   zeigeDublettenHinweis('Kandidat', d.voller_name);
 }
 
@@ -1502,7 +1503,8 @@ async function zeigeDublettenHinweis(eigenerTyp, name){
   if(head && head.nextSibling) page.insertBefore(banner, head.nextSibling); else page.appendChild(banner);
 }
 
-function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl){
+function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails){
+  mails=mails||[];
   dok = dok || [];
   kontextDatensatz={typ:'Kandidat',id:d.id,name:d.voller_name};
   const geschuetzt = istGeschuetzt(d);
@@ -1537,6 +1539,7 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl){
           : `<button class="editbtn" style="margin-left:0;background:${d.abwerbeschutz?'var(--hot)':'var(--panel2)'};color:${d.abwerbeschutz?'#fff':'inherit'}" title="${d.abwerbeschutz?'Abwerbeschutz manuell aufheben':'Abwerbeschutz manuell aktivieren'}" onclick="abwerbeschutzToggle('${d.id}',${d.abwerbeschutz?'true':'false'})">${d.abwerbeschutz?'🔒 Manuell':'🔓 Schützen'}</button>`
         }
         <button class="editbtn" style="margin-left:0" onclick="bearbeiteKandidat('${d.id}')">✎ Bearbeiten</button>
+        <button class="editbtn" style="margin-left:0;background:var(--accent2);color:#fff" onclick="mailProtokollieren('${d.id}','${esc(d.voller_name)}')">📧 E-Mail</button>
       </div>
     </div>
 
@@ -1656,6 +1659,16 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl){
           <span id="dokMsg" style="font-size:12px"></span>
         </div>
         <div style="color:var(--muted);font-size:11px;margin-top:6px">PDF, Word, Bilder. Max. 25 MB pro Datei.</div>
+      </div>
+    </details>
+
+    <details class="acc" id="mailAcc">
+      <summary><span>E-Mails<span class="acc-cnt">(${mails.length})</span></span><span class="acc-arr">▶</span></summary>
+      <div class="acc-body">
+        <div id="mailHistorie">${mailHistorieHtml(mails)}</div>
+        <div style="margin-top:10px">
+          <button class="neuBtn" onclick="mailProtokollieren('${d.id}','${esc(d.voller_name)}')">📧 E-Mail protokollieren</button>
+        </div>
       </div>
     </details>
 
@@ -3654,6 +3667,150 @@ Viele Grüße
     _vorlagenData = null; // Cache zurücksetzen
   }
 })();
+
+
+
+// ================================================================
+//  E-MAIL PROTOKOLLIEREN
+// ================================================================
+
+function mailHistorieHtml(mails){
+  if(!mails||!mails.length) return '<div style="color:var(--muted);font-size:13px">Noch keine E-Mails protokolliert.</div>';
+  return mails.map(m=>{
+    const ist_gesendet=m.betreff&&m.betreff.startsWith('📤 ');
+    const ist_empfangen=m.betreff&&m.betreff.startsWith('📥 ');
+    const richtPfeil=ist_gesendet?'<span style="color:var(--accent2);font-size:11px;font-weight:700">→ Gesendet</span>':
+                     ist_empfangen?'<span style="color:var(--ok);font-size:11px;font-weight:700">← Empfangen</span>':'';
+    const betreff=m.betreff?m.betreff.replace(/^[📤📥]\s*/,''):'(kein Betreff)';
+    // Notiz aus Betreff extrahieren (Format: "Betreff\n\nNotiz: xyz")
+    const parts=betreff.split('\n\nNotiz: ');
+    const hauptBetreff=parts[0];
+    const notiz=parts[1]||'';
+    return `<div class="note" style="cursor:default">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="flex:1;min-width:0">
+          ${richtPfeil?`<div style="margin-bottom:3px">${richtPfeil}</div>`:''}
+          <div style="font-weight:600;font-size:13px">${esc(hauptBetreff)}</div>
+          ${notiz?`<div style="font-size:12px;color:var(--muted);margin-top:2px">${esc(notiz)}</div>`:''}
+        </div>
+        <div style="font-size:11px;color:var(--muted);white-space:nowrap;flex-shrink:0">${m.erstellt_am?fmtDat(m.erstellt_am):''}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function mailProtokollieren(kandidatId, kandidatName){
+  const heute=new Date().toISOString().slice(0,10);
+  const dlg=document.createElement('dialog');
+  dlg.style.cssText='background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:0;max-width:520px;width:95vw';
+  dlg.innerHTML=`
+    <div style="padding:22px 26px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid var(--line);padding-bottom:12px">
+        <h3 style="margin:0;font-size:16px;font-weight:700">📧 E-Mail protokollieren</h3>
+        <button onclick="this.closest('dialog').close();this.closest('dialog').remove()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--muted)">×</button>
+      </div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:14px">Kandidat: <b>${esc(kandidatName)}</b></div>
+
+      <!-- Richtung -->
+      <div style="margin-bottom:14px">
+        <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px">RICHTUNG</div>
+        <div style="display:flex;gap:10px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 16px;border-radius:6px;border:2px solid var(--accent2);background:var(--accent2);color:#fff;font-weight:600;font-size:13px">
+            <input type="radio" name="mailRicht" value="gesendet" checked style="display:none">
+            📤 Gesendet
+          </label>
+          <label id="mailRichtEmpf" style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 16px;border-radius:6px;border:2px solid var(--line);color:var(--ink);font-size:13px">
+            <input type="radio" name="mailRicht" value="empfangen" style="display:none">
+            📥 Empfangen
+          </label>
+        </div>
+      </div>
+
+      <!-- Datum -->
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">DATUM</label>
+        <input id="mailDatum" type="date" value="${heute}" style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
+      </div>
+
+      <!-- Betreff -->
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">BETREFF <span style="font-weight:400">(Pflichtfeld)</span></label>
+        <input id="mailBetreff" placeholder="z.B. Vorstellung Position Projektleiter TGA" style="width:100%;padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;box-sizing:border-box">
+      </div>
+
+      <!-- Notiz -->
+      <div style="margin-bottom:16px">
+        <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">NOTIZ <span style="font-weight:400">(optional)</span></label>
+        <textarea id="mailNotiz" rows="3" placeholder="Kurze Zusammenfassung des Inhalts…" style="width:100%;padding:8px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;resize:vertical;font-family:inherit;box-sizing:border-box"></textarea>
+      </div>
+
+      <!-- Vorlage quick-link -->
+      ${vorlagenLaden().length?`<div style="margin-bottom:14px;font-size:12px;color:var(--muted)">
+        💡 Betreff aus Vorlage einfügen:
+        <select id="mailVorlageWahl" onchange="if(this.value){const v=vorlagenLaden().find(v=>v.id==this.value);if(v&&v.betreff)document.getElementById('mailBetreff').value=v.betreff.replace(/{{[^}]+}}/g,'').trim();this.value=''}" style="margin-left:6px;padding:3px 6px;font-size:12px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:4px">
+          <option value="">– Vorlage wählen –</option>
+          ${vorlagenLaden().map(v=>`<option value="${v.id}">${esc(v.name)}</option>`).join('')}
+        </select>
+      </div>`:''}
+
+      <div style="border-top:1px solid var(--line);padding-top:14px;display:flex;gap:10px;justify-content:flex-end">
+        <button onclick="this.closest('dialog').close();this.closest('dialog').remove()" style="padding:7px 18px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);color:var(--ink)">Abbrechen</button>
+        <button onclick="mailProtokollierenSpeichern('${kandidatId}',this.closest('dialog'))" style="padding:7px 22px;border-radius:5px;cursor:pointer;background:var(--accent2);color:#fff;border:none;font-weight:700">💾 Speichern</button>
+      </div>
+    </div>`;
+
+  // Richtungs-Toggle stylen
+  dlg.querySelectorAll('input[name="mailRicht"]').forEach(radio=>{
+    radio.addEventListener('change',()=>{
+      dlg.querySelectorAll('label').forEach(lbl=>{
+        const r=lbl.querySelector('input[name="mailRicht"]');
+        if(!r) return;
+        if(r.checked){
+          lbl.style.background='var(--accent2)';lbl.style.color='#fff';lbl.style.borderColor='var(--accent2)';
+        } else {
+          lbl.style.background='';lbl.style.color='var(--ink)';lbl.style.borderColor='var(--line)';
+        }
+      });
+    });
+  });
+
+  document.body.appendChild(dlg);
+  dlg.showModal();
+  setTimeout(()=>dlg.querySelector('#mailBetreff').focus(),80);
+}
+
+async function mailProtokollierenSpeichern(kandidatId, dlg){
+  const betreff=dlg.querySelector('#mailBetreff').value.trim();
+  if(!betreff){dlg.querySelector('#mailBetreff').focus();zeigeMeldung('Bitte einen Betreff eingeben','warn');return;}
+  const richtung=dlg.querySelector('input[name="mailRicht"]:checked').value;
+  const datum=dlg.querySelector('#mailDatum').value;
+  const notiz=dlg.querySelector('#mailNotiz').value.trim();
+  const praefix=richtung==='gesendet'?'📤 ':'📥 ';
+  const vollerBetreff=praefix+betreff+(notiz?'\n\nNotiz: '+notiz:'');
+  const {data:user}=await sb.auth.getUser();
+  const neueId='yavis_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
+  const ts=datum?new Date(datum).toISOString():new Date().toISOString();
+  const {error}=await sb.from('emails').insert({
+    id: neueId,
+    betreff: vollerBetreff,
+    entity_id: kandidatId,
+    besitzer_id: user?.user?.id||null,
+    erstellt_am: ts,
+  });
+  if(error){zeigeMeldung('Fehler: '+error.message,'err');return;}
+  dlg.close(); dlg.remove();
+  zeigeMeldung('E-Mail protokolliert ✓','ok');
+  // Sektion aktualisieren
+  const {data:mails}=await sb.from('emails').select('*').eq('entity_id',kandidatId).order('erstellt_am',{ascending:false}).limit(100);
+  const hist=document.getElementById('mailHistorie');
+  if(hist) hist.innerHTML=mailHistorieHtml(mails||[]);
+  const acc=document.getElementById('mailAcc');
+  if(acc){
+    const cnt=acc.querySelector('.acc-cnt');
+    if(cnt) cnt.textContent='('+(mails?.length||0)+')';
+    acc.open=true;
+  }
+}
 
 </script>
 </body>
