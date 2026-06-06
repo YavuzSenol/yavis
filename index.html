@@ -502,16 +502,28 @@ function normTag(raw){ if(!raw) return null; let t=String(raw).trim().replace(/^
 function parseTags(raw){ if(!raw) return []; const out=[]; String(raw).split(/[;,]/).forEach(p=>{ const t=normTag(p); if(t&&!out.includes(t)) out.push(t); }); return out; }
 function kategorieVon(tag){ for(const k in TAG_KATEGORIEN){ if(TAG_KATEGORIEN[k].includes(tag)) return k; } return 'Sonstige'; }
 let tagFilter=new Set();
-let auftraggeberNamen=null; // null=noch nicht geladen; Array mit Kleinbuchstaben-Namen der Auftraggeber-Firmen
+let auftraggeberNamen=null; // null=noch nicht geladen; Array mit normalisierten Namen
+// Normalisiert Firmennamen: entfernt Rechtsformen (GmbH, AG…) und Standort-Suffixe (- NL Köln)
+function normFirma(s){
+  if(!s) return '';
+  return s.toLowerCase()
+    .replace(/\s*[-–]\s*(nl|nl\.|niederlassung|standort|büro|office|branch)\s+\S+/gi,'') // "- NL Köln"
+    .replace(/\s*[-–]\s*[a-zäöü]+\s*$/gi,'')   // "- Stuttgart" am Ende
+    .replace(/\b(gmbh\s*&\s*co\.?\s*kg|gmbh\s*&\s*co|gmbh|ag|se|kg|co\.|ug|plc|inc|ltd|mbh|s\.a\.|n\.v\.)\b/gi,'')
+    .replace(/[&.,;]/g,' ')
+    .replace(/\s+/g,' ')
+    .trim();
+}
 async function ladeAuftraggeberNamen(){
   if(auftraggeberNamen!==null) return;
   const {data}=await sb.from('kunden').select('name').in('typ',['Auftraggeber','Auftraggeber Potenzial']);
-  auftraggeberNamen=(data||[]).map(k=>(k.name||'').toLowerCase()).filter(Boolean);
+  auftraggeberNamen=(data||[]).map(k=>normFirma(k.name||'')).filter(Boolean);
 }
 function istGeschuetzt(r){
   if(r.abwerbeschutz) return true;
   if(!r.arbeitgeber||!auftraggeberNamen||!auftraggeberNamen.length) return false;
-  const ag=r.arbeitgeber.toLowerCase();
+  const ag=normFirma(r.arbeitgeber);
+  if(!ag) return false;
   return auftraggeberNamen.some(n=>n&&(ag.includes(n)||n.includes(ag)));
 }
 let alleTagsCache=null;
@@ -728,7 +740,7 @@ async function ladeKandidaten(){
   if(posListe) query=query.in('berufsbezeichnung',posListe);
   if(luecke) query=lueckeQuery(query,luecke);
   if(mitProfil) query=query.or('xing_profil.ilike.%http%,linkedin_profil.ilike.%http%');
-  if(q) query=query.or(`voller_name.ilike.%${q}%,berufsbezeichnung.ilike.%${q}%,faehigkeiten.ilike.%${q}%,stadt.ilike.%${q}%`);
+  if(q) query=query.or(`voller_name.ilike.%${q}%,berufsbezeichnung.ilike.%${q}%,faehigkeiten.ilike.%${q}%,stadt.ilike.%${q}%,arbeitgeber.ilike.%${q}%`);
   const tmod=tagModusWert();
   if(tmod==='leer'){ query=query.or('tags.is.null,tags.eq.,tags.eq.;;'); }
   else if(tmod==='nichtleer'){ query=query.not('tags','is',null).neq('tags','').neq('tags',';;'); }
