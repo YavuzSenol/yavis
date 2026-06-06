@@ -507,6 +507,10 @@
           <div><b>Standard-BCC</b><div style="font-size:12px;color:var(--muted)">Automatisch in Serien-E-Mail vorausgefüllt</div></div>
           <input id="einsBcc" type="email" placeholder="deine@email.de" style="width:220px;padding:6px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
         </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--line)">
+          <div><b>E-Mail-Vorlagen</b><div style="font-size:12px;color:var(--muted)">Texte und Betreffzeilen fuer Serien-E-Mails</div></div>
+          <button onclick="document.getElementById('einstellungenDlg').close();oeffneVorlagen()" style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:13px">Verwalten</button>
+        </div>
         <div style="padding:11px 16px">
           <div style="margin-bottom:6px"><b>E-Mail-Signatur</b> <span style="font-size:12px;color:var(--muted)">— wird in Serien-E-Mail angezeigt</span></div>
           <textarea id="einsSignatur" rows="4" placeholder="Mit freundlichen Grüßen&#10;Yavuz Senol&#10;Senol Consulting · Köln" style="width:100%;padding:8px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;resize:vertical;font-family:inherit;box-sizing:border-box"></textarea>
@@ -558,6 +562,63 @@
   </div>
 </dialog>
 
+
+
+<!-- ============================================================
+     VORLAGEN-VERWALTUNG (E-Mail-Vorlagen)
+     ============================================================ -->
+<dialog id="vorlagenDlg" style="width:min(740px,96vw);max-height:92vh;overflow-y:auto;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;padding:0">
+  <div style="padding:22px 26px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid var(--line);padding-bottom:12px">
+      <h2 style="margin:0;font-size:18px;font-weight:700">📝 E-Mail-Vorlagen</h2>
+      <button onclick="document.getElementById('vorlagenDlg').close()" style="background:none;border:none;cursor:pointer;font-size:22px;color:var(--muted)">×</button>
+    </div>
+
+    <!-- Vorlage neu / bearbeiten -->
+    <div id="vorlagenForm" style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:16px;margin-bottom:16px">
+      <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px" id="vorlagenFormTitel">➕ Neue Vorlage</div>
+      <input type="hidden" id="vId">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div>
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Name der Vorlage</label>
+          <input id="vName" placeholder="z.B. Initialkontakt Techniker" style="width:100%;padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Betreff</label>
+          <input id="vBetreff" placeholder="z.B. Karrierechance als {{Stelle}} in {{Stadt}}" style="width:100%;padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Text <span style="font-weight:400;color:var(--muted)">— Platzhalter: {{Begrüßung}} {{Name}} {{Stelle}} {{Stadt}} {{MeinName}}</span></label>
+          <textarea id="vText" rows="7" placeholder="Sehr geehrte(r) {{Begrüßung}} {{Name}},&#10;&#10;ich habe eine spannende Position für Sie als {{Stelle}}...&#10;&#10;Mit freundlichen Grüßen&#10;{{MeinName}}" style="width:100%;padding:8px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;resize:vertical;font-family:inherit;box-sizing:border-box"></textarea>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button onclick="vorlageSpeichern()" style="padding:7px 20px;border-radius:5px;cursor:pointer;background:var(--accent);color:#0f1115;border:none;font-weight:700">💾 Speichern</button>
+          <button onclick="vorlagenFormReset()" style="padding:7px 14px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink)">Abbrechen</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Vorlagen-Liste -->
+    <div id="vorlagenListe" style="display:flex;flex-direction:column;gap:8px"></div>
+  </div>
+</dialog>
+
+<!-- ============================================================
+     VORLAGE AUSWÄHLEN (beim Serien-E-Mail)
+     ============================================================ -->
+<dialog id="vorlagenPickerDlg" style="width:min(560px,96vw);border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;padding:0">
+  <div style="padding:20px 24px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid var(--line);padding-bottom:12px">
+      <h3 style="margin:0;font-size:16px;font-weight:700">📝 Vorlage wählen</h3>
+      <button onclick="document.getElementById('vorlagenPickerDlg').close()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--muted)">×</button>
+    </div>
+    <div id="vorlagenPickerListe" style="display:flex;flex-direction:column;gap:8px;max-height:400px;overflow-y:auto"></div>
+    <div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px;display:flex;justify-content:space-between;align-items:center">
+      <button onclick="oeffneVorlagen()" style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);color:var(--ink);font-size:13px">✏️ Vorlagen verwalten</button>
+      <button onclick="serienMailOhneVorlage()" style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);color:var(--ink);font-size:13px">Ohne Vorlage weiter →</button>
+    </div>
+  </div>
+</dialog>
 
 <script>
 let sb=null;
@@ -689,37 +750,7 @@ async function exportiereAuswahl(){
   const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='yavis_export_'+new Date().toISOString().slice(0,10)+'.csv'; a.click();
 }
-async function serienMailAuswahl(){
-  if(!selectedKandIds.size) return;
-  const ids=[...selectedKandIds];
-  const {data}=await sb.from('kandidaten').select('voller_name,begruessung,email,mobil,berufsbezeichnung').in('id',ids);
-  const rows=(data||[]);
-  const mitMail=rows.filter(r=>r.email); const ohneMail=rows.filter(r=>!r.email);
-  const adressen=mitMail.map(r=>r.email).join('; ');
-  const liste=rows.map(r=>`${r.begruessung||''} ${r.voller_name||''}`.trim()+' — '+(r.email||'⚠️ keine E-Mail')+(r.mobil?' · '+r.mobil:'')).join('\n');
-  const bccSaved=localStorage.getItem('yavis_bcc')||'';
-  const sigSaved=localStorage.getItem('yavis_signatur')||'';
-  const dlg=document.createElement('dialog');
-  dlg.style.cssText='background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:24px;max-width:640px;width:95vw';
-  dlg.innerHTML=`<h3 style="margin:0 0 14px">✉️ Serien-E-Mail — ${rows.length} Kandidaten</h3>
-    <p style="font-size:13px;color:var(--muted);margin:0 0 4px">An / BCC (alle Adressen, für Outlook):</p>
-    <textarea id="mailAddrBox" style="width:100%;height:60px;resize:vertical;font-size:13px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:8px;box-sizing:border-box" readonly>${adressen}</textarea>
-    <div style="display:flex;gap:8px;align-items:center;margin:6px 0 10px">
-      <button onclick="navigator.clipboard.writeText(document.getElementById('mailAddrBox').value);this.textContent='✓ Kopiert!'" style="padding:5px 14px;border-radius:4px;cursor:pointer;background:var(--accent);color:#0f1115;border:none;font-weight:600">📋 Adressen kopieren</button>
-      <span style="font-size:12px;color:var(--muted)">${mitMail.length} mit Adresse${ohneMail.length?' · ⚠️ '+ohneMail.length+' ohne':''}</span>
-    </div>
-    ${ohneMail.length?`<p style="font-size:12px;color:var(--hot);margin:0 0 10px">Ohne E-Mail: ${ohneMail.map(r=>r.voller_name).join(', ')}</p>`:''}
-    <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
-      <label style="font-size:13px;color:var(--muted);white-space:nowrap">BCC an mich:</label>
-      <input id="mailBccBox" type="email" value="${esc(bccSaved)}" placeholder="deine@email.de" style="flex:1;padding:6px 10px;font-size:13px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px">
-      <button onclick="if(document.getElementById('mailBccBox').value){navigator.clipboard.writeText(document.getElementById('mailBccBox').value);this.textContent='✓';setTimeout(()=>this.textContent='📋 BCC',1200);}" style="padding:5px 10px;border-radius:4px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);font-size:12px">📋 BCC</button>
-    </div>
-    ${sigSaved?`<div style="margin-bottom:10px"><p style="font-size:13px;color:var(--muted);margin:0 0 4px">Signatur:</p><pre style="font-size:12px;background:var(--bg);padding:8px;border-radius:4px;border:1px solid var(--line);white-space:pre-wrap;margin:0">${esc(sigSaved)}</pre></div>`:''}
-    <p style="font-size:13px;color:var(--muted);margin:0 0 4px">Alle Empfänger (Name · E-Mail · Mobil):</p>
-    <pre style="font-size:12px;max-height:160px;overflow-y:auto;background:var(--bg);padding:10px;border-radius:4px;border:1px solid var(--line);white-space:pre-wrap;margin:0 0 14px">${esc(liste)}</pre>
-    <div style="text-align:right"><button onclick="this.closest('dialog').close();this.closest('dialog').remove()" style="padding:6px 18px;border-radius:4px;cursor:pointer;background:var(--panel2);border:1px solid var(--line)">Schließen</button></div>`;
-  document.body.appendChild(dlg); dlg.showModal();
-}
+
 // ---- Toast-Meldung ----
 function zeigeMeldung(msg,typ='ok'){
   let el=document.getElementById('yavisToast');
@@ -2855,6 +2886,265 @@ async function exportAlleKandidaten(){
     document.body.classList.add('kompakt');
   }
 })();
+
+
+// ================================================================
+//  E-MAIL-VORLAGEN
+// ================================================================
+let _vorlagenData = null;
+
+function vorlagenLaden(){
+  if(!_vorlagenData){
+    try{ _vorlagenData=JSON.parse(localStorage.getItem('yavis_vorlagen')||'[]'); }
+    catch(e){ _vorlagenData=[]; }
+  }
+  return _vorlagenData;
+}
+
+function vorlagenSpeichernLS(){
+  localStorage.setItem('yavis_vorlagen', JSON.stringify(_vorlagenData));
+}
+
+function oeffneVorlagen(){
+  // Falls Picker offen, schliessen
+  const picker=document.getElementById('vorlagenPickerDlg');
+  if(picker&&picker.open) picker.close();
+  vorlagenFormReset();
+  vorlagenListeRendern();
+  document.getElementById('vorlagenDlg').showModal();
+}
+
+function vorlagenFormReset(){
+  document.getElementById('vId').value='';
+  document.getElementById('vName').value='';
+  document.getElementById('vBetreff').value='';
+  document.getElementById('vText').value='';
+  document.getElementById('vorlagenFormTitel').textContent='➕ Neue Vorlage';
+}
+
+function vorlageSpeichern(){
+  const name=document.getElementById('vName').value.trim();
+  const betreff=document.getElementById('vBetreff').value.trim();
+  const text=document.getElementById('vText').value;
+  if(!name){zeigeMeldung('Bitte einen Namen eingeben','warn');return;}
+  const vl=vorlagenLaden();
+  const id=document.getElementById('vId').value;
+  if(id){
+    const idx=vl.findIndex(v=>String(v.id)===id);
+    if(idx>=0) vl[idx]={id:parseInt(id),name,betreff,text};
+  } else {
+    vl.push({id:Date.now(),name,betreff,text});
+  }
+  _vorlagenData=vl;
+  vorlagenSpeichernLS();
+  vorlagenFormReset();
+  vorlagenListeRendern();
+  zeigeMeldung('Vorlage gespeichert ✓','ok');
+}
+
+function vorlagenListeRendern(){
+  const vl=vorlagenLaden();
+  const div=document.getElementById('vorlagenListe');
+  if(!vl.length){
+    div.innerHTML='<div style="font-size:13px;color:var(--muted);text-align:center;padding:20px">Noch keine Vorlagen — oben eine anlegen.</div>';
+    return;
+  }
+  div.innerHTML=vl.map(v=>`
+    <div style="background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:12px 14px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:14px;margin-bottom:2px">${esc(v.name)}</div>
+          ${v.betreff?`<div style="font-size:12px;color:var(--muted);margin-bottom:4px">✉️ ${esc(v.betreff)}</div>`:''}
+          <div style="font-size:12px;color:var(--muted);white-space:pre-wrap;max-height:50px;overflow:hidden;text-overflow:ellipsis">${esc((v.text||'').substring(0,120))}${(v.text||'').length>120?'…':''}</div>
+        </div>
+        <div style="display:flex;gap:6px;margin-left:10px;flex-shrink:0">
+          <button onclick="vorlagenBearbeiten(${v.id})" style="padding:4px 10px;border-radius:4px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:12px">✏️</button>
+          <button onclick="vorlagenLoeschen(${v.id})" style="padding:4px 10px;border-radius:4px;cursor:pointer;background:rgba(220,38,38,0.15);border:1px solid rgba(220,38,38,0.3);color:var(--hot);font-size:12px">🗑️</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function vorlagenBearbeiten(id){
+  const v=vorlagenLaden().find(v=>v.id===id);
+  if(!v) return;
+  document.getElementById('vId').value=id;
+  document.getElementById('vName').value=v.name||'';
+  document.getElementById('vBetreff').value=v.betreff||'';
+  document.getElementById('vText').value=v.text||'';
+  document.getElementById('vorlagenFormTitel').textContent='✏️ Vorlage bearbeiten';
+  document.getElementById('vorlagenDlg').querySelector('#vName').focus();
+}
+
+function vorlagenLoeschen(id){
+  if(!confirm('Vorlage wirklich löschen?')) return;
+  _vorlagenData=vorlagenLaden().filter(v=>v.id!==id);
+  vorlagenSpeichernLS();
+  vorlagenListeRendern();
+  zeigeMeldung('Vorlage gelöscht','ok');
+}
+
+// ================================================================
+//  SERIEN-E-MAIL MIT VORLAGE → OUTLOOK
+// ================================================================
+
+// Globaler Kontext fuer Serien-E-Mail
+let _serienMailKandidaten=null;
+
+async function serienMailAuswahl(){
+  if(!selectedKandIds.size) return;
+  const ids=[...selectedKandIds];
+  const {data}=await sb.from('kandidaten').select('voller_name,begruessung,email,mobil,berufsbezeichnung,stadt').in('id',ids);
+  _serienMailKandidaten=data||[];
+  // Vorlagen vorhanden? → Picker zeigen
+  const vl=vorlagenLaden();
+  if(vl.length){
+    vorlagenPickerRendern();
+    document.getElementById('vorlagenPickerDlg').showModal();
+  } else {
+    serienMailDialog(_serienMailKandidaten, null);
+  }
+}
+
+function vorlagenPickerRendern(){
+  const vl=vorlagenLaden();
+  const div=document.getElementById('vorlagenPickerListe');
+  if(!vl.length){
+    div.innerHTML='<div style="font-size:13px;color:var(--muted);text-align:center;padding:16px">Noch keine Vorlagen angelegt.</div>';
+    return;
+  }
+  div.innerHTML=vl.map(v=>`
+    <div onclick="vorlagenPickerWaehlen(${v.id})" style="background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:12px 14px;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--line)'">
+      <div style="font-weight:700;font-size:14px;margin-bottom:3px">${esc(v.name)}</div>
+      ${v.betreff?`<div style="font-size:12px;color:var(--muted)">✉️ ${esc(v.betreff)}</div>`:''}
+    </div>`).join('');
+}
+
+function vorlagenPickerWaehlen(id){
+  document.getElementById('vorlagenPickerDlg').close();
+  const v=vorlagenLaden().find(v=>v.id===id)||null;
+  serienMailDialog(_serienMailKandidaten, v);
+}
+
+function serienMailOhneVorlage(){
+  document.getElementById('vorlagenPickerDlg').close();
+  serienMailDialog(_serienMailKandidaten, null);
+}
+
+function serienMailDialog(rows, vorlage){
+  const mitMail=(rows||[]).filter(r=>r.email);
+  const ohneMail=(rows||[]).filter(r=>!r.email);
+  const bccAdressen=mitMail.map(r=>r.email).join(';');
+  const bccSaved=localStorage.getItem('yavis_bcc')||'';
+  const sigSaved=localStorage.getItem('yavis_signatur')||'';
+  const meinName=localStorage.getItem('yavis_mein_name')||'';
+  const heute=new Date().toLocaleDateString('de-DE');
+
+  // Platzhalter füllen (für Serien-E-Mail: kein {{Name}}, da eine Mail an viele)
+  function fillPlaceholder(str){
+    return (str||'')
+      .replace(/\{\{MeinName\}\}/g, meinName)
+      .replace(/\{\{Datum\}\}/g, heute);
+  }
+
+  const betreff=fillPlaceholder(vorlage?.betreff||'');
+  let bodyText=fillPlaceholder(vorlage?.text||'');
+  if(sigSaved && bodyText && !bodyText.includes(sigSaved)) bodyText+='\n\n'+sigSaved;
+  if(!bodyText && sigSaved) bodyText=sigSaved;
+
+  const dlg=document.createElement('dialog');
+  dlg.style.cssText='background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:0;max-width:680px;width:95vw';
+  dlg.innerHTML=`
+    <div style="padding:22px 26px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid var(--line);padding-bottom:12px">
+        <h3 style="margin:0;font-size:17px;font-weight:700">✉️ Serien-E-Mail — ${rows.length} Kandidaten</h3>
+        <button onclick="this.closest('dialog').close();this.closest('dialog').remove()" style="background:none;border:none;cursor:pointer;font-size:22px;color:var(--muted)">×</button>
+      </div>
+
+      <!-- BCC Adressen -->
+      <div style="margin-bottom:12px">
+        <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:5px">BCC-ADRESSEN (${mitMail.length} Empfänger — jeder sieht nur sich selbst)</div>
+        <div style="display:flex;gap:8px">
+          <textarea id="smBcc" style="flex:1;height:52px;resize:none;font-size:12px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:5px;padding:7px;font-family:inherit" readonly>${esc(bccAdressen)}</textarea>
+          <button onclick="navigator.clipboard.writeText(document.getElementById('smBcc').value);this.textContent='✓';setTimeout(()=>this.textContent='📋 BCC',1400)" style="padding:6px 12px;border-radius:5px;cursor:pointer;background:var(--accent);color:#0f1115;border:none;font-weight:600;font-size:13px;align-self:center">📋 BCC</button>
+        </div>
+        ${ohneMail.length?`<div style="font-size:12px;color:var(--hot);margin-top:5px">⚠️ ${ohneMail.length} ohne E-Mail: ${ohneMail.map(r=>r.voller_name).join(', ')}</div>`:''}
+      </div>
+
+      <!-- Mein BCC -->
+      ${bccSaved?`<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+        <div style="font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap">BCC AN MICH:</div>
+        <input id="smMeinBcc" value="${esc(bccSaved)}" style="flex:1;padding:6px 10px;font-size:13px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:5px">
+        <button onclick="navigator.clipboard.writeText(document.getElementById('smMeinBcc').value);this.textContent='✓';setTimeout(()=>this.textContent='📋',1400)" style="padding:6px 10px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);font-size:12px">📋</button>
+      </div>`:''}
+
+      <!-- Betreff -->
+      <div style="margin-bottom:10px">
+        <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:5px">BETREFF</div>
+        <div style="display:flex;gap:8px">
+          <input id="smBetreff" value="${esc(betreff)}" placeholder="Betreff eingeben…" style="flex:1;padding:7px 10px;font-size:13px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:5px">
+          <button onclick="navigator.clipboard.writeText(document.getElementById('smBetreff').value);this.textContent='✓';setTimeout(()=>this.textContent='📋',1400)" style="padding:6px 10px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);font-size:12px">📋</button>
+        </div>
+      </div>
+
+      <!-- E-Mail Text -->
+      <div style="margin-bottom:14px">
+        <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:5px">E-MAIL-TEXT</div>
+        <textarea id="smText" rows="8" style="width:100%;padding:8px;font-size:13px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:5px;resize:vertical;font-family:inherit;box-sizing:border-box">${esc(bodyText)}</textarea>
+      </div>
+
+      <!-- Vorlage wechseln -->
+      ${vorlagenLaden().length?`<div style="margin-bottom:14px">
+        <button onclick="this.closest('dialog').close();this.closest('dialog').remove();vorlagenPickerRendern();document.getElementById('vorlagenPickerDlg').showModal()" style="padding:6px 12px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);color:var(--ink);font-size:13px">📝 Andere Vorlage wählen</button>
+      </div>`:''}
+
+      <!-- Outlook öffnen -->
+      <div style="border-top:1px solid var(--line);padding-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+        <button onclick="outlookOeffnen(this)" style="padding:9px 20px;border-radius:6px;cursor:pointer;background:#0078d4;color:#fff;border:none;font-weight:700;font-size:14px">📨 In Outlook öffnen</button>
+        <button onclick="this.closest('dialog').close();this.closest('dialog').remove()" style="padding:9px 18px;border-radius:6px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);color:var(--ink)">Schließen</button>
+        <span style="font-size:12px;color:var(--muted);align-self:center">Öffnet Outlook mit BCC + Betreff vorausgefüllt</span>
+      </div>
+    </div>`;
+  document.body.appendChild(dlg);
+  dlg.showModal();
+}
+
+function outlookOeffnen(btn){
+  const dlg=btn.closest('dialog');
+  const bcc=document.getElementById('smBcc').value;
+  const betreff=document.getElementById('smBetreff').value;
+  const text=document.getElementById('smText').value;
+  const meinBccEl=document.getElementById('smMeinBcc');
+  const meinBcc=meinBccEl?meinBccEl.value:'';
+
+  // mailto: aufbauen
+  // TO: leer (oder mein BCC damit Outlook nicht meckert)
+  const to=meinBcc||'';
+  let mailto=`mailto:${encodeURIComponent(to)}?`;
+  const params=[];
+  if(bcc) params.push('bcc='+encodeURIComponent(bcc));
+  if(betreff) params.push('subject='+encodeURIComponent(betreff));
+  if(text) params.push('body='+encodeURIComponent(text));
+  mailto+=params.join('&');
+
+  // mailto: hat Zeichenlimit (~2000) — warnen wenn zu lang
+  if(mailto.length>2000){
+    // Nur BCC + Betreff, Text separat
+    let kurz=`mailto:${encodeURIComponent(to)}?`;
+    const kParams=[];
+    if(bcc) kParams.push('bcc='+encodeURIComponent(bcc));
+    if(betreff) kParams.push('subject='+encodeURIComponent(betreff));
+    kurz+=kParams.join('&');
+    window.location.href=kurz;
+    // Text in Clipboard
+    navigator.clipboard.writeText(text).then(()=>{
+      zeigeMeldung('Outlook geöffnet — Text in Zwischenablage (Strg+V im E-Mail-Body)','ok');
+    });
+  } else {
+    window.location.href=mailto;
+    zeigeMeldung('Outlook wird geöffnet …','ok');
+  }
+}
 
 </script>
 </body>
