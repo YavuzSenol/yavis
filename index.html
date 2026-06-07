@@ -397,7 +397,7 @@
           <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Status</div>
           <select id="rmStatus" style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
             <option value="">alle Status</option>
-            <option>New</option><option>In Review</option><option>Available</option><option>Engaged</option><option>Offered</option><option>Hired</option><option>Rejected</option>
+            <option>Aktiv suchend</option><option>Offen für Angebote</option><option>Nicht verfügbar</option><option>Platziert</option><option>Gesperrt</option>
           </select>
         </div>
         <div>
@@ -417,20 +417,12 @@
             <input type="checkbox" id="rmHatTel" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent2)"> ☎ hat Telefon/Mobil
           </label>
         </div>
-        <div>
-          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Ausschließen (int. Wertung)</div>
-          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:5px">
-            <input type="checkbox" id="rmExVerm" checked style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent2)"> vermittelt
-          </label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:5px">
-            <input type="checkbox" id="rmExNicht" checked style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent2)"> nicht vermittelbar
-          </label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:5px">
-            <input type="checkbox" id="rmExKein" checked style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent2)"> generell kein Interesse
-          </label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
-            <input type="checkbox" id="rmExKont" checked style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent2)"> kein Kontakt erwünscht
-          </label>
+        <div style="flex:1;min-width:220px">
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Ausschließen (int. Wertung)</div>
+          <textarea id="rmExWert" rows="3" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();rechercheMaskeAusfuehren();}"
+                    placeholder="Werte kommagetrennt, z.B.: vermittelt, gesperrt"
+                    style="width:100%;padding:7px 10px;font-size:12px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;resize:vertical;font-family:inherit;box-sizing:border-box;line-height:1.5">vermittelt, nicht vermittelbar, generell kein Interesse, kein Kontakt erwünscht</textarea>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">Kommagetrennt — Teilstring-Abgleich · leer lassen = kein Ausschluss</div>
         </div>
       </div>
       <!-- Aktions-Buttons + Ergebnis-Zaehler -->
@@ -1909,7 +1901,7 @@ async function loescheDokument(id, pfad){
 
 
 // ---- Bearbeiten / Neu anlegen ----
-const EDIT_STATUS=['New','In Review','Available','Engaged','Offered','Hired','Rejected'];
+const EDIT_STATUS=['Aktiv suchend','Offen für Angebote','Nicht verfügbar','Platziert','Gesperrt'];
 const ANREDE_OPTS=['Keine','Herr','Herr Dr.','Frau','Frau Dr.'];
 const FIRMEN_TYPEN=['Auftraggeber','Auftraggeber-Potenzial','Lieferant','Sonstige'];
 
@@ -5162,18 +5154,12 @@ async function rechercheMaskeAusfuehren() {
   const radius    =  document.getElementById('rmRadius').value;
   const hatMail   =  document.getElementById('rmHatMail').checked;
   const hatTel    =  document.getElementById('rmHatTel').checked;
-  const exVerm    =  document.getElementById('rmExVerm').checked;
-  const exNicht   =  document.getElementById('rmExNicht').checked;
-  const exKein    =  document.getElementById('rmExKein').checked;
-  const exKont    =  document.getElementById('rmExKont').checked;
   const statusVal =  document.getElementById('rmStatus').value;
   const umzugVal  = (document.getElementById('rmUmzug').value      || '').trim();
-
-  const ausschluss = [];
-  if (exVerm)  ausschluss.push('vermittelt');
-  if (exNicht) ausschluss.push('nicht vermittelbar');
-  if (exKein)  ausschluss.push('generell kein interesse');
-  if (exKont)  ausschluss.push('kein kontakt erwünscht');
+  const exText    = (document.getElementById('rmExWert').value      || '').trim();
+  const ausschluss = exText
+    ? exText.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+    : [];
 
   let rows = [];
 
@@ -5283,9 +5269,8 @@ function rechercheMaskeZuruecksetzen() {
   ['rmHatMail', 'rmHatTel'].forEach(id => {
     const el = document.getElementById(id); if (el) el.checked = false;
   });
-  ['rmExVerm', 'rmExNicht', 'rmExKein', 'rmExKont'].forEach(id => {
-    const el = document.getElementById(id); if (el) el.checked = true;
-  });
+  const exEl = document.getElementById('rmExWert');
+  if (exEl) exEl.value = 'vermittelt, nicht vermittelbar, generell kein Interesse, kein Kontakt erwünscht';
   const anzEl = document.getElementById('rmAnzahl'); if (anzEl) anzEl.textContent = '';
   const bodyEl = document.getElementById('rmBody'); if (bodyEl) bodyEl.innerHTML = '';
 }
