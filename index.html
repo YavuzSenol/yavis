@@ -334,7 +334,7 @@
     </div>
     <div class="count" id="wvCount"></div>
     <table><thead><tr>
-      <th>Fällig am</th><th>Betreff</th><th>Wer</th><th>Priorität</th><th>Erledigt</th>
+      <th>Fällig am</th><th>Betreff</th><th>Wer</th><th>Aktionen</th>
     </tr></thead><tbody id="wvBody"></tbody></table>
   </div>
 
@@ -422,8 +422,7 @@
     <div style="display:flex;gap:12px;margin-bottom:10px">
       <div class="field" style="flex:1"><label>Fällig am</label>
         <input id="tdDatum" type="date" style="width:100%"></div>
-      <div class="field" style="flex:1"><label>Priorität</label>
-        <select id="tdPrio" style="width:100%"><option>Normal</option><option>Hoch</option><option>Niedrig</option></select></div>
+
     </div>
     <div class="field" style="margin-bottom:4px"><label>Beschreibung (optional)</label>
       <textarea id="tdText" rows="4" placeholder="Details … (Strg+Enter speichert)"
@@ -747,6 +746,7 @@ document.querySelectorAll('.tab[data-view]').forEach(t=>t.onclick=()=>{
   if(t.dataset.view==='start') zeigeStart();
   if(t.dataset.view==='kunden') ladeKunden();
   if(t.dataset.view==='projekte') zeigeProjekteListe();
+  if(t.dataset.view==='kandidaten') ladeKandidaten();
   if(t.dataset.view==='kontakte') ladeKontakte();
   if(t.dataset.view==='wiedervorlagen') ladeWiedervorlagen();
 });
@@ -1347,17 +1347,27 @@ function aufgabeNeuPopup(){
   setTimeout(()=>document.getElementById('tdBetreff').focus(),120);
 }
 async function aufgabeSpeichern(){
-  if(!kontextDatensatz) return;
+  if(!kontextDatensatz&&!_aufgabeEditId) return;
   const betreff=document.getElementById('tdBetreff').value.trim();
   const datum=document.getElementById('tdDatum').value;
-  const prio=document.getElementById('tdPrio').value;
   const text=document.getElementById('tdText').value.trim();
   const msg=document.getElementById('tdMsg');
   if(!betreff){ msg.style.color='var(--hot)'; msg.textContent='Bitte einen Betreff eingeben.'; return; }
   msg.style.color='var(--muted)'; msg.textContent='Speichere …';
+  if(_aufgabeEditId){
+    const eid=_aufgabeEditId; _aufgabeEditId=null;
+    const {error}=await sb.from('aufgaben').update({
+      betreff, beschreibung:text||null,
+      faelligkeitsdatum:datum||null, geaendert_am:new Date().toISOString()
+    }).eq('id',eid);
+    if(error){ msg.style.color='var(--hot)'; msg.textContent='Fehler: '+error.message; return; }
+    msg.style.color='var(--ok)'; msg.textContent='Gespeichert ✓';
+    setTimeout(()=>{ document.getElementById('taskDlg').close(); ladeWiedervorlagen(); },500);
+    return;
+  }
   const {typ,id,name}=kontextDatensatz;
   const rec={ id:'task_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
-    betreff, beschreibung:text||null, status:'Offen', prioritaet:prio,
+    betreff, beschreibung:text||null, status:'Offen',
     faelligkeitsdatum:datum||null, verknuepft_mit:id, kontaktname:name||null,
     erstellt_am:new Date().toISOString(), geaendert_am:new Date().toISOString() };
   const {error}=await sb.from('aufgaben').insert(rec);
@@ -1401,17 +1411,20 @@ async function ladeWiedervorlagen(){
     (ko.data||[]).forEach(r=>map[r.id]={typ:'Kontakt',ic:'📇',name:r.voller_name,open:()=>detailKontakt(r.id)});
   }
   cnt.textContent=tasks.length+' Aufgabe'+(tasks.length===1?'':'n')+(modus==='alle'?'':modus==='faellig'?' (fällig/überfällig)':' (offen)');
-  if(!tasks.length){ body.innerHTML='<tr><td colspan="5" class="empty">Keine Aufgaben.</td></tr>'; return; }
+  if(!tasks.length){ body.innerHTML='<tr><td colspan="4" class="empty">Keine Aufgaben.</td></tr>'; return; }
   tasks.forEach(t=>{
     const ref=map[t.verknuepft_mit];
     const ueber=istOffen(t.status)&&t.faelligkeitsdatum&&t.faelligkeitsdatum<heute;
     const tr=document.createElement('tr'); tr.className='row-click';
     tr.innerHTML=`
       <td style="${ueber?'color:var(--hot);font-weight:600':''}">${t.faelligkeitsdatum?fmtDatum(t.faelligkeitsdatum):'–'}${ueber?' ⚠':''}</td>
-      <td>${esc(t.betreff)||'–'}</td>
+      <td>${esc(t.betreff)||'–'}${t.beschreibung?'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+esc(t.beschreibung.slice(0,80))+(t.beschreibung.length>80?'…':'')+'</div>':''}</td>
       <td>${ref?ref.ic+' '+esc(ref.name)+' <span class="pill">'+ref.typ+'</span>':(t.kontaktname?esc(t.kontaktname):'–')}</td>
-      <td>${t.prioritaet&&/high|hoch/i.test(t.prioritaet)?'<span class="pill hot">Hoch</span>':esc(t.prioritaet||'')}</td>
-      <td>${istOffen(t.status)?`<button class="tab" onclick="event.stopPropagation();aufgabeErledigt('${t.id}','WV')">✓</button>`:esc(t.status||'')}</td>`;
+      <td style="white-space:nowrap">
+        ${istOffen(t.status)?`<button class="tab" style="padding:3px 8px;font-size:12px" onclick="event.stopPropagation();aufgabeErledigt('${t.id}','WV')">✓ Erledigt</button>`:'<span style="font-size:12px;color:var(--muted)">'+esc(t.status||'')+'</span>'}
+        <button class="tab" style="padding:3px 8px;font-size:12px;margin-left:4px" onclick="event.stopPropagation();aufgabeBearbeitenPopup('${t.id}')">✏️</button>
+        <button class="tab" style="padding:3px 8px;font-size:12px;margin-left:4px;color:var(--hot)" onclick="event.stopPropagation();aufgabeLoeschen('${t.id}','${esc(t.betreff||'')}')">🗑️</button>
+      </td>`;
     if(ref) tr.onclick=ref.open;
     body.appendChild(tr);
   });
@@ -1524,7 +1537,7 @@ async function detailKandidat(id){
   const d=k.data; if(!d) return;
   // Foto laden (signierte URL, 2h gültig)
   let fotoUrl=null;
-  const fotoPfad=`kandidat/${id}/foto`;
+  const fotoPfad=`kandidat/${id}/foto.jpg`;
   const {data:fotoData}=await sb.storage.from('dokumente').createSignedUrl(fotoPfad,7200);
   if(fotoData?.signedUrl) fotoUrl=fotoData.signedUrl;
   zeigeKandidatSeite(d, ausb.data||[], erf.data||[], notiz.data||[], bew.data||[], aufg.data||[], dok.data||[], fotoUrl, mailRes.data||[]);
@@ -1583,7 +1596,8 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails)
           : `<button class="editbtn" style="margin-left:0;background:${d.abwerbeschutz?'var(--hot)':'var(--panel2)'};color:${d.abwerbeschutz?'#fff':'inherit'}" title="${d.abwerbeschutz?'Abwerbeschutz manuell aufheben':'Abwerbeschutz manuell aktivieren'}" onclick="abwerbeschutzToggle('${d.id}',${d.abwerbeschutz?'true':'false'})">${d.abwerbeschutz?'🔒 Manuell':'🔓 Schützen'}</button>`
         }
         <button class="editbtn" style="margin-left:0" onclick="bearbeiteKandidat('${d.id}')">✎ Bearbeiten</button>
-        <button class="editbtn" style="margin-left:0;background:var(--accent2);color:#fff" onclick="mailProtokollieren('${d.id}','${esc(d.voller_name)}')">📧 E-Mail</button>
+        <button class="editbtn" style="margin-left:0;color:var(--hot);border-color:rgba(192,64,42,.35)" onclick="kandidatLoeschen('${d.id}','${esc(d.voller_name)}')">🗑️ Löschen</button>
+        <button class="editbtn" style="margin-left:0;background:var(--accent2);color:#fff" onclick="mailSendenDialog('${esc(d.email||d.email_beruflich||'')}','${d.id}','${esc(d.voller_name)}')">📧 E-Mail senden</button>
       </div>
     </div>
 
@@ -1767,8 +1781,7 @@ async function fotoSpeichern(kandidatId){
   const file=inp?.files[0]; if(!file) return;
   if(!file.type.startsWith('image/')){ alert('Bitte nur Bilddateien hochladen (JPG, PNG, …)'); return; }
   if(file.size>10*1024*1024){ alert('Foto zu groß (max. 10 MB).'); return; }
-  const ext=file.name.split('.').pop().toLowerCase()||'jpg';
-  const pfad=`kandidat/${kandidatId}/foto.${ext}`;
+  const pfad=`kandidat/${kandidatId}/foto.jpg`;
   // altes Foto löschen, neues hochladen (upsert)
   await sb.storage.from('dokumente').remove([`kandidat/${kandidatId}/foto.jpg`,`kandidat/${kandidatId}/foto.jpeg`,`kandidat/${kandidatId}/foto.png`,`kandidat/${kandidatId}/foto.webp`]);
   const {error}=await sb.storage.from('dokumente').upload(pfad,file,{upsert:true});
@@ -2015,6 +2028,7 @@ async function detailKunde(id){
       <button class="back" onclick="zurueckZurListe()">← Zurück</button>
       <h2>${esc(d.name)||'Kunde'}</h2>
       <button class="editbtn" onclick="bearbeiteKunde('${d.id}')">✎ Bearbeiten</button>
+      <button class="editbtn" style="color:var(--hot);border-color:rgba(192,64,42,.35)" onclick="kundeLoeschen('${d.id}','${esc(d.name)}')">🗑️ Löschen</button>
     </div>
     <div class="detail-sub"><span class="pill">${esc(d.typ)||'Auftraggeber'}</span>${d.branche?' · '+esc(d.branche):''}</div>
     <div class="card"><h3>Kontakt & Adresse</h3><div class="grid2">
@@ -4742,6 +4756,227 @@ function _kundeWaehlen(id, name) {
   const kg=document.getElementById('sKundeGew'); if(kg) kg.innerHTML='✅ '+esc(name);
   const kr=document.getElementById('sKundeRes'); if(kr) kr.style.display='none';
 }
+
+
+// ================================================================
+//  NEUE + ERSETZTE FUNKTIONEN (Bugfixes + Features)
+// ================================================================
+
+// ---- Aufgabe: Bearbeiten + Löschen (Wiedervorlagen) ----
+let _aufgabeEditId = null;
+
+async function aufgabeBearbeitenPopup(taskId) {
+  const { data: t } = await sb.from('aufgaben').select('*').eq('id', taskId).single();
+  if (!t) { zeigeMeldung('Aufgabe nicht gefunden', 'err'); return; }
+  _aufgabeEditId = taskId;
+  const dlg = document.getElementById('taskDlg');
+  document.getElementById('tdWho').textContent = t.kontaktname || '— Aufgabe bearbeiten —';
+  document.getElementById('tdBetreff').value = t.betreff || '';
+  document.getElementById('tdDatum').value = (t.faelligkeitsdatum || '').slice(0, 10);
+  document.getElementById('tdText').value = t.beschreibung || '';
+  document.getElementById('tdMsg').textContent = '';
+  if (!dlg.open) dlg.showModal();
+  setTimeout(() => document.getElementById('tdBetreff').focus(), 120);
+}
+
+async function aufgabeLoeschen(taskId, betreff) {
+  if (!confirm('Aufgabe löschen?\n"' + betreff + '"')) return;
+  const { error } = await sb.from('aufgaben').delete().eq('id', taskId);
+  if (error) { zeigeMeldung('Fehler: ' + error.message, 'err'); return; }
+  zeigeMeldung('Aufgabe gelöscht', 'ok');
+  ladeWiedervorlagen();
+}
+
+// ---- E-Mail senden Dialog ----
+function mailSendenDialog(email, kandidatId, name) {
+  const vorlagen = vorlagenLaden();
+  const dlg = document.createElement('dialog');
+  dlg.style.cssText = 'background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:0;max-width:560px;width:95vw;max-height:90vh;display:flex;flex-direction:column';
+  dlg.innerHTML = `
+    <div style="padding:18px 22px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
+      <div style="font-size:16px;font-weight:700">📧 E-Mail senden</div>
+      <button onclick="this.closest('dialog').close();this.closest('dialog').remove()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--muted)">×</button>
+    </div>
+    <div style="overflow-y:auto;flex:1;padding:18px 22px">
+      <div style="font-size:13px;margin-bottom:14px;padding:10px 14px;background:var(--panel2);border-radius:6px;border:1px solid var(--line)">
+        An: <b>${esc(email || '(keine E-Mail-Adresse hinterlegt)')}</b>
+        ${!email ? '<br><span style="color:var(--hot);font-size:12px;margin-top:4px;display:block">⚠️ Bitte zuerst eine E-Mail-Adresse im Profil hinterlegen.</span>' : ''}
+      </div>
+      ${vorlagen.length ? `
+      <div style="margin-bottom:12px">
+        <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">VORLAGE (optional)</label>
+        <select id="msVorlageWahl" onchange="msVorlageBerechnen(this,'${esc(name)}')"
+                style="width:100%;padding:7px 9px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
+          <option value="">– Vorlage wählen –</option>
+          ${vorlagen.map(v => `<option value="${v.id}">${esc(v.name)}</option>`).join('')}
+        </select>
+      </div>` : ''}
+      <div style="margin-bottom:12px">
+        <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">BETREFF</label>
+        <input id="msBetreff" placeholder="E-Mail-Betreff …"
+               style="width:100%;padding:7px 9px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">NACHRICHT (optional)</label>
+        <textarea id="msText" rows="7" placeholder="Nachrichtentext …"
+                  style="width:100%;padding:7px 9px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;resize:vertical;font-family:inherit;box-sizing:border-box"></textarea>
+      </div>
+    </div>
+    <div style="padding:14px 22px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:space-between;align-items:center;flex-shrink:0">
+      <button onclick="mailProtokollieren('${esc(kandidatId)}','${esc(name)}');this.closest('dialog').close();this.closest('dialog').remove()"
+              style="font-size:12px;color:var(--muted);background:none;border:none;cursor:pointer;text-decoration:underline">
+        📝 Nur manuell protokollieren
+      </button>
+      <div style="display:flex;gap:10px">
+        <button onclick="this.closest('dialog').close();this.closest('dialog').remove()"
+                style="padding:7px 18px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line)">Abbrechen</button>
+        <button ${!email ? 'disabled style="opacity:0.45;cursor:not-allowed"' : ''}
+                onclick="msMailOeffnen('${esc(email || '')}','${esc(kandidatId)}','${esc(name)}',this.closest('dialog'))"
+                style="padding:7px 22px;border-radius:5px;cursor:pointer;background:var(--accent2);color:#fff;border:none;font-weight:700">
+          📨 In Outlook öffnen
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(dlg);
+  dlg.showModal();
+  setTimeout(() => dlg.querySelector('#msBetreff')?.focus(), 80);
+}
+
+function msVorlageBerechnen(sel, name) {
+  const vorlagen = vorlagenLaden();
+  const v = vorlagen.find(v => String(v.id) === String(sel.value));
+  if (!v) return;
+  const teile = (name || '').split(' ');
+  const ersetzen = s => (s || '')
+    .replace(/\{\{Vorname\}\}/g, teile[0] || '')
+    .replace(/\{\{Nachname\}\}/g, teile.slice(1).join(' ') || '')
+    .replace(/\{\{voller_name\}\}/g, name || '')
+    .replace(/\{\{Name\}\}/g, teile[0] || '')
+    .replace(/\{\{[^}]+\}\}/g, '');
+  const be = document.getElementById('msBetreff');
+  const tx = document.getElementById('msText');
+  if (be && v.betreff) be.value = ersetzen(v.betreff);
+  if (tx && v.text)    tx.value = ersetzen(v.text);
+}
+
+async function msMailOeffnen(email, kandidatId, name, dlg) {
+  const betreff = dlg.querySelector('#msBetreff')?.value?.trim() || '';
+  const text    = dlg.querySelector('#msText')?.value?.trim() || '';
+  const signatur = localStorage.getItem('yavis_signatur') || '';
+  const vollerText = text + (signatur ? '\n\n' + signatur : '');
+  window.location.href = 'mailto:' + encodeURIComponent(email)
+    + '?subject=' + encodeURIComponent(betreff)
+    + '&body='    + encodeURIComponent(vollerText);
+  dlg.close(); dlg.remove();
+  // Auto-protokollieren nach kurzer Pause
+  setTimeout(async () => {
+    const { data: user } = await sb.auth.getUser();
+    const { error } = await sb.from('emails').insert({
+      id: 'yavis_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+      betreff: '📤 ' + (betreff || 'E-Mail via Outlook'),
+      entity_id: kandidatId,
+      besitzer_id: user?.user?.id || null,
+      erstellt_am: new Date().toISOString(),
+    });
+    if (!error) {
+      const { data: mails } = await sb.from('emails').select('*')
+        .eq('entity_id', kandidatId).order('erstellt_am', { ascending: false }).limit(100);
+      const hist = document.getElementById('mailHistorie');
+      if (hist) hist.innerHTML = mailHistorieHtml(mails || []);
+      const acc = document.getElementById('mailAcc');
+      if (acc) { const cnt = acc.querySelector('.acc-cnt'); if (cnt) cnt.textContent = '(' + (mails?.length || 0) + ')'; }
+    }
+    zeigeMeldung('Outlook geöffnet — E-Mail protokolliert ✓', 'ok');
+  }, 800);
+}
+
+// ---- Kandidat löschen ----
+function kandidatLoeschen(id, name) {
+  const dlg = document.createElement('dialog');
+  dlg.style.cssText = 'background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:24px;max-width:440px;width:95vw';
+  dlg.innerHTML = `
+    <div style="font-size:16px;font-weight:700;margin-bottom:10px">🗑️ Kandidat löschen?</div>
+    <div style="font-size:14px;font-weight:600;margin-bottom:8px">${esc(name)}</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:18px;line-height:1.5">
+      Alle zugehörigen Daten werden unwiderruflich gelöscht:<br>
+      Erfahrungen, Ausbildungen, Notizen, Bewerbungen, Aufgaben, Dokumente, E-Mail-Protokolle.
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="this.closest('dialog').close();this.closest('dialog').remove()"
+              style="padding:7px 18px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line)">Abbrechen</button>
+      <button onclick="_kandidatWirklichLoeschen('${esc(id)}',this.closest('dialog'))"
+              style="padding:7px 22px;border-radius:5px;cursor:pointer;background:var(--hot);color:#fff;border:none;font-weight:700">Ja, endgültig löschen</button>
+    </div>`;
+  document.body.appendChild(dlg);
+  dlg.showModal();
+}
+
+async function _kandidatWirklichLoeschen(id, dlg) {
+  const btn = dlg.querySelector('button:last-child');
+  btn.textContent = 'Lösche …'; btn.disabled = true;
+  const tables = [
+    ['erfahrung',   'kandidat_id'],
+    ['ausbildung',  'kandidat_id'],
+    ['notizen',     'kandidat_id'],
+    ['bewerbungen', 'kandidat_id'],
+    ['aufgaben',    'verknuepft_mit'],
+    ['dokumente',   'kandidat_id'],
+    ['emails',      'entity_id'],
+  ];
+  for (const [tbl, col] of tables) {
+    const { error } = await sb.from(tbl).delete().eq(col, id);
+    if (error) console.warn('Löschen ' + tbl + ':', error.message);
+  }
+  const { error } = await sb.from('kandidaten').delete().eq('id', id);
+  if (error) {
+    zeigeMeldung('Fehler: ' + error.message, 'err');
+    btn.disabled = false; btn.textContent = 'Ja, endgültig löschen';
+    return;
+  }
+  dlg.close(); dlg.remove();
+  zeigeMeldung('Kandidat gelöscht ✓', 'ok');
+  zurueckZurListe();
+}
+
+// ---- Kunde löschen ----
+function kundeLoeschen(id, name) {
+  const dlg = document.createElement('dialog');
+  dlg.style.cssText = 'background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:24px;max-width:440px;width:95vw';
+  dlg.innerHTML = `
+    <div style="font-size:16px;font-weight:700;margin-bottom:10px">🗑️ Kunde löschen?</div>
+    <div style="font-size:14px;font-weight:600;margin-bottom:8px">${esc(name)}</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:18px;line-height:1.5">
+      Notizen, Aufgaben und E-Mail-Protokolle werden gelöscht.<br>
+      Verknüpfte Ansprechpartner und Stellenausschreibungen bleiben erhalten, verlieren aber die Kundenzuordnung.
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="this.closest('dialog').close();this.closest('dialog').remove()"
+              style="padding:7px 18px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line)">Abbrechen</button>
+      <button onclick="_kundeWirklichLoeschen('${esc(id)}',this.closest('dialog'))"
+              style="padding:7px 22px;border-radius:5px;cursor:pointer;background:var(--hot);color:#fff;border:none;font-weight:700">Ja, löschen</button>
+    </div>`;
+  document.body.appendChild(dlg);
+  dlg.showModal();
+}
+
+async function _kundeWirklichLoeschen(id, dlg) {
+  const btn = dlg.querySelector('button:last-child');
+  btn.textContent = 'Lösche …'; btn.disabled = true;
+  for (const [tbl, col] of [['aufgaben','verknuepft_mit'],['emails','entity_id']]) {
+    const { error } = await sb.from(tbl).delete().eq(col, id);
+    if (error) console.warn('Löschen ' + tbl + ':', error.message);
+  }
+  const { error } = await sb.from('kunden').delete().eq('id', id);
+  if (error) {
+    zeigeMeldung('Fehler: ' + error.message + ' — ggf. noch verknüpfte Stellen vorhanden', 'err');
+    btn.disabled = false; btn.textContent = 'Ja, löschen';
+    return;
+  }
+  dlg.close(); dlg.remove();
+  zeigeMeldung('Kunde gelöscht ✓', 'ok');
+  zurueckZurListe();
+}
+
 </script>
 </body>
 </html>
