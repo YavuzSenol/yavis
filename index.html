@@ -397,7 +397,6 @@
           <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Status</div>
           <select id="rmStatus" style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
             <option value="">alle Status</option>
-            <option>Aktiv suchend</option><option>Offen für Angebote</option><option>Nicht verfügbar</option><option>Platziert</option><option>Gesperrt</option>
           </select>
         </div>
         <div>
@@ -616,6 +615,22 @@
         <div style="padding:11px 16px">
           <div style="margin-bottom:6px"><b>E-Mail-Signatur</b> <span style="font-size:12px;color:var(--muted)">— wird in Serien-E-Mail angezeigt</span></div>
           <textarea id="einsSignatur" rows="4" placeholder="Mit freundlichen Grüßen&#10;Yavuz Senol&#10;Senol Consulting · Köln" style="width:100%;padding:8px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;resize:vertical;font-family:inherit;box-sizing:border-box"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Kandidaten-Status -->
+    <div style="margin-bottom:20px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">🏷️ Kandidaten-Status</div>
+      <div style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;overflow:hidden">
+        <div id="statusVerwaltungCont"></div>
+        <div style="padding:11px 16px;display:flex;gap:8px;align-items:center;border-top:1px solid var(--line)">
+          <input id="statusNeuInp" placeholder="Neuer Wert …" onkeydown="if(event.key==='Enter')statusHinzufuegen()"
+                 style="flex:1;padding:6px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
+          <button onclick="statusHinzufuegen()"
+                  style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--accent2);color:#fff;border:none;font-size:13px;font-weight:600">+ Hinzufügen</button>
+          <button onclick="statusAufStandardReset()" title="Auf Standard-Werte zurücksetzen"
+                  style="padding:6px 12px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);font-size:13px;color:var(--muted)">↺</button>
         </div>
       </div>
     </div>
@@ -1901,7 +1916,14 @@ async function loescheDokument(id, pfad){
 
 
 // ---- Bearbeiten / Neu anlegen ----
-const EDIT_STATUS=['Aktiv suchend','Offen für Angebote','Nicht verfügbar','Platziert','Gesperrt'];
+const STATUS_STANDARD = ['Aktiv suchend','Offen für Angebote','Nicht verfügbar','Platziert','Gesperrt','derzeit kein Interesse','generell kein Interesse'];
+function statusListe() {
+  try {
+    const stored = localStorage.getItem('yavis_status_liste');
+    if (stored) { const arr = JSON.parse(stored); if (arr && arr.length) return arr; }
+  } catch(e) {}
+  return [...STATUS_STANDARD];
+}
 const ANREDE_OPTS=['Keine','Herr','Herr Dr.','Frau','Frau Dr.'];
 const FIRMEN_TYPEN=['Auftraggeber','Auftraggeber-Potenzial','Lieferant','Sonstige'];
 
@@ -1984,7 +2006,7 @@ function zeigeFormular(d){
       ${ef('Kündigungsfrist','kuendigungsfrist',d.kuendigungsfrist)}
       ${ef('Umzugsbereitschaft','umzugsbereitschaft',d.umzugsbereitschaft)}
       ${ef('Wunschregion','wunschregion',d.wunschregion)}
-      ${esel('Status','status',d.status,EDIT_STATUS)}
+      ${esel('Status','status',d.status,statusListe())}
       ${ef('Interne Wertung','wertung_intern',d.wertung_intern)}
       ${ef('Kontaktstatus','kontaktstatus',d.kontaktstatus)}
       ${ef('XING Profil','xing_profil',d.xing_profil)}
@@ -2975,7 +2997,7 @@ function oeffneEinstellungen(){
   // Kompakt-Button-Label
   const kb=document.getElementById('kompaktBtn');
   if(kb) kb.textContent=document.body.classList.contains('kompakt')?'✅ An':'⬜ Aus';
-  document.getElementById('einstellungenDlg').showModal();
+  document.getElementById('einstellungenDlg').showModal(); renderStatusVerwaltung();;
   msEinstellungenUI();
 }
 
@@ -5127,6 +5149,14 @@ function zeigeRechercheMaske() {
       chip.style.color        = aktiv ? '#fff'           : 'var(--ink)';
     });
   }
+  // rmStatus-Dropdown mit aktueller Status-Liste befuellen
+  const rmSel = document.getElementById('rmStatus');
+  if (rmSel && rmSel.options.length <= 1) {
+    statusListe().forEach(s => {
+      const o = document.createElement('option'); o.value = s; o.textContent = s;
+      rmSel.appendChild(o);
+    });
+  }
 }
 
 function rmChipToggle(chip, pos) {
@@ -5274,6 +5304,85 @@ function rechercheMaskeZuruecksetzen() {
   const anzEl = document.getElementById('rmAnzahl'); if (anzEl) anzEl.textContent = '';
   const bodyEl = document.getElementById('rmBody'); if (bodyEl) bodyEl.innerHTML = '';
 }
+
+// ================================================================
+//  STATUS-VERWALTUNG (Einstellungen)
+// ================================================================
+function renderStatusVerwaltung() {
+  const cont = document.getElementById('statusVerwaltungCont');
+  if (!cont) return;
+  const liste = statusListe();
+  if (!liste.length) {
+    cont.innerHTML = '<div style="padding:10px 16px;font-size:13px;color:var(--muted)">Keine Werte — Standard wird verwendet.</div>';
+    return;
+  }
+  cont.innerHTML = liste.map((v, i) =>
+    '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 16px;' +
+    (i < liste.length - 1 ? 'border-bottom:1px solid var(--line)' : '') + '">' +
+    '<span style="font-size:13px">' + esc(v) + '</span>' +
+    '<button onclick="statusLoeschen(' + i + ')" ' +
+    'style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;line-height:1;padding:0 2px" ' +
+    'title="Entfernen">×</button>' +
+    '</div>'
+  ).join('');
+}
+
+function statusHinzufuegen() {
+  const inp = document.getElementById('statusNeuInp');
+  const val = (inp.value || '').trim();
+  if (!val) return;
+  const liste = statusListe();
+  if (liste.some(s => s.toLowerCase() === val.toLowerCase())) {
+    zeigeMeldung('Wert existiert bereits', 'err'); return;
+  }
+  liste.push(val);
+  localStorage.setItem('yavis_status_liste', JSON.stringify(liste));
+  inp.value = '';
+  renderStatusVerwaltung();
+  // rmStatus-Dropdown neu aufbauen
+  const rmSel = document.getElementById('rmStatus');
+  if (rmSel) {
+    while (rmSel.options.length > 1) rmSel.remove(1);
+    statusListe().forEach(s => {
+      const o = document.createElement('option'); o.value = s; o.textContent = s;
+      rmSel.appendChild(o);
+    });
+  }
+  zeigeMeldung('"' + val + '" hinzugefügt ✓', 'ok');
+}
+
+function statusLoeschen(idx) {
+  const liste = statusListe();
+  if (liste.length <= 1) { zeigeMeldung('Mindestens ein Wert muss vorhanden sein', 'err'); return; }
+  const entfernt = liste.splice(idx, 1)[0];
+  localStorage.setItem('yavis_status_liste', JSON.stringify(liste));
+  renderStatusVerwaltung();
+  const rmSel = document.getElementById('rmStatus');
+  if (rmSel) {
+    while (rmSel.options.length > 1) rmSel.remove(1);
+    statusListe().forEach(s => {
+      const o = document.createElement('option'); o.value = s; o.textContent = s;
+      rmSel.appendChild(o);
+    });
+  }
+  zeigeMeldung('"' + entfernt + '" entfernt', 'ok');
+}
+
+function statusAufStandardReset() {
+  if (!confirm('Status-Liste auf die Standard-Werte zurücksetzen?\n\n' + STATUS_STANDARD.join(', '))) return;
+  localStorage.removeItem('yavis_status_liste');
+  renderStatusVerwaltung();
+  const rmSel = document.getElementById('rmStatus');
+  if (rmSel) {
+    while (rmSel.options.length > 1) rmSel.remove(1);
+    statusListe().forEach(s => {
+      const o = document.createElement('option'); o.value = s; o.textContent = s;
+      rmSel.appendChild(o);
+    });
+  }
+  zeigeMeldung('Standard-Werte wiederhergestellt ✓', 'ok');
+}
+
 </script>
 </body>
 </html>
