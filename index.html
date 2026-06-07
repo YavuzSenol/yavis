@@ -218,7 +218,7 @@
   <button class="tab" data-view="recherche">🔍 Recherche</button>
   <button class="tab" data-view="newsletter">✉️ Newsletter</button>
 </nav>
-<div class="wrap">
+<div class="wrap" id="appWrap">
   <div id="setup" class="setup" style="display:none">
     <strong>Einmalige Einrichtung:</strong> Trage unten deine Supabase-Zugangsdaten ein.
     Du findest sie im Supabase-Dashboard unter <code>Project Settings → API</code>.
@@ -676,6 +676,18 @@
             <span id="einsZoomLabel" style="font-size:13px;font-weight:600;min-width:38px;text-align:right">85 %</span>
           </div>
         </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-top:1px solid var(--line)">
+          <div>
+            <b>App-Zoom</b>
+            <div style="font-size:12px;color:var(--muted)">Alle Hauptansichten skalieren — für kleinen oder großen Bildschirm</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <input type="range" id="appZoomSlider" min="70" max="130" step="5" value="100"
+              oninput="appZoomLive(this.value)"
+              style="width:110px;cursor:pointer;accent-color:var(--accent2)">
+            <span id="appZoomLabel" style="font-size:13px;font-weight:600;min-width:38px;text-align:right">100 %</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -864,6 +876,14 @@ function toggleTheme(){
     const btn=document.getElementById('themeBtn');
     if(btn) btn.textContent='☀️ Hell';
   }
+  // App-Zoom beim Start sofort anwenden
+  (function(){
+    const z = localStorage.getItem('yavis_app_zoom');
+    if (z) {
+      const w = document.getElementById('appWrap');
+      if (w) w.style.zoom = (parseInt(z) / 100).toFixed(2);
+    }
+  })();
 })();
 
 const cfg = { url: localStorage.getItem('sb_url'), key: localStorage.getItem('sb_key') };
@@ -5829,13 +5849,20 @@ function _nlVorlagenDropdownBefuellen() {
 //  EINSTELLUNGEN-ZOOM
 // ================================================================
 function einsZoomAnwenden() {
-  const z = parseInt(localStorage.getItem('yavis_eins_zoom') || '85');
+  // Einstellungs-Zoom
+  const ez = parseInt(localStorage.getItem('yavis_eins_zoom') || '85');
   const body = document.getElementById('einstellungenBody');
-  if (body) body.style.zoom = (z / 100).toFixed(2);
-  const slider = document.getElementById('einsZoomSlider');
-  const label  = document.getElementById('einsZoomLabel');
-  if (slider) slider.value = z;
-  if (label)  label.textContent = z + ' %';
+  if (body) body.style.zoom = (ez / 100).toFixed(2);
+  const eSlider = document.getElementById('einsZoomSlider');
+  const eLabel  = document.getElementById('einsZoomLabel');
+  if (eSlider) eSlider.value = ez;
+  if (eLabel)  eLabel.textContent = ez + ' %';
+  // App-Zoom
+  const az = parseInt(localStorage.getItem('yavis_app_zoom') || '100');
+  const aSlider = document.getElementById('appZoomSlider');
+  const aLabel  = document.getElementById('appZoomLabel');
+  if (aSlider) aSlider.value = az;
+  if (aLabel)  aLabel.textContent = az + ' %';
 }
 function einsZoomLive(val) {
   const z = parseInt(val);
@@ -5843,6 +5870,14 @@ function einsZoomLive(val) {
   const body = document.getElementById('einstellungenBody');
   if (body) body.style.zoom = (z / 100).toFixed(2);
   const label = document.getElementById('einsZoomLabel');
+  if (label) label.textContent = z + ' %';
+}
+function appZoomLive(val) {
+  const z = parseInt(val);
+  localStorage.setItem('yavis_app_zoom', z);
+  const wrap = document.getElementById('appWrap');
+  if (wrap) wrap.style.zoom = (z / 100).toFixed(2);
+  const label = document.getElementById('appZoomLabel');
   if (label) label.textContent = z + ' %';
 }
 
