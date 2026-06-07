@@ -215,6 +215,7 @@
   <button class="tab" data-view="kontakte">Ansprechpartner</button>
   <button class="tab" data-view="wiedervorlagen">📋 Wiedervorlagen</button>
   <button class="tab" data-view="projekte">📁 Projekte</button>
+  <button class="tab" data-view="recherche">🔍 Recherche</button>
   <button class="tab" data-view="newsletter">✉️ Newsletter</button>
 </nav>
 <div class="wrap">
@@ -365,6 +366,84 @@
     </div>
     <!-- Detail-Ansicht -->
     <div id="projektDetailDiv" style="display:none"></div>
+  </div>
+
+  <!-- Recherche-Maske -->
+  <div id="view-recherche" style="display:none">
+    <div style="margin-bottom:16px">
+      <h2 style="font-size:20px;font-weight:700;margin:0 0 4px;color:var(--fg)">🔍 Kandidaten-Recherche</h2>
+      <div style="font-size:13px;color:var(--muted)">Interne Datenbank — Stufe-1-Suche vor LinkedIn/XING</div>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <!-- Position Chips -->
+      <div style="margin-bottom:18px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Position (Mehrfachauswahl)</div>
+        <div id="rmPosCont" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+      </div>
+      <!-- Zeile 2: PLZ, Radius, Status, Umzugsbereitschaft -->
+      <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;margin-bottom:18px">
+        <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">PLZ (optional)</div>
+          <input id="rmPlz" placeholder="z.B. 60311" onkeydown="if(event.key==='Enter')rechercheMaskeAusfuehren()"
+                 style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:120px">
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Radius</div>
+          <select id="rmRadius" style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
+            <option>25</option><option selected>50</option><option>75</option><option>100</option><option>150</option>
+          </select>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Status</div>
+          <select id="rmStatus" style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
+            <option value="">alle Status</option>
+            <option>New</option><option>In Review</option><option>Available</option><option>Engaged</option><option>Offered</option><option>Hired</option><option>Rejected</option>
+          </select>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Umzugsbereitschaft</div>
+          <input id="rmUmzug" placeholder="z.B. bundesweit" onkeydown="if(event.key==='Enter')rechercheMaskeAusfuehren()"
+                 style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:160px">
+        </div>
+      </div>
+      <!-- Zeile 3: Erreichbarkeit + Ausschluesse -->
+      <div style="display:flex;flex-wrap:wrap;gap:28px;margin-bottom:18px">
+        <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Erreichbarkeit</div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:6px">
+            <input type="checkbox" id="rmHatMail" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent2)"> ✉ hat E-Mail
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+            <input type="checkbox" id="rmHatTel" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent2)"> ☎ hat Telefon/Mobil
+          </label>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Ausschließen (int. Wertung)</div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:5px">
+            <input type="checkbox" id="rmExVerm" checked style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent2)"> vermittelt
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:5px">
+            <input type="checkbox" id="rmExNicht" checked style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent2)"> nicht vermittelbar
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:5px">
+            <input type="checkbox" id="rmExKein" checked style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent2)"> generell kein Interesse
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+            <input type="checkbox" id="rmExKont" checked style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent2)"> kein Kontakt erwünscht
+          </label>
+        </div>
+      </div>
+      <!-- Aktions-Buttons + Ergebnis-Zaehler -->
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button onclick="rechercheMaskeAusfuehren()"
+                style="padding:8px 22px;border-radius:5px;cursor:pointer;background:var(--accent2);color:#fff;border:none;font-size:14px;font-weight:700">🔍 Suchen</button>
+        <button onclick="rechercheMaskeZuruecksetzen()"
+                style="padding:8px 16px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);font-size:13px">↺ Zurücksetzen</button>
+        <span id="rmAnzahl" style="font-size:13px;color:var(--muted);margin-left:4px"></span>
+      </div>
+    </div>
+    <!-- Ergebnisbereich -->
+    <div id="rmBody"></div>
   </div>
 
   <!-- Newsletter (Platzhalter) -->
@@ -741,7 +820,7 @@ document.querySelectorAll('.tab[data-view]').forEach(t=>t.onclick=()=>{
   document.getElementById('detailPage').style.display='none';
   document.querySelectorAll('.tab[data-view]').forEach(x=>x.classList.remove('active'));
   t.classList.add('active');
-  ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>
+  ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte','recherche'].forEach(v=>
     document.getElementById('view-'+v).style.display = v===t.dataset.view?'block':'none');
   if(t.dataset.view==='start') zeigeStart();
   if(t.dataset.view==='kunden') ladeKunden();
@@ -749,6 +828,7 @@ document.querySelectorAll('.tab[data-view]').forEach(t=>t.onclick=()=>{
   if(t.dataset.view==='kandidaten') ladeKandidaten();
   if(t.dataset.view==='kontakte') ladeKontakte();
   if(t.dataset.view==='wiedervorlagen') ladeWiedervorlagen();
+  if(t.dataset.view==='recherche') zeigeRechercheMaske();
 });
 
 async function ladeStatusFilter(){
@@ -1082,7 +1162,7 @@ async function zeigeStart(){
   document.getElementById('detailPage').style.display='none';
   document.querySelectorAll('.tab[data-view]').forEach(x=>x.classList.remove('active'));
   const st=document.querySelector('.tab[data-view="start"]'); if(st) st.classList.add('active');
-  ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>{const el=document.getElementById('view-'+v); if(el) el.style.display = v==='start'?'block':'none';});
+  ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte','recherche'].forEach(v=>{const el=document.getElementById('view-'+v); if(el) el.style.display = v==='start'?'block':'none';});
   const view=document.getElementById('view-start');
   view.innerHTML='<div style="color:var(--muted);font-size:14px">Lade Übersicht …</div>';
   const [ka,ku,ko,auf]=await Promise.all([
@@ -5022,6 +5102,193 @@ async function _kundeWirklichLoeschen(id, dlg) {
   zurueckZurListe();
 }
 
+
+// ================================================================
+//  RECHERCHE-MASKE (Stufe-1-Suche)
+// ================================================================
+let _rmGewaehltePos = new Set();
+
+function zeigeRechercheMaske() {
+  const cont = document.getElementById('rmPosCont');
+  if (!cont) return;
+  if (!cont.childElementCount) {
+    // Chips beim ersten Öffnen rendern
+    POSITIONEN_LISTE.forEach(p => {
+      const chip = document.createElement('button');
+      chip.textContent = p;
+      chip.dataset.pos = p;
+      chip.style.cssText = 'padding:5px 12px;border-radius:20px;cursor:pointer;font-size:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);white-space:nowrap';
+      if (_rmGewaehltePos.has(p)) {
+        chip.style.background = 'var(--accent2)';
+        chip.style.borderColor = 'var(--accent2)';
+        chip.style.color = '#fff';
+      }
+      chip.onclick = () => rmChipToggle(chip, p);
+      cont.appendChild(chip);
+    });
+  } else {
+    // Chip-Zustände synchronisieren (nach Zurücksetzen)
+    cont.querySelectorAll('[data-pos]').forEach(chip => {
+      const aktiv = _rmGewaehltePos.has(chip.dataset.pos);
+      chip.style.background   = aktiv ? 'var(--accent2)' : 'var(--bg)';
+      chip.style.borderColor  = aktiv ? 'var(--accent2)' : 'var(--line)';
+      chip.style.color        = aktiv ? '#fff'           : 'var(--ink)';
+    });
+  }
+}
+
+function rmChipToggle(chip, pos) {
+  if (_rmGewaehltePos.has(pos)) {
+    _rmGewaehltePos.delete(pos);
+    chip.style.background  = 'var(--bg)';
+    chip.style.borderColor = 'var(--line)';
+    chip.style.color       = 'var(--ink)';
+  } else {
+    _rmGewaehltePos.add(pos);
+    chip.style.background  = 'var(--accent2)';
+    chip.style.borderColor = 'var(--accent2)';
+    chip.style.color       = '#fff';
+  }
+}
+
+async function rechercheMaskeAusfuehren() {
+  const anzEl = document.getElementById('rmAnzahl');
+  const bodyEl = document.getElementById('rmBody');
+  if (!anzEl || !bodyEl) return;
+  anzEl.textContent = 'Suche läuft …';
+  bodyEl.innerHTML  = '';
+
+  const plz       = (document.getElementById('rmPlz').value       || '').trim();
+  const radius    =  document.getElementById('rmRadius').value;
+  const hatMail   =  document.getElementById('rmHatMail').checked;
+  const hatTel    =  document.getElementById('rmHatTel').checked;
+  const exVerm    =  document.getElementById('rmExVerm').checked;
+  const exNicht   =  document.getElementById('rmExNicht').checked;
+  const exKein    =  document.getElementById('rmExKein').checked;
+  const exKont    =  document.getElementById('rmExKont').checked;
+  const statusVal =  document.getElementById('rmStatus').value;
+  const umzugVal  = (document.getElementById('rmUmzug').value      || '').trim();
+
+  const ausschluss = [];
+  if (exVerm)  ausschluss.push('vermittelt');
+  if (exNicht) ausschluss.push('nicht vermittelbar');
+  if (exKein)  ausschluss.push('generell kein interesse');
+  if (exKont)  ausschluss.push('kein kontakt erwünscht');
+
+  let rows = [];
+
+  if (plz) {
+    // Umkreissuche via vorhandene RPC-Funktion
+    const { data, error } = await sb.rpc('kandidaten_im_umkreis',
+      { such_plz: plz, radius_km: Number(radius) });
+    if (error) { anzEl.textContent = 'Fehler: ' + error.message; return; }
+    const rpcRows = data || [];
+    // Volle Datensätze nachladen wenn Client-Filter nötig
+    const brauchtVoll = _rmGewaehltePos.size || statusVal || hatMail || hatTel || ausschluss.length || umzugVal;
+    if (rpcRows.length && brauchtVoll) {
+      const ids = rpcRows.map(r => r.id);
+      const map = {};
+      for (let i = 0; i < ids.length; i += 300) {
+        const { data: td } = await sb.from('kandidaten').select('*').in('id', ids.slice(i, i + 300));
+        (td || []).forEach(x => map[x.id] = x);
+      }
+      rows = rpcRows.map(r => ({ ...(map[r.id] || {}), entfernung_km: r.entfernung_km }));
+    } else {
+      rows = rpcRows;
+    }
+  } else {
+    // Serverseite: Position + Status direkt in Supabase-Query
+    let q = sb.from('kandidaten').select('*').limit(500)
+              .order('nachname', { ascending: true, nullsFirst: false });
+    if (_rmGewaehltePos.size) q = q.in('berufsbezeichnung', [..._rmGewaehltePos]);
+    if (statusVal)            q = q.eq('status', statusVal);
+    const { data, error } = await q;
+    if (error) { anzEl.textContent = 'Fehler: ' + error.message; return; }
+    rows = data || [];
+  }
+
+  // ----------- Client-seitige Filter -----------
+  if (plz && _rmGewaehltePos.size) rows = rows.filter(r => _rmGewaehltePos.has(r.berufsbezeichnung));
+  if (plz && statusVal)            rows = rows.filter(r => r.status === statusVal);
+  if (hatMail)  rows = rows.filter(r => r.email || r.email_beruflich || r.email_zweit);
+  if (hatTel)   rows = rows.filter(r => r.mobil || r.mobil_privat || r.telefon || r.telefon_privat);
+  if (umzugVal) {
+    const ul = umzugVal.toLowerCase();
+    rows = rows.filter(r => (r.umzugsbereitschaft || '').toLowerCase().includes(ul));
+  }
+  if (ausschluss.length) {
+    rows = rows.filter(r => {
+      const wi = (r.wertung_intern || '').toLowerCase();
+      return !ausschluss.some(a => wi.includes(a));
+    });
+  }
+
+  // ----------- Ergebnis-Label -----------
+  const n = rows.length;
+  let label = n + ' Kandidat' + (n === 1 ? '' : 'en') + ' gefunden';
+  if (plz)                   label += '  ·  Umkreis ' + radius + ' km um ' + plz;
+  if (_rmGewaehltePos.size)  label += '  ·  ' + [..._rmGewaehltePos].join(', ');
+  anzEl.textContent = label;
+
+  if (!n) {
+    bodyEl.innerHTML = '<div style="color:var(--muted);font-size:14px;padding:16px 0">Keine Treffer — bitte Filter anpassen.</div>';
+    return;
+  }
+
+  // ----------- Tabelle rendern -----------
+  const hatKm = plz && rows.some(r => r.entfernung_km != null);
+  let html = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">'
+    + '<thead><tr style="border-bottom:2px solid var(--line);text-align:left">'
+    + '<th style="padding:7px 10px 8px;color:var(--muted);font-weight:600">Name</th>'
+    + '<th style="padding:7px 10px 8px;color:var(--muted);font-weight:600">Position</th>'
+    + '<th style="padding:7px 10px 8px;color:var(--muted);font-weight:600">Ort</th>'
+    + (hatKm ? '<th style="padding:7px 10px 8px;color:var(--muted);font-weight:600">Entfernung</th>' : '')
+    + '<th style="padding:7px 8px 8px;color:var(--muted);font-weight:600" title="Erreichbarkeit">✉&nbsp;☎</th>'
+    + '</tr></thead><tbody>';
+
+  rows.forEach(r => {
+    const hatM = !!(r.email || r.email_beruflich || r.email_zweit);
+    const hatT = !!(r.mobil || r.mobil_privat || r.telefon || r.telefon_privat);
+    const ort  = [r.plz, r.stadt].filter(Boolean).join(' ') || '–';
+    const km   = r.entfernung_km != null ? Math.round(r.entfernung_km) + ' km' : '';
+    const err  = [
+      hatM ? '<span title="E-Mail vorhanden" style="color:var(--accent2)">✉</span>' : '',
+      hatT ? '<span title="Telefon/Mobil vorhanden" style="color:#10b981">☎</span>' : ''
+    ].filter(Boolean).join('&nbsp;');
+    html += '<tr onclick="detailKandidat(\'' + r.id + '\')" style="cursor:pointer;border-bottom:1px solid var(--line)"'
+          + ' onmouseover="this.style.background=\'var(--panel2)\'" onmouseout="this.style.background=\'\'">'
+          + '<td style="padding:7px 10px;font-weight:600">'      + esc(r.voller_name || '–')        + '</td>'
+          + '<td style="padding:7px 10px;color:var(--muted);font-size:12px">' + esc(r.berufsbezeichnung || '–') + '</td>'
+          + '<td style="padding:7px 10px;color:var(--muted);font-size:12px">' + esc(ort)            + '</td>'
+          + (hatKm ? '<td style="padding:7px 10px;color:var(--muted);font-size:12px">' + km + '</td>' : '')
+          + '<td style="padding:7px 8px">' + (err || '–') + '</td>'
+          + '</tr>';
+  });
+  html += '</tbody></table></div>';
+  bodyEl.innerHTML = html;
+}
+
+function rechercheMaskeZuruecksetzen() {
+  _rmGewaehltePos.clear();
+  const cont = document.getElementById('rmPosCont');
+  if (cont) cont.querySelectorAll('[data-pos]').forEach(c => {
+    c.style.background  = 'var(--bg)';
+    c.style.borderColor = 'var(--line)';
+    c.style.color       = 'var(--ink)';
+  });
+  ['rmPlz', 'rmUmzug'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  const sel = document.getElementById('rmStatus'); if (sel) sel.value = '';
+  ['rmHatMail', 'rmHatTel'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.checked = false;
+  });
+  ['rmExVerm', 'rmExNicht', 'rmExKein', 'rmExKont'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.checked = true;
+  });
+  const anzEl = document.getElementById('rmAnzahl'); if (anzEl) anzEl.textContent = '';
+  const bodyEl = document.getElementById('rmBody'); if (bodyEl) bodyEl.innerHTML = '';
+}
 </script>
 </body>
 </html>
