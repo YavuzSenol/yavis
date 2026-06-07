@@ -437,10 +437,110 @@
     <div id="rmBody"></div>
   </div>
 
-  <!-- Newsletter (Platzhalter) -->
+  <!-- Newsletter / Serien-Mail -->
   <div id="view-newsletter" style="display:none">
-    <h2 style="color:var(--accent);font-size:18px;margin:0 0 8px">✉️ Newsletter</h2>
-    <div style="color:var(--muted);font-size:14px">Dieser Bereich ist angelegt und wird später mit Leben gefüllt (z. B. Verteiler / Empfängerlisten).</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+      <h2 style="color:var(--accent);font-size:18px;margin:0">✉️ Serien-Mail / Newsletter</h2>
+    </div>
+
+    <!-- Schritt 1: Empfänger -->
+    <div class="card" style="margin-bottom:16px">
+      <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:14px">
+        Schritt 1 — Empfänger auswählen
+      </div>
+
+      <!-- Position-Chips -->
+      <div style="margin-bottom:14px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Position</div>
+        <div id="nlPosCont" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+      </div>
+
+      <!-- PLZ + Radius + Ausschließen -->
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;align-items:flex-end">
+        <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">PLZ (optional)</div>
+          <input id="nlPlz" type="text" maxlength="5" placeholder="50667"
+                 style="width:90px;padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Radius</div>
+          <select id="nlRadius" style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
+            <option value="25">25 km</option>
+            <option value="50" selected>50 km</option>
+            <option value="75">75 km</option>
+            <option value="100">100 km</option>
+            <option value="150">150 km</option>
+            <option value="200">200 km</option>
+          </select>
+        </div>
+        <div style="flex:1;min-width:220px">
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Ausschließen (int. Wertung)</div>
+          <textarea id="nlExWert" rows="2" placeholder="vermittelt, gesperrt …"
+                    style="width:100%;padding:7px 10px;font-size:12px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;resize:vertical;font-family:inherit;box-sizing:border-box;line-height:1.5">vermittelt, nicht vermittelbar, generell kein Interesse, kein Kontakt erwünscht</textarea>
+          <div style="font-size:11px;color:var(--muted);margin-top:3px">Kommagetrennt — nur Kandidaten <b>mit E-Mail</b> werden angezeigt</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button onclick="nlSucheAusfuehren()"
+                style="padding:8px 22px;border-radius:6px;cursor:pointer;background:var(--accent2);color:#fff;border:none;font-weight:700;font-size:14px">
+          🔍 Kandidaten suchen
+        </button>
+        <button onclick="nlZuruecksetzen()"
+                style="padding:8px 16px;border-radius:6px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);font-size:13px;color:var(--muted)">
+          ↺ Zurücksetzen
+        </button>
+      </div>
+
+      <!-- Ergebnisse -->
+      <div id="nlErgebnisse" style="margin-top:16px"></div>
+    </div>
+
+    <!-- Schritt 2: E-Mail verfassen (erst sichtbar wenn >= 1 ausgewählt) -->
+    <div id="nlSchritt2" class="card" style="display:none">
+      <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:14px">
+        Schritt 2 — E-Mail verfassen &amp; senden
+      </div>
+
+      <!-- Vorlage -->
+      <div style="margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Vorlage laden</div>
+        <select id="nlVorlageWahl" onchange="nlVorlageBefuellen()"
+                style="width:100%;max-width:420px;padding:8px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
+          <option value="">— Vorlage wählen (optional) —</option>
+        </select>
+      </div>
+
+      <!-- Betreff -->
+      <div style="margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Betreff</div>
+        <input id="nlBetreff" type="text" placeholder="Betreff der E-Mail …" oninput="nlVorschauAktualisieren()"
+               style="width:100%;padding:8px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;box-sizing:border-box">
+      </div>
+
+      <!-- Nachricht -->
+      <div style="margin-bottom:14px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Nachricht</div>
+        <textarea id="nlText" rows="8" placeholder="Text der E-Mail …" oninput="nlVorschauAktualisieren()"
+                  style="width:100%;padding:8px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;resize:vertical;font-family:inherit;box-sizing:border-box;line-height:1.6"></textarea>
+      </div>
+
+      <!-- Vorschau -->
+      <div id="nlVorschau" style="display:none;margin-bottom:16px"></div>
+
+      <!-- Senden-Buttons -->
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button id="nlSendBtn" onclick="nlSerienMailOeffnen()"
+                style="padding:9px 22px;border-radius:6px;cursor:pointer;background:#0078d4;color:#fff;border:none;font-weight:700;font-size:14px">
+          📨 Serien-Mail in Outlook öffnen
+        </button>
+        <button onclick="nlAdressenKopieren()"
+                style="padding:9px 16px;border-radius:6px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);font-size:13px;color:var(--ink)">
+          📋 Adressen kopieren
+        </button>
+        <span id="nlSendHinweis" style="font-size:12px;color:var(--muted)"></span>
+      </div>
+    </div>
   </div>
 
   <!-- Vollständige Detailseite -->
@@ -836,6 +936,7 @@ document.querySelectorAll('.tab[data-view]').forEach(t=>t.onclick=()=>{
   if(t.dataset.view==='kontakte') ladeKontakte();
   if(t.dataset.view==='wiedervorlagen') ladeWiedervorlagen();
   if(t.dataset.view==='recherche') zeigeRechercheMaske();
+  if(t.dataset.view==='newsletter') zeigeNewsletter();
 });
 
 async function ladeStatusFilter(){
@@ -5381,6 +5482,320 @@ function statusAufStandardReset() {
     });
   }
   zeigeMeldung('Standard-Werte wiederhergestellt ✓', 'ok');
+}
+
+
+// ================================================================
+//  NEWSLETTER / SERIEN-MAIL TAB
+// ================================================================
+let _nlGewaehltePos  = new Set();
+let _nlKandidaten    = [];   // Suchergebnisse
+let _nlAusgewaehlt   = new Set();  // ausgewaehlte IDs
+
+function zeigeNewsletter() {
+  // Position-Chips beim ersten Oeffnen rendern
+  const cont = document.getElementById('nlPosCont');
+  if (!cont) return;
+  _nlVorlagenDropdownBefuellen();
+  if (!cont.childElementCount) {
+    POSITIONEN_LISTE.forEach(p => {
+      const chip = document.createElement('button');
+      chip.textContent = p;
+      chip.dataset.pos = p;
+      chip.style.cssText = 'padding:5px 12px;border-radius:20px;cursor:pointer;font-size:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);white-space:nowrap';
+      chip.onclick = () => nlChipToggle(chip, p);
+      cont.appendChild(chip);
+    });
+  }
+}
+
+function nlChipToggle(chip, pos) {
+  if (_nlGewaehltePos.has(pos)) {
+    _nlGewaehltePos.delete(pos);
+    chip.style.background  = 'var(--bg)';
+    chip.style.borderColor = 'var(--line)';
+    chip.style.color       = 'var(--ink)';
+  } else {
+    _nlGewaehltePos.add(pos);
+    chip.style.background  = 'var(--accent2)';
+    chip.style.borderColor = 'var(--accent2)';
+    chip.style.color       = '#fff';
+  }
+}
+
+async function nlSucheAusfuehren() {
+  const bodyEl  = document.getElementById('nlErgebnisse');
+  const zaehler = document.getElementById('nlZaehler');
+  if (!bodyEl) return;
+  bodyEl.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:8px 0">Suche läuft …</div>';
+  document.getElementById('nlSchritt2').style.display = 'none';
+  _nlKandidaten  = [];
+  _nlAusgewaehlt = new Set();
+
+  const plz    = (document.getElementById('nlPlz').value    || '').trim();
+  const radius =  document.getElementById('nlRadius').value;
+  const exText = (document.getElementById('nlExWert').value || '').trim();
+  const ausschluss = exText
+    ? exText.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+    : [];
+
+  let rows = [];
+
+  if (plz) {
+    const { data, error } = await sb.rpc('kandidaten_im_umkreis',
+      { such_plz: plz, radius_km: Number(radius) });
+    if (error) { bodyEl.innerHTML = '<div style="color:var(--hot)">Fehler: ' + error.message + '</div>'; return; }
+    const ids = (data || []).map(r => r.id);
+    if (ids.length) {
+      const map = {};
+      for (let i = 0; i < ids.length; i += 300) {
+        const { data: td } = await sb.from('kandidaten').select('*').in('id', ids.slice(i, i + 300));
+        (td || []).forEach(x => map[x.id] = x);
+      }
+      rows = (data || []).map(r => ({ ...(map[r.id] || {}), entfernung_km: r.entfernung_km }));
+    }
+  } else {
+    let q = sb.from('kandidaten').select('*').limit(500)
+              .order('nachname', { ascending: true, nullsFirst: false });
+    if (_nlGewaehltePos.size) q = q.in('berufsbezeichnung', [..._nlGewaehltePos]);
+    const { data, error } = await q;
+    if (error) { bodyEl.innerHTML = '<div style="color:var(--hot)">Fehler: ' + error.message + '</div>'; return; }
+    rows = data || [];
+  }
+
+  // Client-seitig filtern
+  if (plz && _nlGewaehltePos.size) rows = rows.filter(r => _nlGewaehltePos.has(r.berufsbezeichnung));
+  // Nur Kandidaten mit E-Mail
+  rows = rows.filter(r => r.email || r.email_beruflich || r.email_zweit);
+  // Ausschluesse (wertung_intern)
+  if (ausschluss.length) {
+    rows = rows.filter(r => {
+      const wi = (r.wertung_intern || '').toLowerCase();
+      return !ausschluss.some(a => wi.includes(a));
+    });
+  }
+
+  _nlKandidaten = rows;
+
+  if (!rows.length) {
+    bodyEl.innerHTML = '<div style="color:var(--muted);font-size:14px;padding:8px 0">Keine Treffer — Filter anpassen.</div>';
+    if (zaehler) zaehler.textContent = '';
+    return;
+  }
+
+  // Tabelle rendern
+  const hatKm = plz && rows.some(r => r.entfernung_km != null);
+  let html = '<div style="overflow-x:auto">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">'
+    + '<label style="font-size:13px;display:flex;align-items:center;gap:6px;cursor:pointer">'
+    + '<input type="checkbox" id="nlAlleCheck" onchange="nlToggleAlle(this.checked)" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent2)"> Alle auswählen</label>'
+    + '<span id="nlZaehler" style="font-size:13px;color:var(--muted)"></span>'
+    + '</div>'
+    + '<table style="width:100%;border-collapse:collapse;font-size:13px">'
+    + '<thead><tr style="border-bottom:2px solid var(--line);text-align:left">'
+    + '<th style="padding:6px 8px;width:32px"></th>'
+    + '<th style="padding:6px 10px;color:var(--muted)">Name</th>'
+    + '<th style="padding:6px 10px;color:var(--muted)">Position</th>'
+    + '<th style="padding:6px 10px;color:var(--muted)">Ort</th>'
+    + (hatKm ? '<th style="padding:6px 10px;color:var(--muted)">km</th>' : '')
+    + '<th style="padding:6px 10px;color:var(--muted)">E-Mail</th>'
+    + '</tr></thead><tbody id="nlTbody">';
+
+  rows.forEach(r => {
+    const email = r.email || r.email_beruflich || r.email_zweit || '';
+    const ort   = [r.plz, r.stadt].filter(Boolean).join(' ') || '–';
+    const km    = r.entfernung_km != null ? Math.round(r.entfernung_km) + ' km' : '';
+    html += '<tr style="border-bottom:1px solid var(--line)">'
+      + '<td style="padding:6px 8px"><input type="checkbox" data-id="' + r.id + '" '
+      + 'onchange="nlToggleEmpfaenger(\'' + r.id + '\',this.checked)" '
+      + 'style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent2)"></td>'
+      + '<td style="padding:6px 10px;font-weight:600">' + esc(r.voller_name || '–') + '</td>'
+      + '<td style="padding:6px 10px;color:var(--muted);font-size:12px">' + esc(r.berufsbezeichnung || '–') + '</td>'
+      + '<td style="padding:6px 10px;color:var(--muted);font-size:12px">' + esc(ort) + '</td>'
+      + (hatKm ? '<td style="padding:6px 10px;color:var(--muted);font-size:12px">' + km + '</td>' : '')
+      + '<td style="padding:6px 10px;color:var(--muted);font-size:12px">' + esc(email) + '</td>'
+      + '</tr>';
+  });
+  html += '</tbody></table></div>';
+  bodyEl.innerHTML = html;
+  nlUpdateZaehler();
+}
+
+function nlToggleAlle(checked) {
+  _nlAusgewaehlt = checked ? new Set(_nlKandidaten.map(r => r.id)) : new Set();
+  document.querySelectorAll('#nlTbody input[type="checkbox"]').forEach(cb => { cb.checked = checked; });
+  nlUpdateZaehler();
+}
+
+function nlToggleEmpfaenger(id, checked) {
+  if (checked) _nlAusgewaehlt.add(id);
+  else         _nlAusgewaehlt.delete(id);
+  // "Alle"-Checkbox synchronisieren
+  const alleCheck = document.getElementById('nlAlleCheck');
+  if (alleCheck) alleCheck.checked = _nlAusgewaehlt.size === _nlKandidaten.length;
+  nlUpdateZaehler();
+}
+
+function nlUpdateZaehler() {
+  const z   = document.getElementById('nlZaehler');
+  const s2  = document.getElementById('nlSchritt2');
+  const n   = _nlAusgewaehlt.size;
+  const mitMail = [..._nlAusgewaehlt].filter(id => {
+    const k = _nlKandidaten.find(r => r.id === id);
+    return k && (k.email || k.email_beruflich || k.email_zweit);
+  }).length;
+  if (z) z.textContent = n
+    ? n + ' ausgewählt' + (mitMail < n ? ' · ' + (n - mitMail) + ' ohne E-Mail' : '')
+    : '';
+  if (s2) s2.style.display = n > 0 ? 'block' : 'none';
+  if (n > 0) nlVorschauAktualisieren();
+}
+
+function nlVorlageBefuellen() {
+  const sel = document.getElementById('nlVorlageWahl');
+  if (!sel || !sel.value) return;
+  const vorlagen = vorlagenLaden();
+  const v = vorlagen.find(v => String(v.id) === String(sel.value));
+  if (!v) return;
+  // Beispiel-Name aus erstem ausgewaehlten Kandidaten
+  const ersterId = [..._nlAusgewaehlt][0];
+  const erster   = _nlKandidaten.find(r => r.id === ersterId);
+  const name     = erster ? (erster.voller_name || '') : '';
+  const teile    = name.split(' ');
+  const ersetzen = s => (s || '')
+    .replace(/\{\{Vorname\}\}/g,    teile[0] || '')
+    .replace(/\{\{Nachname\}\}/g,   teile.slice(1).join(' ') || '')
+    .replace(/\{\{voller_name\}\}/g, name)
+    .replace(/\{\{Name\}\}/g,       teile[0] || '')
+    .replace(/\{\{[^}]+\}\}/g, '');
+  const betreff = document.getElementById('nlBetreff');
+  const text    = document.getElementById('nlText');
+  if (betreff && v.betreff) betreff.value = ersetzen(v.betreff);
+  if (text    && v.text)    text.value    = ersetzen(v.text);
+  nlVorschauAktualisieren();
+}
+
+function nlVorschauAktualisieren() {
+  const prev  = document.getElementById('nlVorschau');
+  const betreff = (document.getElementById('nlBetreff')?.value || '').trim();
+  const text    = (document.getElementById('nlText')?.value    || '').trim();
+  if (!prev) return;
+  const n = _nlAusgewaehlt.size;
+  const ersterId = [..._nlAusgewaehlt][0];
+  const erster   = _nlKandidaten.find(r => r.id === ersterId);
+  const name     = erster ? (erster.voller_name || '') : '';
+  if (!betreff && !text) { prev.style.display = 'none'; return; }
+  prev.style.display = 'block';
+  prev.innerHTML = '<div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">'
+    + 'VORSCHAU (Beispiel: ' + esc(name || 'erster Empfänger') + ')</div>'
+    + '<div style="background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:12px;font-size:13px">'
+    + '<div style="color:var(--muted);margin-bottom:4px">Betreff: <b>' + esc(betreff) + '</b></div>'
+    + '<pre style="white-space:pre-wrap;font-family:inherit;font-size:12px;margin:8px 0 0;color:var(--fg)">'
+    + esc((text + (localStorage.getItem('yavis_signatur') ? '\n\n' + localStorage.getItem('yavis_signatur') : '')).slice(0, 400))
+    + (text.length > 400 ? '\n…' : '')
+    + '</pre></div>';
+}
+
+async function nlSerienMailOeffnen() {
+  const betreff  = (document.getElementById('nlBetreff')?.value || '').trim();
+  const text     = (document.getElementById('nlText')?.value    || '').trim();
+  const signatur = localStorage.getItem('yavis_signatur') || '';
+  const vollerText = text + (signatur ? '\n\n' + signatur : '');
+  const bcc      = localStorage.getItem('yavis_bcc') || '';
+
+  // Alle ausgewaehlten Kandidaten mit E-Mail sammeln
+  const empfaenger = [..._nlAusgewaehlt]
+    .map(id => _nlKandidaten.find(r => r.id === id))
+    .filter(Boolean)
+    .map(r => ({ id: r.id, name: r.voller_name || '', email: r.email || r.email_beruflich || r.email_zweit || '' }))
+    .filter(r => r.email);
+
+  if (!empfaenger.length) { zeigeMeldung('Keine Empfänger mit E-Mail-Adresse', 'err'); return; }
+  if (!betreff) { zeigeMeldung('Bitte einen Betreff eingeben', 'err'); return; }
+
+  const alleEmails = empfaenger.map(r => r.email).join(',');
+  const bccStr = [alleEmails, bcc].filter(Boolean).join(',');
+
+  // mailto: URL oeffnen
+  const url = 'mailto:?' +
+    'bcc=' + encodeURIComponent(bccStr) +
+    '&subject=' + encodeURIComponent(betreff) +
+    '&body=' + encodeURIComponent(vollerText);
+
+  window.location.href = url;
+
+  // Protokollierung fuer alle Empfaenger
+  const btn = document.getElementById('nlSendBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Protokolliere …'; }
+
+  setTimeout(async () => {
+    const { data: user } = await sb.auth.getUser();
+    const userId = user?.user?.id || null;
+    const ts = Date.now();
+    let ok = 0;
+    for (let i = 0; i < empfaenger.length; i++) {
+      const { error } = await sb.from('emails').insert({
+        id:          'nl_' + ts + '_' + i,
+        betreff:     '📤 ' + betreff,
+        entity_id:   empfaenger[i].id,
+        besitzer_id: userId,
+        erstellt_am: new Date().toISOString(),
+      });
+      if (!error) ok++;
+    }
+    if (btn) { btn.disabled = false; btn.textContent = '📨 Serien-Mail in Outlook öffnen'; }
+    zeigeMeldung('Outlook geöffnet · ' + ok + ' von ' + empfaenger.length + ' E-Mails protokolliert ✓', 'ok');
+  }, 900);
+}
+
+function nlAdressenKopieren() {
+  const adressen = [..._nlAusgewaehlt]
+    .map(id => _nlKandidaten.find(r => r.id === id))
+    .filter(Boolean)
+    .map(r => r.email || r.email_beruflich || r.email_zweit || '')
+    .filter(Boolean)
+    .join('; ');
+  if (!adressen) { zeigeMeldung('Keine E-Mail-Adressen vorhanden', 'err'); return; }
+  navigator.clipboard.writeText(adressen).then(
+    () => zeigeMeldung(adressen.split(';').length + ' Adressen kopiert ✓', 'ok'),
+    () => { prompt('E-Mail-Adressen (kopieren):', adressen); }
+  );
+}
+
+function nlZuruecksetzen() {
+  // Chips deaktivieren
+  _nlGewaehltePos = new Set();
+  const cont = document.getElementById('nlPosCont');
+  if (cont) cont.querySelectorAll('[data-pos]').forEach(chip => {
+    chip.style.background  = 'var(--bg)';
+    chip.style.borderColor = 'var(--line)';
+    chip.style.color       = 'var(--ink)';
+  });
+  // Eingaben leeren
+  const plz = document.getElementById('nlPlz');   if (plz) plz.value = '';
+  const ex  = document.getElementById('nlExWert');
+  if (ex) ex.value = 'vermittelt, nicht vermittelbar, generell kein Interesse, kein Kontakt erwünscht';
+  // Ergebnisse & Schritt 2 leeren
+  _nlKandidaten  = [];
+  _nlAusgewaehlt = new Set();
+  const res = document.getElementById('nlErgebnisse'); if (res) res.innerHTML = '';
+  const s2  = document.getElementById('nlSchritt2');   if (s2) s2.style.display = 'none';
+}
+
+
+// Vorlage-Dropdown beim Oeffnen befuellen
+function _nlVorlagenDropdownBefuellen() {
+  const sel = document.getElementById('nlVorlageWahl');
+  if (!sel) return;
+  // Bestehende Optionen (ausser Platzhalter) entfernen
+  while (sel.options.length > 1) sel.remove(1);
+  const vorlagen = vorlagenLaden();
+  vorlagen.forEach(v => {
+    const o = document.createElement('option');
+    o.value = String(v.id);
+    o.textContent = v.name || ('Vorlage ' + v.id);
+    sel.appendChild(o);
+  });
 }
 
 </script>
