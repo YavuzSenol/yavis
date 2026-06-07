@@ -497,7 +497,7 @@
     </div>
 
     <!-- Schritt 2: E-Mail verfassen (erst sichtbar wenn >= 1 ausgewählt) -->
-    <div id="nlSchritt2" class="card" style="display:none">
+    <div id="nlSchritt2" class="card">
       <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:14px">
         Schritt 2 — E-Mail verfassen &amp; senden
       </div>
@@ -531,8 +531,8 @@
       <!-- Senden-Buttons -->
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
         <button id="nlSendBtn" onclick="nlSerienMailOeffnen()"
-                style="padding:9px 22px;border-radius:6px;cursor:pointer;background:#0078d4;color:#fff;border:none;font-weight:700;font-size:14px">
-          📨 Serien-Mail in Outlook öffnen
+                disabled style="padding:9px 22px;border-radius:6px;cursor:pointer;background:var(--muted);color:#fff;border:none;font-weight:700;font-size:14px">
+          📨 Serien-Mail öffnen (erst Kandidaten auswählen)
         </button>
         <button onclick="nlAdressenKopieren()"
                 style="padding:9px 16px;border-radius:6px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);font-size:13px;color:var(--ink)">
@@ -646,7 +646,7 @@
   </div></dialog>
 
 <dialog id="einstellungenDlg" style="width:min(720px,96vw);max-height:90vh;overflow-y:auto;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;padding:0">
-  <div style="padding:24px 28px">
+  <div id="einstellungenBody" style="padding:24px 28px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;border-bottom:1px solid var(--line);padding-bottom:14px">
       <h2 style="margin:0;font-size:19px;font-weight:700">⚙️ Einstellungen</h2>
       <button onclick="document.getElementById('einstellungenDlg').close()" style="background:none;border:none;cursor:pointer;font-size:22px;color:var(--muted);line-height:1">×</button>
@@ -660,9 +660,21 @@
           <div><b>Farbschema</b><div style="font-size:12px;color:var(--muted)">Zwischen hellem und dunklem Design wechseln</div></div>
           <button id="themeBtn" onclick="toggleTheme()" style="padding:6px 16px;border-radius:6px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:13px;min-width:110px">🌙 Dunkel</button>
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-top:1px solid var(--line)">
           <div><b>Kompakt-Modus</b><div style="font-size:12px;color:var(--muted)">Tabellenzeilen enger — mehr Kandidaten auf einen Blick</div></div>
           <button id="kompaktBtn" onclick="toggleKompakt()" style="padding:6px 16px;border-radius:6px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:13px;min-width:110px">⬜ Aus</button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-top:1px solid var(--line)">
+          <div>
+            <b>Einstellungs-Zoom</b>
+            <div style="font-size:12px;color:var(--muted)">Schriftgröße dieses Dialogs anpassen — wird gespeichert</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <input type="range" id="einsZoomSlider" min="65" max="115" step="5" value="85"
+              oninput="einsZoomLive(this.value)"
+              style="width:110px;cursor:pointer;accent-color:var(--accent2)">
+            <span id="einsZoomLabel" style="font-size:13px;font-weight:600;min-width:38px;text-align:right">85 %</span>
+          </div>
         </div>
       </div>
     </div>
@@ -3098,7 +3110,7 @@ function oeffneEinstellungen(){
   // Kompakt-Button-Label
   const kb=document.getElementById('kompaktBtn');
   if(kb) kb.textContent=document.body.classList.contains('kompakt')?'✅ An':'⬜ Aus';
-  document.getElementById('einstellungenDlg').showModal(); renderStatusVerwaltung();;
+  document.getElementById('einstellungenDlg').showModal(); renderStatusVerwaltung(); einsZoomAnwenden();
   msEinstellungenUI();
 }
 
@@ -3217,17 +3229,21 @@ function vorlagenListeRendern(){
     div.innerHTML='<div style="font-size:13px;color:var(--muted);text-align:center;padding:20px">Noch keine Vorlagen — oben eine anlegen.</div>';
     return;
   }
-  div.innerHTML=vl.map(v=>`
-    <div style="background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:12px 14px">
+  div.innerHTML=vl.map((v,i)=>`
+    <div style="background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:12px 14px;margin-bottom:4px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div style="flex:1;min-width:0">
           <div style="font-weight:700;font-size:14px;margin-bottom:2px">${esc(v.name)}</div>
           ${v.betreff?`<div style="font-size:12px;color:var(--muted);margin-bottom:4px">✉️ ${esc(v.betreff)}</div>`:''}
           <div style="font-size:12px;color:var(--muted);white-space:pre-wrap;max-height:50px;overflow:hidden;text-overflow:ellipsis">${esc((v.text||'').substring(0,120))}${(v.text||'').length>120?'…':''}</div>
         </div>
-        <div style="display:flex;gap:6px;margin-left:10px;flex-shrink:0">
-          <button onclick="vorlagenBearbeiten(${v.id})" style="padding:4px 10px;border-radius:4px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:12px">✏️</button>
-          <button onclick="vorlagenLoeschen(${v.id})" style="padding:4px 10px;border-radius:4px;cursor:pointer;background:rgba(220,38,38,0.15);border:1px solid rgba(220,38,38,0.3);color:var(--hot);font-size:12px">🗑️</button>
+        <div style="display:flex;gap:5px;margin-left:10px;flex-shrink:0;align-items:center">
+          <div style="display:flex;flex-direction:column;gap:2px">
+            <button onclick="vorlagenHoch(${i})" title="Nach oben" ${i===0?'disabled':''} style="padding:2px 7px;border-radius:3px;cursor:${i===0?'default':'pointer'};background:var(--panel);border:1px solid var(--line);color:${i===0?'var(--muted)':'var(--ink)'};font-size:11px;line-height:1.4">▲</button>
+            <button onclick="vorlagenRunter(${i})" title="Nach unten" ${i===vl.length-1?'disabled':''} style="padding:2px 7px;border-radius:3px;cursor:${i===vl.length-1?'default':'pointer'};background:var(--panel);border:1px solid var(--line);color:${i===vl.length-1?'var(--muted)':'var(--ink)'};font-size:11px;line-height:1.4">▼</button>
+          </div>
+          <button onclick="vorlagenBearbeiten(${v.id})" title="Bearbeiten" style="padding:4px 10px;border-radius:4px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:12px">✏️</button>
+          <button onclick="vorlagenLoeschen(${v.id})" title="Löschen" style="padding:4px 10px;border-radius:4px;cursor:pointer;background:rgba(220,38,38,0.15);border:1px solid rgba(220,38,38,0.3);color:var(--hot);font-size:12px">🗑️</button>
         </div>
       </div>
     </div>`).join('');
@@ -5638,7 +5654,7 @@ function nlToggleEmpfaenger(id, checked) {
 
 function nlUpdateZaehler() {
   const z   = document.getElementById('nlZaehler');
-  const s2  = document.getElementById('nlSchritt2');
+  const btn = document.getElementById('nlSendBtn');
   const n   = _nlAusgewaehlt.size;
   const mitMail = [..._nlAusgewaehlt].filter(id => {
     const k = _nlKandidaten.find(r => r.id === id);
@@ -5647,8 +5663,18 @@ function nlUpdateZaehler() {
   if (z) z.textContent = n
     ? n + ' ausgewählt' + (mitMail < n ? ' · ' + (n - mitMail) + ' ohne E-Mail' : '')
     : '';
-  if (s2) s2.style.display = n > 0 ? 'block' : 'none';
-  if (n > 0) nlVorschauAktualisieren();
+  if (btn) {
+    if (n > 0) {
+      btn.disabled = false;
+      btn.style.background = '#0078d4';
+      btn.textContent = '📨 Serien-Mail an ' + n + ' Empfänger öffnen';
+    } else {
+      btn.disabled = true;
+      btn.style.background = 'var(--muted)';
+      btn.textContent = '📨 Serien-Mail öffnen (erst Kandidaten auswählen)';
+    }
+  }
+  nlVorschauAktualisieren();
 }
 
 function nlVorlageBefuellen() {
@@ -5779,7 +5805,7 @@ function nlZuruecksetzen() {
   _nlKandidaten  = [];
   _nlAusgewaehlt = new Set();
   const res = document.getElementById('nlErgebnisse'); if (res) res.innerHTML = '';
-  const s2  = document.getElementById('nlSchritt2');   if (s2) s2.style.display = 'none';
+  // Schritt 2 bleibt immer sichtbar
 }
 
 
@@ -5796,6 +5822,52 @@ function _nlVorlagenDropdownBefuellen() {
     o.textContent = v.name || ('Vorlage ' + v.id);
     sel.appendChild(o);
   });
+}
+
+
+// ================================================================
+//  EINSTELLUNGEN-ZOOM
+// ================================================================
+function einsZoomAnwenden() {
+  const z = parseInt(localStorage.getItem('yavis_eins_zoom') || '85');
+  const body = document.getElementById('einstellungenBody');
+  if (body) body.style.zoom = (z / 100).toFixed(2);
+  const slider = document.getElementById('einsZoomSlider');
+  const label  = document.getElementById('einsZoomLabel');
+  if (slider) slider.value = z;
+  if (label)  label.textContent = z + ' %';
+}
+function einsZoomLive(val) {
+  const z = parseInt(val);
+  localStorage.setItem('yavis_eins_zoom', z);
+  const body = document.getElementById('einstellungenBody');
+  if (body) body.style.zoom = (z / 100).toFixed(2);
+  const label = document.getElementById('einsZoomLabel');
+  if (label) label.textContent = z + ' %';
+}
+
+// ================================================================
+//  VORLAGEN-REIHENFOLGE
+// ================================================================
+function vorlagenHoch(idx) {
+  const vl = vorlagenLaden();
+  if (idx <= 0) return;
+  const tmp = vl[idx - 1];
+  vl[idx - 1] = vl[idx];
+  vl[idx]     = tmp;
+  _vorlagenData = vl;
+  vorlagenSpeichernLS();
+  vorlagenListeRendern();
+}
+function vorlagenRunter(idx) {
+  const vl = vorlagenLaden();
+  if (idx >= vl.length - 1) return;
+  const tmp = vl[idx + 1];
+  vl[idx + 1] = vl[idx];
+  vl[idx]     = tmp;
+  _vorlagenData = vl;
+  vorlagenSpeichernLS();
+  vorlagenListeRendern();
 }
 
 </script>
