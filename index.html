@@ -338,10 +338,32 @@
     </tr></thead><tbody id="wvBody"></tbody></table>
   </div>
 
-  <!-- Projekte (Platzhalter) -->
+  <!-- Projekte-Tab -->
   <div id="view-projekte" style="display:none">
-    <h2 style="color:var(--accent);font-size:18px;margin:0 0 8px">📁 Projekte</h2>
-    <div style="color:var(--muted);font-size:14px">Dieser Bereich ist angelegt und wird später mit Leben gefüllt (z. B. offene Stellen / Vakanzen).</div>
+    <!-- Listen-Ansicht -->
+    <div id="projekteListeDiv">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+        <h2 style="color:var(--accent);font-size:18px;margin:0">📁 Projekte</h2>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <input id="projSuche" placeholder="🔍 Suchen …"
+                 oninput="renderProjekteListe(_projekteCache||[])"
+                 style="padding:6px 10px;font-size:13px;background:var(--bg);color:var(--ink);
+                        border:1px solid var(--line);border-radius:5px;width:190px">
+          <select id="projStatusFilter" onchange="renderProjekteListe(_projekteCache||[])"
+                  style="padding:6px 10px;font-size:13px;background:var(--bg);color:var(--ink);
+                         border:1px solid var(--line);border-radius:5px">
+            <option value="In-progress">Aktive</option>
+            <option value="">Alle</option>
+            <option value="On-Hold">On Hold</option>
+            <option value="Inactive">Inaktiv</option>
+            <option value="Cancelled">Abgebrochen</option>
+          </select>
+        </div>
+      </div>
+      <div id="projekteKartenDiv"><div style="color:var(--muted);font-size:14px">Lade Projekte …</div></div>
+    </div>
+    <!-- Detail-Ansicht -->
+    <div id="projektDetailDiv" style="display:none"></div>
   </div>
 
   <!-- Newsletter (Platzhalter) -->
@@ -723,6 +745,7 @@ document.querySelectorAll('.tab[data-view]').forEach(t=>t.onclick=()=>{
     document.getElementById('view-'+v).style.display = v===t.dataset.view?'block':'none');
   if(t.dataset.view==='start') zeigeStart();
   if(t.dataset.view==='kunden') ladeKunden();
+  if(t.dataset.view==='projekte') zeigeProjekteListe();
   if(t.dataset.view==='kontakte') ladeKontakte();
   if(t.dataset.view==='wiedervorlagen') ladeWiedervorlagen();
 });
@@ -4127,6 +4150,436 @@ function msEinstellungenUI(){
     window._msPendingCallback=true;
   }
 })();
+
+
+
+// ================================================================
+//  PROJEKTE-TAB
+// ================================================================
+
+// Pipeline-Stufen (Reihenfolge für Kanban)
+const PIPELINE_STUFEN = [
+  { key: 'Kandidatensuche',     label: '🔍 Suche',     color: '#6366f1', aktiv: true  },
+  { key: 'Kandidatenansprache', label: '📧 Ansprache', color: '#f59e0b', aktiv: true  },
+  { key: 'Vorstellungsgespräch',label: '🗣️ Gespräch',  color: '#3b82f6', aktiv: true  },
+  { key: 'Offered',             label: '💼 Angebot',   color: '#10b981', aktiv: true  },
+  { key: 'Platziert',           label: '✅ Platziert', color: '#059669', aktiv: true  },
+  { key: 'Rejected',            label: '❌ Abgelehnt', color: '#ef4444', aktiv: false },
+  { key: 'Archived',            label: '📁 Archiviert',color: '#6b7280', aktiv: false },
+];
+
+let _projekteCache = null;
+
+async function ladeProjekte() {
+  if (_projekteCache) return _projekteCache;
+
+  document.getElementById('projekteKartenDiv').innerHTML =
+    '<div style="color:var(--muted);font-size:14px;padding:20px 0">Lade Projekte …</div>';
+
+  const { data: stellen, error } = await sb.from('stellen')
+    .select('*')
+    .order('erstellt_am', { ascending: false });
+
+  if (error) { zeigeMeldung('Fehler: ' + error.message, 'err'); return []; }
+
+  // Kunden-Namen laden
+  const kundeIds = [...new Set(stellen.filter(s => s.kunde_id).map(s => s.kunde_id))];
+  let kundeMap = {};
+  if (kundeIds.length) {
+    const { data: kunden } = await sb.from('kunden')
+      .select('id,firmenname')
+      .in('id', kundeIds);
+    if (kunden) kunden.forEach(k => { kundeMap[k.id] = k.firmenname; });
+  }
+
+  // Bewerbungs-Anzahl pro Stelle
+  const { data: bewStats } = await sb.from('bewerbungen')
+    .select('stelle_id,stufe')
+    .not('stelle_id', 'is', null);
+
+  const bewCount = {};
+  if (bewStats) {
+    bewStats.forEach(b => {
+      if (!bewCount[b.stelle_id]) bewCount[b.stelle_id] = { total: 0, active: 0 };
+      bewCount[b.stelle_id].total++;
+      if (b.stufe !== 'Rejected' && b.stufe !== 'Archived') {
+        bewCount[b.stelle_id].active++;
+      }
+    });
+  }
+
+  _projekteCache = stellen.map(s => ({
+    ...s,
+    kundeName: kundeMap[s.kunde_id] || '',
+    bewTotal:  bewCount[s.id]?.total  || 0,
+    bewActive: bewCount[s.id]?.active || 0,
+  }));
+
+  return _projekteCache;
+}
+
+async function zeigeProjekteListe() {
+  document.getElementById('projekteListeDiv').style.display  = 'block';
+  document.getElementById('projektDetailDiv').style.display  = 'none';
+  const stellen = await ladeProjekte();
+  renderProjekteListe(stellen);
+}
+
+function renderProjekteListe(stellen) {
+  const filter = (document.getElementById('projStatusFilter')?.value ?? 'In-progress');
+  const suche  = (document.getElementById('projSuche')?.value || '').toLowerCase();
+
+  let liste = stellen || [];
+  if (filter) liste = liste.filter(s => s.status === filter);
+  if (suche)  liste = liste.filter(s =>
+    (s.jobtitel   || '').toLowerCase().includes(suche) ||
+    (s.kundeName  || '').toLowerCase().includes(suche) ||
+    (s.stadt      || '').toLowerCase().includes(suche)
+  );
+
+  const SC = { 'In-progress': '#10b981', 'Inactive': '#6b7280', 'Cancelled': '#ef4444', 'On-Hold': '#f59e0b' };
+
+  const html = liste.length === 0
+    ? '<div style="color:var(--muted);font-size:14px;padding:20px 0">Keine Projekte gefunden.</div>'
+    : liste.map(s => `
+      <div class="note" onclick="detailProjekt('${esc(s.id)}')"
+           style="cursor:pointer;padding:14px 18px;margin-bottom:10px;border-radius:8px;
+                  border:1px solid var(--line);background:var(--panel);transition:border-color .15s"
+           onmouseenter="this.style.borderColor='var(--accent)'"
+           onmouseleave="this.style.borderColor='var(--line)'">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+              <span style="font-weight:700;font-size:15px">${esc(s.jobtitel||'(ohne Titel)')}</span>
+              <span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;
+                     background:${SC[s.status]||'#6b7280'}20;color:${SC[s.status]||'#6b7280'};
+                     border:1px solid ${SC[s.status]||'#6b7280'}40">${s.status||''}</span>
+              ${s.remote ? '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--panel2);color:var(--muted);border:1px solid var(--line)">Remote</span>' : ''}
+            </div>
+            <div style="font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:12px">
+              ${s.kundeName  ? `<span>🏢 ${esc(s.kundeName)}</span>`  : ''}
+              ${s.stadt      ? `<span>📍 ${esc(s.stadt)}</span>`      : ''}
+              ${s.position   ? `<span>👤 ${esc(s.position)}</span>`   : ''}
+              ${s.gehalt     ? `<span>💶 ${esc(s.gehalt)}</span>`     : ''}
+            </div>
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-size:24px;font-weight:700;color:var(--accent);line-height:1">${s.bewActive}</div>
+            <div style="font-size:11px;color:var(--muted)">aktiv</div>
+            ${s.bewTotal > s.bewActive
+              ? `<div style="font-size:11px;color:var(--muted)">${s.bewTotal} gesamt</div>` : ''}
+          </div>
+        </div>
+        <div style="display:flex;gap:16px;margin-top:8px;font-size:11px;color:var(--muted);
+                    border-top:1px solid var(--line);padding-top:8px;flex-wrap:wrap">
+          ${s.oeffnungsdatum ? `<span>📅 Eröffnet: ${fmtDat(s.oeffnungsdatum)}</span>` : ''}
+          ${s.zieldatum      ? `<span>🎯 Ziel: ${fmtDat(s.zieldatum)}</span>`          : ''}
+          ${s.branche        ? `<span>🏭 ${esc(s.branche)}</span>`                     : ''}
+          ${s.stellentyp     ? `<span>📋 ${esc(s.stellentyp)}</span>`                  : ''}
+        </div>
+      </div>`).join('');
+
+  document.getElementById('projekteKartenDiv').innerHTML = html;
+}
+
+// ---- Projekt-Detail (Kanban-Pipeline) ----
+async function detailProjekt(stelleId) {
+  document.getElementById('projekteListeDiv').style.display = 'none';
+  const dd = document.getElementById('projektDetailDiv');
+  dd.style.display = 'block';
+  dd.innerHTML = '<div style="color:var(--muted);font-size:14px;padding:20px">Lade Projekt …</div>';
+
+  const [{ data: stelle }, { data: bews }] = await Promise.all([
+    sb.from('stellen').select('*').eq('id', stelleId).single(),
+    sb.from('bewerbungen')
+      .select('*,kandidaten(id,voller_name,position_original)')
+      .eq('stelle_id', stelleId)
+      .order('erstellt_am', { ascending: false }),
+  ]);
+
+  if (!stelle) { zeigeMeldung('Stelle nicht gefunden', 'err'); return; }
+
+  let kundeName = '';
+  if (stelle.kunde_id) {
+    const { data: k } = await sb.from('kunden')
+      .select('firmenname').eq('id', stelle.kunde_id).single();
+    if (k) kundeName = k.firmenname;
+  }
+
+  dd.innerHTML = _projektDetailHtml(stelle, kundeName, bews || []);
+  // Akkordeons aktivieren
+  dd.querySelectorAll('details.acc').forEach(d => {
+    d.querySelector('summary')?.addEventListener('click', () => {
+      setTimeout(() => {
+        const arr = d.querySelector('.acc-arr');
+        if (arr) arr.textContent = d.open ? '▼' : '▶';
+      }, 10);
+    });
+  });
+}
+
+function _projektDetailHtml(stelle, kundeName, bews) {
+  // Gruppen nach Stufe
+  const stufeMap = {};
+  PIPELINE_STUFEN.forEach(ps => { stufeMap[ps.key] = []; });
+  stufeMap['__sonstige'] = [];
+  bews.forEach(b => {
+    const s = b.stufe || 'Kandidatensuche';
+    if (stufeMap[s] !== undefined) stufeMap[s].push(b);
+    else stufeMap['__sonstige'].push(b);
+  });
+
+  const SC = { 'In-progress': '#10b981', 'Inactive': '#6b7280', 'Cancelled': '#ef4444', 'On-Hold': '#f59e0b' };
+
+  const renderKarte = (b) => {
+    const k    = b.kandidaten;
+    const name = k?.voller_name || b.jobtitel || '(Kandidat)';
+    const pos  = k?.position_original || '';
+    const sterne = b.bewertung ? '⭐'.repeat(Math.min(parseInt(b.bewertung)||0, 5)) : '';
+    const kid  = b.kandidat_id || '';
+    const optsHtml = PIPELINE_STUFEN.map(ps =>
+      `<option value="${ps.key}"${b.stufe===ps.key?' selected':''}>${ps.label}</option>`
+    ).join('') + (!PIPELINE_STUFEN.find(ps=>ps.key===b.stufe)&&b.stufe
+      ? `<option value="${esc(b.stufe)}" selected>${esc(b.stufe)}</option>` : '');
+    return `<div class="note" style="padding:10px 12px;margin-bottom:6px;border-radius:6px">
+      <div style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+                  cursor:pointer;color:var(--accent2)"
+           onclick="detailKandidat('${esc(kid)}')" title="Profil öffnen">${esc(name)}</div>
+      ${pos    ? `<div style="font-size:11px;color:var(--muted)">${esc(pos)}</div>` : ''}
+      ${sterne ? `<div style="font-size:11px;margin-top:2px">${sterne}</div>` : ''}
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;gap:4px">
+        <select onchange="bewStufeAendern('${esc(b.id)}','${esc(stelle.id)}',this.value,this)"
+                onclick="event.stopPropagation()"
+                style="font-size:11px;padding:2px 4px;max-width:130px;background:var(--bg);color:var(--ink);
+                       border:1px solid var(--line);border-radius:4px;cursor:pointer">${optsHtml}</select>
+        <span style="font-size:10px;color:var(--muted);white-space:nowrap">${b.erstellt_am?fmtDat(b.erstellt_am):''}</span>
+      </div>
+    </div>`;
+  };
+
+  const aktiveStufen  = PIPELINE_STUFEN.filter(ps => ps.aktiv);
+  const inaktivStufen = PIPELINE_STUFEN.filter(ps => !ps.aktiv);
+
+  const kanbanHtml = aktiveStufen.map(ps => {
+    const karten = stufeMap[ps.key] || [];
+    return `<div style="flex:0 0 185px;background:var(--panel2);border-radius:8px;
+                        padding:10px;border:1px solid var(--line)">
+      <div style="font-size:12px;font-weight:700;margin-bottom:8px;
+                  display:flex;justify-content:space-between;align-items:center">
+        <span style="color:${ps.color}">${ps.label}</span>
+        <span style="background:${ps.color}25;color:${ps.color};padding:1px 7px;
+                     border-radius:10px;font-size:11px">${karten.length}</span>
+      </div>
+      ${karten.length
+        ? karten.map(renderKarte).join('')
+        : '<div style="color:var(--muted);font-size:12px;text-align:center;padding:12px 0">–</div>'}
+    </div>`;
+  }).join('');
+
+  const abgListe = inaktivStufen.flatMap(ps => (stufeMap[ps.key]||[]).map(renderKarte));
+  const abgCount = abgListe.length;
+
+  const sonstigeAnz = stufeMap['__sonstige'].length;
+
+  return `
+    <!-- Header -->
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+      <button onclick="zeigeProjekteListe()"
+              style="padding:5px 14px;border-radius:5px;cursor:pointer;
+                     background:var(--panel2);border:1px solid var(--line);font-size:13px">← Zurück</button>
+      <h2 style="margin:0;font-size:18px;color:var(--accent)">${esc(stelle.jobtitel||'Projekt')}</h2>
+      <span style="font-size:12px;font-weight:600;padding:3px 10px;border-radius:10px;
+             background:${SC[stelle.status]||'#6b7280'}20;color:${SC[stelle.status]||'#6b7280'};
+             border:1px solid ${SC[stelle.status]||'#6b7280'}40">${stelle.status||''}</span>
+    </div>
+
+    <!-- Stammdaten -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:10px;
+                margin-bottom:14px;padding:14px 18px;background:var(--panel);
+                border-radius:8px;border:1px solid var(--line)">
+      ${kundeName            ? `<div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">KUNDE</div><div style="font-weight:600;font-size:13px">${esc(kundeName)}</div></div>` : ''}
+      ${stelle.position      ? `<div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">POSITION</div><div style="font-weight:600;font-size:13px">${esc(stelle.position)}</div></div>` : ''}
+      ${stelle.stadt         ? `<div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">STANDORT</div><div style="font-weight:600;font-size:13px">${esc(stelle.stadt)}${stelle.remote?' (Remote)':''}</div></div>` : ''}
+      ${stelle.gehalt        ? `<div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">GEHALT</div><div style="font-weight:600;font-size:13px">${esc(stelle.gehalt)}</div></div>` : ''}
+      ${stelle.branche       ? `<div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">BRANCHE</div><div style="font-weight:600;font-size:13px">${esc(stelle.branche)}</div></div>` : ''}
+      ${stelle.berufserfahrung?`<div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">ERFAHRUNG</div><div style="font-weight:600;font-size:13px">${esc(stelle.berufserfahrung)}</div></div>` : ''}
+      ${stelle.zieldatum     ? `<div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">ZIELDATUM</div><div style="font-weight:600;font-size:13px">${fmtDat(stelle.zieldatum)}</div></div>` : ''}
+      ${stelle.anzahl_positionen?`<div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">POSITIONEN</div><div style="font-weight:600;font-size:13px">${stelle.anzahl_positionen}</div></div>` : ''}
+      ${stelle.stellentyp    ? `<div><div style="font-size:10px;color:var(--muted);margin-bottom:2px">TYP</div><div style="font-weight:600;font-size:13px">${esc(stelle.stellentyp)}</div></div>` : ''}
+    </div>
+
+    ${stelle.beschreibung ? `<details class="acc" style="margin-bottom:10px">
+      <summary><span>Stellenbeschreibung</span><span class="acc-arr">▶</span></summary>
+      <div class="acc-body"><div style="white-space:pre-wrap;font-size:13px;line-height:1.5">${esc(stelle.beschreibung)}</div></div>
+    </details>` : ''}
+
+    ${stelle.erforderliche_skills ? `<details class="acc" style="margin-bottom:10px">
+      <summary><span>Anforderungen / Skills</span><span class="acc-arr">▶</span></summary>
+      <div class="acc-body"><div style="white-space:pre-wrap;font-size:13px;line-height:1.5">${esc(stelle.erforderliche_skills)}</div></div>
+    </details>` : ''}
+
+    <!-- Pipeline -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 10px">
+      <h3 style="margin:0;font-size:15px;font-weight:700">
+        📊 Pipeline
+        <span style="font-size:12px;color:var(--muted);font-weight:400">${bews.length} Kandidaten gesamt</span>
+      </h3>
+      <button onclick="neueBewerbung('${esc(stelle.id)}')"
+              style="padding:6px 14px;border-radius:5px;cursor:pointer;
+                     background:var(--accent2);color:#fff;border:none;font-size:13px;font-weight:600">
+        + Kandidat hinzufügen
+      </button>
+    </div>
+
+    <div style="overflow-x:auto;padding-bottom:8px">
+      <div style="display:flex;gap:10px;min-width:max-content">${kanbanHtml}</div>
+    </div>
+
+    ${abgCount > 0 ? `<details class="acc" style="margin-top:12px">
+      <summary><span>Abgelehnte / Archivierte <span class="acc-cnt">(${abgCount})</span></span><span class="acc-arr">▶</span></summary>
+      <div class="acc-body">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:8px">
+          ${abgListe.join('')}
+        </div>
+      </div>
+    </details>` : ''}
+
+    ${sonstigeAnz > 0 ? `<details class="acc" style="margin-top:8px">
+      <summary><span>Sonstige Status <span class="acc-cnt">(${sonstigeAnz})</span></span><span class="acc-arr">▶</span></summary>
+      <div class="acc-body">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:8px">
+          ${stufeMap['__sonstige'].map(renderKarte).join('')}
+        </div>
+      </div>
+    </details>` : ''}
+  `;
+  // NOTE: bews is in scope via closure from _projektDetailHtml(stelle, kundeName, bews)
+}
+
+async function bewStufeAendern(bewId, stelleId, neueStufe, selectEl) {
+  const { error } = await sb.from('bewerbungen')
+    .update({ stufe: neueStufe, geaendert_am: new Date().toISOString() })
+    .eq('id', bewId);
+  if (error) { zeigeMeldung('Fehler: ' + error.message, 'err'); return; }
+  _projekteCache = null;
+  zeigeMeldung('Stufe geändert ✓', 'ok');
+  if (selectEl) {
+    selectEl.style.borderColor = 'var(--ok)';
+    setTimeout(() => { try { selectEl.style.borderColor = 'var(--line)'; } catch(e){} }, 1500);
+  }
+  // Pipeline nach kurzer Pause neu laden
+  setTimeout(() => detailProjekt(stelleId), 700);
+}
+
+// ---- Neuen Kandidaten zur Stelle hinzufügen ----
+async function neueBewerbung(stelleId) {
+  const dlg = document.createElement('dialog');
+  dlg.style.cssText = 'background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:0;max-width:500px;width:95vw';
+  dlg.innerHTML = `
+    <div style="padding:22px 26px">
+      <div style="display:flex;justify-content:space-between;align-items:center;
+                  margin-bottom:16px;border-bottom:1px solid var(--line);padding-bottom:12px">
+        <h3 style="margin:0;font-size:16px;font-weight:700">+ Kandidat zur Pipeline</h3>
+        <button onclick="this.closest('dialog').close();this.closest('dialog').remove()"
+                style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--muted)">×</button>
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">KANDIDAT SUCHEN</label>
+        <input id="bewKandSuche" placeholder="Name eingeben …"
+               oninput="sucheKandFuerBew(this.value)"
+               style="width:100%;padding:8px;font-size:13px;background:var(--bg);color:var(--ink);
+                      border:1px solid var(--line);border-radius:5px 5px 0 0;box-sizing:border-box">
+        <div id="bewKandRes"
+             style="max-height:200px;overflow-y:auto;border:1px solid var(--line);border-top:none;
+                    border-radius:0 0 5px 5px;background:var(--bg);display:none"></div>
+        <input type="hidden" id="bewKandId">
+        <div id="bewKandGew" style="font-size:12px;color:var(--ok);margin-top:5px"></div>
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px">EINSTIEGSSTUFE</label>
+        <select id="bewStufe"
+                style="width:100%;padding:8px;font-size:13px;background:var(--bg);color:var(--ink);
+                       border:1px solid var(--line);border-radius:5px">
+          ${PIPELINE_STUFEN.filter(ps=>ps.aktiv)
+            .map(ps=>`<option value="${ps.key}">${ps.label}</option>`).join('')}
+        </select>
+      </div>
+      <div style="border-top:1px solid var(--line);padding-top:14px;display:flex;gap:10px;justify-content:flex-end">
+        <button onclick="this.closest('dialog').close();this.closest('dialog').remove()"
+                style="padding:7px 18px;border-radius:5px;cursor:pointer;
+                       background:var(--panel2);border:1px solid var(--line);color:var(--ink)">Abbrechen</button>
+        <button onclick="_neueBewSpeichern('${esc(stelleId)}',this.closest('dialog'))"
+                style="padding:7px 22px;border-radius:5px;cursor:pointer;
+                       background:var(--accent2);color:#fff;border:none;font-weight:700">Hinzufügen</button>
+      </div>
+    </div>`;
+  document.body.appendChild(dlg);
+  dlg.showModal();
+  setTimeout(() => dlg.querySelector('#bewKandSuche')?.focus(), 80);
+}
+
+let _bewSuchTmr = null;
+function sucheKandFuerBew(q) {
+  clearTimeout(_bewSuchTmr);
+  const res = document.getElementById('bewKandRes');
+  if (!q || q.length < 2) { if (res) res.style.display = 'none'; return; }
+  _bewSuchTmr = setTimeout(async () => {
+    const { data } = await sb.from('kandidaten')
+      .select('id,voller_name,position_original')
+      .ilike('voller_name', '%' + q + '%')
+      .limit(10);
+    if (!res) return;
+    if (!data?.length) { res.style.display = 'none'; return; }
+    res.innerHTML = data.map(k => `
+      <div onclick="_bewKandWaehlen('${esc(k.id)}','${esc(k.voller_name)}','${esc(k.position_original||'')}')"
+           style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--line);font-size:13px"
+           onmouseenter="this.style.background='var(--panel2)'"
+           onmouseleave="this.style.background=''">
+        <div style="font-weight:600">${esc(k.voller_name)}</div>
+        ${k.position_original
+          ? `<div style="font-size:11px;color:var(--muted)">${esc(k.position_original)}</div>` : ''}
+      </div>`).join('');
+    res.style.display = 'block';
+  }, 300);
+}
+
+function _bewKandWaehlen(id, name, pos) {
+  document.getElementById('bewKandId').value = id;
+  document.getElementById('bewKandGew').innerHTML =
+    `✅ <b>${esc(name)}</b>${pos ? ' — ' + esc(pos) : ''}`;
+  const inp = document.getElementById('bewKandSuche');
+  if (inp) inp.value = name;
+  const res = document.getElementById('bewKandRes');
+  if (res) res.style.display = 'none';
+}
+
+async function _neueBewSpeichern(stelleId, dlg) {
+  const kandId = dlg.querySelector('#bewKandId').value;
+  const stufe  = dlg.querySelector('#bewStufe').value;
+  if (!kandId) { zeigeMeldung('Bitte einen Kandidaten auswählen', 'warn'); return; }
+
+  const cached  = (_projekteCache || []).find(s => s.id === stelleId);
+  const jobtitel = cached?.jobtitel  || '';
+  const kunde_id = cached?.kunde_id  || null;
+
+  const neueId = 'bew_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+  const { error } = await sb.from('bewerbungen').insert({
+    id:          neueId,
+    kandidat_id: kandId,
+    stelle_id:   stelleId,
+    kunde_id,
+    jobtitel,
+    stufe,
+    status:      'New',
+    erstellt_am: new Date().toISOString(),
+  });
+
+  if (error) { zeigeMeldung('Fehler: ' + error.message, 'err'); return; }
+  dlg.close(); dlg.remove();
+  _projekteCache = null;
+  zeigeMeldung('Kandidat hinzugefügt ✓', 'ok');
+  detailProjekt(stelleId);
+}
 
 </script>
 </body>
