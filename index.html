@@ -1931,7 +1931,7 @@ async function wvDatumBestaetigen(dlg) {
   }
 }
 
-function ladeWiedervorlagen(){
+async function ladeWiedervorlagen(){
   const body=document.getElementById('wvBody'); body.innerHTML='';
   const cnt=document.getElementById('wvCount'); cnt.textContent='Lade …';
   const modus=document.getElementById('wvFilter').value;
@@ -5230,7 +5230,7 @@ async function neueBewerbung(stelleId) {
 }
 
 let _bewSuchTmr = null;
-function sucheKandFuerBew(q) {
+async function sucheKandFuerBew(q) {
   clearTimeout(_bewSuchTmr);
   const res = document.getElementById('bewKandRes');
   if (!q||q.length<2) { if(res) res.style.display='none'; return; }
@@ -5465,7 +5465,7 @@ async function _stelleWirklichLoeschen(stelleId, dlg) {
 
 // ---- Kunden-Suche für Stelle-Dialog ----
 let _kundeSuchTmr = null;
-function sucheKundeFuerStelle(q) {
+async function sucheKundeFuerStelle(q) {
   clearTimeout(_kundeSuchTmr);
   const res=document.getElementById('sKundeRes');
   if (!q||q.length<2) { if(res) res.style.display='none'; return; }
