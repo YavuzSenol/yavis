@@ -737,8 +737,8 @@
           <button onclick="document.getElementById('einstellungenDlg').close();oeffneVorlagen()" style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:13px">Verwalten</button>
         </div>
         <div style="padding:11px 16px">
-          <div style="margin-bottom:6px"><b>E-Mail-Signatur</b> <span style="font-size:12px;color:var(--muted)">— wird in Serien-E-Mail angezeigt</span></div>
-          <textarea id="einsSignatur" rows="4" placeholder="Mit freundlichen Grüßen&#10;Yavuz Senol&#10;Senol Consulting · Köln" style="width:100%;padding:8px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;resize:vertical;font-family:inherit;box-sizing:border-box"></textarea>
+          <div style="margin-bottom:6px"><b>E-Mail-Signatur</b> <span style="font-size:12px;color:var(--muted)">— HTML erlaubt · wird an alle Outlook-Entwürfe angehängt</span></div>
+          <textarea id="einsSignatur" rows="6" placeholder="HTML-Signatur hier einfügen (z.B. aus Outlook-Signaturdatei kopiert)&#10;&#10;Oder einfach Klartext:&#10;Mit freundlichen Grüßen&#10;Yavuz Senol · Senol Consulting · Köln" style="width:100%;padding:8px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;resize:vertical;font-family:inherit;box-sizing:border-box"></textarea>
         </div>
       </div>
     </div>
@@ -3431,13 +3431,27 @@ function serienMailDialog(rows, vorlage){
   dlg.showModal();
 }
 
-function outlookOeffnen(btn){
+async function outlookOeffnen(btn){
   const dlg=btn.closest('dialog');
   const bcc=document.getElementById('smBcc').value;
   const betreff=document.getElementById('smBetreff').value;
   const text=document.getElementById('smText').value;
   const meinBccEl=document.getElementById('smMeinBcc');
   const meinBcc=meinBccEl?meinBccEl.value:'';
+
+  // Versuche: Outlook-Web-Entwurf via Graph API
+  if (msIstVerbunden()) {
+    const bccList = bcc.split(/[;,]/).map(e=>e.trim()).filter(Boolean);
+    const ok = await erstelleOutlookEntwurf({ to: meinBcc||'', bcc: bccList, betreff, bodyText: text });
+    if (ok) {
+      btn.textContent='✅ Entwurf in Outlook geöffnet';
+      btn.style.background='var(--ok)';
+      btn.disabled=true;
+      const protokollBox=dlg.querySelector('#smProtokollBox');
+      if(protokollBox) protokollBox.style.display='block';
+      return;
+    }
+  }
 
   const to=meinBcc||'';
   let mailto=`mailto:${encodeURIComponent(to)}?`;
@@ -5030,6 +5044,46 @@ async function aufgabeLoeschen(taskId, betreff) {
   ladeWiedervorlagen();
 }
 
+// ---- Outlook-Web-Entwurf via Graph API ----
+async function erstelleOutlookEntwurf({to='', bcc=[], betreff='', bodyText=''}={}) {
+  const token = await msGetToken();
+  if (!token) return false;
+
+  const signatur = localStorage.getItem('yavis_signatur') || '';
+  // Klartext → HTML (Sonderzeichen escapen, Zeilenumbrüche → <br>)
+  const escH = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const bodyHtml = escH(bodyText).replace(/\n/g,'<br>')
+    + (signatur ? '<br><br>' + signatur : '');
+
+  const entwurf = {
+    subject: betreff,
+    body: { contentType: 'html', content: bodyHtml }
+  };
+  if (to) entwurf.toRecipients = [{ emailAddress: { address: to } }];
+  const bccArr = Array.isArray(bcc) ? bcc : String(bcc).split(/[;,]/).map(e=>e.trim()).filter(Boolean);
+  if (bccArr.length) entwurf.bccRecipients = bccArr.map(e => ({ emailAddress: { address: e } }));
+
+  try {
+    const resp = await fetch('https://graph.microsoft.com/v1.0/me/messages', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify(entwurf)
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(()=>({}));
+      console.error('Outlook Entwurf Fehler:', resp.status, err);
+      zeigeMeldung('Fehler beim Erstellen des Entwurfs (' + resp.status + ') — bitte Outlook-Verbindung prüfen', 'err');
+      return false;
+    }
+    const msg = await resp.json();
+    window.open(msg.webLink, '_blank');
+    return true;
+  } catch(e) {
+    console.error('Outlook Entwurf Netzwerkfehler:', e);
+    return false;
+  }
+}
+
 // ---- E-Mail senden Dialog ----
 function mailSendenDialog(email, kandidatId, name, anrede='', nachname='') {
   const vorlagen = vorlagenLaden();
@@ -5118,6 +5172,33 @@ function msVorlageBerechnen(sel, name, anrede, nachname) {
 async function msMailOeffnen(email, kandidatId, name, dlg) {
   const betreff = dlg.querySelector('#msBetreff')?.value?.trim() || '';
   const text    = dlg.querySelector('#msText')?.value?.trim() || '';
+  // Versuche: Outlook-Web-Entwurf via Graph API
+  if (msIstVerbunden()) {
+    const ok = await erstelleOutlookEntwurf({ to: email, betreff, bodyText: text });
+    if (ok) {
+      dlg.close(); dlg.remove();
+      const { data: user } = await sb.auth.getUser();
+      const { error } = await sb.from('emails').insert({
+        id: 'yavis_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+        betreff: '📤 ' + (betreff || 'E-Mail via Outlook'),
+        entity_id: kandidatId,
+        besitzer_id: user?.user?.id || null,
+        erstellt_am: new Date().toISOString(),
+      });
+      if (!error) {
+        const { data: mails } = await sb.from('emails').select('*')
+          .eq('entity_id', kandidatId).order('erstellt_am', { ascending: false }).limit(100);
+        const hist = document.getElementById('mailHistorie');
+        if (hist) hist.innerHTML = mailHistorieHtml(mails || []);
+        const acc = document.getElementById('mailAcc');
+        if (acc) { const cnt = acc.querySelector('.acc-cnt'); if (cnt) cnt.textContent = '(' + (mails?.length || 0) + ')'; }
+      }
+      zeigeMeldung('Entwurf in Outlook Web geöffnet — protokolliert ✓', 'ok');
+      return;
+    }
+  }
+
+  // Fallback: mailto:
   const signatur = localStorage.getItem('yavis_signatur') || '';
   const vollerText = text + (signatur ? '\n\n' + signatur : '');
   window.location.href = 'mailto:' + encodeURIComponent(email)
@@ -5784,10 +5865,38 @@ async function nlSerienMailOeffnen() {
   if (!empfaenger.length) { zeigeMeldung('Keine Empfänger mit E-Mail-Adresse', 'err'); return; }
   if (!betreff) { zeigeMeldung('Bitte einen Betreff eingeben', 'err'); return; }
 
-  const alleEmails = empfaenger.map(r => r.email).join(',');
-  const bccStr = [alleEmails, bcc].filter(Boolean).join(',');
+  const alleEmails = empfaenger.map(r => r.email);
+  const bccArr = bcc ? [...alleEmails, bcc] : alleEmails;
+  const bccStr = bccArr.join(',');
+  const btn = document.getElementById('nlSendBtn');
 
-  // mailto: URL oeffnen
+  // Versuche: Outlook-Web-Entwurf via Graph API
+  if (msIstVerbunden()) {
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Entwurf erstellen …'; }
+    const ok = await erstelleOutlookEntwurf({ bcc: bccArr, betreff, bodyText: text });
+    if (ok) {
+      const { data: user } = await sb.auth.getUser();
+      const userId = user?.user?.id || null;
+      const ts = Date.now();
+      let proto = 0;
+      for (let i = 0; i < empfaenger.length; i++) {
+        const { error } = await sb.from('emails').insert({
+          id:          'nl_' + ts + '_' + i,
+          betreff:     '📤 ' + betreff,
+          entity_id:   empfaenger[i].id,
+          besitzer_id: userId,
+          erstellt_am: new Date().toISOString(),
+        });
+        if (!error) proto++;
+      }
+      if (btn) { btn.disabled = false; btn.textContent = '📨 In Outlook öffnen'; }
+      zeigeMeldung('Entwurf in Outlook Web geöffnet · ' + proto + ' von ' + empfaenger.length + ' protokolliert ✓', 'ok');
+      return;
+    }
+    if (btn) { btn.disabled = false; btn.textContent = '📨 In Outlook öffnen'; }
+  }
+
+  // Fallback: mailto:
   const url = 'mailto:?' +
     'bcc=' + encodeURIComponent(bccStr) +
     '&subject=' + encodeURIComponent(betreff) +
@@ -5795,8 +5904,6 @@ async function nlSerienMailOeffnen() {
 
   window.location.href = url;
 
-  // Protokollierung fuer alle Empfaenger
-  const btn = document.getElementById('nlSendBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'Protokolliere …'; }
 
   setTimeout(async () => {
@@ -5814,7 +5921,7 @@ async function nlSerienMailOeffnen() {
       });
       if (!error) ok++;
     }
-    if (btn) { btn.disabled = false; btn.textContent = '📨 Serien-Mail in Outlook öffnen'; }
+    if (btn) { btn.disabled = false; btn.textContent = '📨 In Outlook öffnen'; }
     zeigeMeldung('Outlook geöffnet · ' + ok + ' von ' + empfaenger.length + ' E-Mails protokolliert ✓', 'ok');
   }, 900);
 }
