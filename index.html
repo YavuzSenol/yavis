@@ -1743,6 +1743,7 @@ async function abwerbeschutzToggle(id, aktuell){
 }
 
 async function detailKandidat(id){
+  history.pushState({yavis:'detail'}, '', '');
   await ladeAuftraggeberNamen();
   const [k, ausb, erf, notiz, bew, aufg, dok, mailRes] = await Promise.all([
     sb.from('kandidaten').select('*').eq('id',id).single(),
@@ -1817,7 +1818,7 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails)
         }
         <button class="editbtn" style="margin-left:0" onclick="bearbeiteKandidat('${d.id}')">✎ Bearbeiten</button>
         <button class="editbtn" style="margin-left:0;color:var(--hot);border-color:rgba(192,64,42,.35)" onclick="kandidatLoeschen('${d.id}','${esc(d.voller_name)}')">🗑️ Löschen</button>
-        <button class="editbtn" style="margin-left:0;background:var(--accent2);color:#fff" onclick="mailSendenDialog('${esc(d.email||d.email_beruflich||'')}','${d.id}','${esc(d.voller_name)}')">📧 E-Mail senden</button>
+        <button class="editbtn" style="margin-left:0;background:var(--accent2);color:#fff" onclick="mailSendenDialog('${esc(d.email||d.email_beruflich||'')}','${d.id}','${esc(d.voller_name)}','${esc(d.anrede||'')}','${esc(d.nachname||'')}')">📧 E-Mail senden</button>
       </div>
     </div>
 
@@ -1969,6 +1970,14 @@ function zurueckZurListe(){
   const aktiv=document.querySelector('.tab.active')?.dataset.view||'kandidaten';
   document.getElementById('view-'+aktiv).style.display='block';
 }
+
+// Browser-Zurück-Button: nicht aus der App raus, sondern zurück zur Liste
+window.addEventListener('popstate', () => {
+  const detail = document.getElementById('detailPage');
+  if (detail && detail.style.display !== 'none') {
+    zurueckZurListe();
+  }
+});
 
 function fmtDat(s){ if(!s) return ''; try{const d=new Date(s);
   return d.toLocaleDateString('de-DE')+' '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});}catch{return s;} }
@@ -2237,6 +2246,7 @@ async function speichereKandidat(id){
 
 // ============ KUNDEN ============
 async function detailKunde(id){
+  history.pushState({yavis:'detail'}, '', '');
   const [k, kont, stel, notiz, aufg] = await Promise.all([
     sb.from('kunden').select('*').eq('id',id).single(),
     sb.from('kontakte').select('*').eq('kunde_id',id),
@@ -2354,6 +2364,7 @@ async function speichereKunde(id){
 
 // ============ KONTAKTE ============
 async function detailKontakt(id){
+  history.pushState({yavis:'detail'}, '', '');
   const {data:d}=await sb.from('kontakte').select('*').eq('id',id).single();
   if(!d) return;
   let kunde=null;
@@ -5020,7 +5031,7 @@ async function aufgabeLoeschen(taskId, betreff) {
 }
 
 // ---- E-Mail senden Dialog ----
-function mailSendenDialog(email, kandidatId, name) {
+function mailSendenDialog(email, kandidatId, name, anrede='', nachname='') {
   const vorlagen = vorlagenLaden();
   const dlg = document.createElement('dialog');
   dlg.style.cssText = 'background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:0;max-width:560px;width:95vw;max-height:90vh;display:flex;flex-direction:column';
@@ -5037,7 +5048,7 @@ function mailSendenDialog(email, kandidatId, name) {
       ${vorlagen.length ? `
       <div style="margin-bottom:12px">
         <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">VORLAGE (optional)</label>
-        <select id="msVorlageWahl" onchange="msVorlageBerechnen(this,'${esc(name)}')"
+        <select id="msVorlageWahl" onchange="msVorlageBerechnen(this,'${esc(name)}','${esc(anrede)}','${esc(nachname)}')"
                 style="width:100%;padding:7px 9px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
           <option value="">– Vorlage wählen –</option>
           ${vorlagen.map(v => `<option value="${v.id}">${esc(v.name)}</option>`).join('')}
@@ -5074,21 +5085,34 @@ function mailSendenDialog(email, kandidatId, name) {
   setTimeout(() => dlg.querySelector('#msBetreff')?.focus(), 80);
 }
 
-function msVorlageBerechnen(sel, name) {
+function msVorlageBerechnen(sel, name, anrede, nachname) {
   const vorlagen = vorlagenLaden();
   const v = vorlagen.find(v => String(v.id) === String(sel.value));
   if (!v) return;
   const teile = (name || '').split(' ');
+  // Anrede aufbauen: aus DB-Feldern (Herr/Frau + Nachname) oder aus vollem Namen ableiten
+  const anredeNachname = (anrede && nachname)
+    ? (anrede + ' ' + nachname)
+    : (teile.length > 1 ? teile.slice(1).join(' ') : (teile[0] || ''));
+  const anredeZeile = 'Guten Tag ' + anredeNachname + ',';
+
   const ersetzen = s => (s || '')
+    .replace(/\{\{Anrede\}\}/g, anredeZeile)
     .replace(/\{\{Vorname\}\}/g, teile[0] || '')
-    .replace(/\{\{Nachname\}\}/g, teile.slice(1).join(' ') || '')
+    .replace(/\{\{Nachname\}\}/g, (anrede && nachname) ? nachname : (teile.slice(1).join(' ') || ''))
     .replace(/\{\{voller_name\}\}/g, name || '')
     .replace(/\{\{Name\}\}/g, teile[0] || '')
     .replace(/\{\{[^}]+\}\}/g, '');
+
   const be = document.getElementById('msBetreff');
   const tx = document.getElementById('msText');
   if (be && v.betreff) be.value = ersetzen(v.betreff);
-  if (tx && v.text)    tx.value = ersetzen(v.text);
+  if (tx && v.text) {
+    const text = ersetzen(v.text);
+    // Anrede davor setzen, wenn Vorlage nicht bereits damit beginnt
+    const hatAnrede = /^(guten tag|sehr geehrte|hallo|liebe[rn]?|dear)/i.test(text.trim());
+    tx.value = hatAnrede ? text : (anredeZeile + '\n\n' + text);
+  }
 }
 
 async function msMailOeffnen(email, kandidatId, name, dlg) {
