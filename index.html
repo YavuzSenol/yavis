@@ -582,7 +582,7 @@
 
 <dialog id="taskDlg" style="width:min(560px,92vw);border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:6px;padding:0">
   <div class="dlg-head" style="display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line)">
-    <strong>📋 Aufgabe / Wiedervorlage</strong>
+    <strong>📅 Wiedervorlage</strong>
     <button class="x" style="margin-left:auto;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer" onclick="document.getElementById('taskDlg').close()">×</button></div>
   <div style="padding:18px">
     <div id="tdWho" style="color:var(--accent);font-size:14px;font-weight:600;margin-bottom:12px"></div>
@@ -1565,13 +1565,17 @@ function aufgabenCardHtml(tasks, typ, id){
         ${t.beschreibung?`<div style="font-size:13px;margin-top:3px">${esc(t.beschreibung)}</div>`:''}
         <div class="meta">${t.faelligkeitsdatum?`<span style="${ueber?'color:var(--hot);font-weight:600':''}">📅 ${fmtDatum(t.faelligkeitsdatum)}${ueber?' · überfällig':''}</span>`:'ohne Datum'}${(!istOffen(t.status)&&t.status)?' · '+esc(t.status):''}</div>
       </div>
-      ${istOffen(t.status)?`<button class="tab" style="white-space:nowrap" onclick="aufgabeErledigt('${t.id}','${typ}','${id}')">✓ Erledigt</button>`:''}
+      <div style="display:flex;gap:4px;flex-shrink:0">
+        ${istOffen(t.status)?`<button class="tab" style="padding:4px 8px" onclick="aufgabeErledigt('${t.id}','${typ}','${id}')">✓</button>`:''}
+        <button class="tab" style="padding:4px 8px" title="Bearbeiten" onclick="aufgabeBearbeitenPopup('${t.id}')">✏️</button>
+        <button class="tab" style="padding:4px 8px;color:var(--hot)" title="Löschen" onclick="aufgabeLoeschen('${t.id}','${esc(t.betreff||"")}')" >🗑️</button>
+      </div>
     </div>`;
   };
   return `<details class="acc" open>
-    <summary><span>Aufgaben &amp; Wiedervorlagen<span class="acc-cnt">${offen.length?' ('+offen.length+' offen)':''}</span></span><span class="acc-arr">▶</span></summary>
+    <summary><span>Wiedervorlagen<span class="acc-cnt">${offen.length?' ('+offen.length+' offen)':''}</span></span><span class="acc-arr">▶</span></summary>
     <div class="acc-body">
-      <button class="neuBtn" style="margin-bottom:12px" onclick="aufgabeNeuPopup()">+ Aufgabe / Wiedervorlage</button>
+      <button class="neuBtn" style="margin-bottom:12px" onclick="aufgabeNeuPopup()">+ Wiedervorlage</button>
       ${offen.length?offen.map(row).join(''):'<div style="color:var(--muted);font-size:13px">Keine offenen Aufgaben.</div>'}
       ${erledigt.length?`<details style="margin-top:10px"><summary style="cursor:pointer;color:var(--muted);font-size:13px">Erledigte (${erledigt.length})</summary>${erledigt.slice(0,20).map(row).join('')}</details>`:''}
     </div>
@@ -1605,7 +1609,15 @@ async function aufgabeSpeichern(){
     }).eq('id',eid);
     if(error){ msg.style.color='var(--hot)'; msg.textContent='Fehler: '+error.message; return; }
     msg.style.color='var(--ok)'; msg.textContent='Gespeichert ✓';
-    setTimeout(()=>{ document.getElementById('taskDlg').close(); ladeWiedervorlagen(); },500);
+    setTimeout(()=>{
+      document.getElementById('taskDlg').close();
+      if(kontextDatensatz){
+        if(kontextDatensatz.typ==='Kandidat') detailKandidat(kontextDatensatz.id);
+        else if(kontextDatensatz.typ==='Kunde') detailKunde(kontextDatensatz.id);
+        else if(kontextDatensatz.typ==='Kontakt') detailKontakt(kontextDatensatz.id);
+        else ladeWiedervorlagen();
+      } else ladeWiedervorlagen();
+    },500);
     return;
   }
   const {typ,id,name}=kontextDatensatz;
@@ -5156,11 +5168,16 @@ async function aufgabeBearbeitenPopup(taskId) {
 }
 
 async function aufgabeLoeschen(taskId, betreff) {
-  if (!confirm('Aufgabe löschen?\n"' + betreff + '"')) return;
+  if (!confirm('Wiedervorlage löschen?\n"' + betreff + '"')) return;
   const { error } = await sb.from('aufgaben').delete().eq('id', taskId);
   if (error) { zeigeMeldung('Fehler: ' + error.message, 'err'); return; }
-  zeigeMeldung('Aufgabe gelöscht', 'ok');
-  ladeWiedervorlagen();
+  zeigeMeldung('Wiedervorlage gelöscht', 'ok');
+  if(kontextDatensatz){
+    if(kontextDatensatz.typ==='Kandidat') detailKandidat(kontextDatensatz.id);
+    else if(kontextDatensatz.typ==='Kunde') detailKunde(kontextDatensatz.id);
+    else if(kontextDatensatz.typ==='Kontakt') detailKontakt(kontextDatensatz.id);
+    else ladeWiedervorlagen();
+  } else ladeWiedervorlagen();
 }
 
 // ---- Outlook-Web-Entwurf via Graph API ----
