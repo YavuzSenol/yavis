@@ -1080,7 +1080,9 @@ const cfg = { url: localStorage.getItem('sb_url'), key: localStorage.getItem('sb
 
 async function init(){
   if(cfg.url && cfg.key){
-    sb = supabase.createClient(cfg.url, cfg.key);
+    try { sb = supabase.createClient(cfg.url, cfg.key); } catch(e) {
+      document.getElementById('setup').style.display='block'; return;
+    }
     document.getElementById('setup').style.display='none';
     await pruefeLogin();
   } else {
@@ -1089,10 +1091,15 @@ async function init(){
 }
 
 async function pruefeLogin(){
-  const {data:{session}} = await sb.auth.getSession();
-  if(session){
-    zeigeApp();
-  } else {
+  try {
+    const res = await sb.auth.getSession();
+    const session = res?.data?.session;
+    if(session){
+      zeigeApp();
+    } else {
+      document.getElementById('login').style.display='flex';
+    }
+  } catch(e) {
     document.getElementById('login').style.display='flex';
   }
 }
@@ -1517,36 +1524,40 @@ function kachelPlatz(ic,titel){
   return `<div class="kachel platz"><div class="k-ic">${ic}</div><div class="k-tit" style="margin-top:14px">${titel}</div><div class="k-sub">bald</div></div>`;
 }
 async function zeigeStart(){
-  if(!sb) return;
+  if(!sb){ document.getElementById('login').style.display='flex'; return; }
   document.getElementById('detailPage').style.display='none';
   document.querySelectorAll('.tab[data-view]').forEach(x=>x.classList.remove('active'));
   const st=document.querySelector('.tab[data-view="start"]'); if(st) st.classList.add('active');
   ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte','recherche'].forEach(v=>{const el=document.getElementById('view-'+v); if(el) el.style.display = v==='start'?'block':'none';});
   const view=document.getElementById('view-start');
   view.innerHTML='<div style="color:var(--muted);font-size:14px">Lade Übersicht …</div>';
-  const [ka,ku,ko,auf]=await Promise.all([
-    sb.from('kandidaten').select('*',{count:'exact',head:true}),
-    sb.from('kunden').select('*',{count:'exact',head:true}),
-    sb.from('kontakte').select('*',{count:'exact',head:true}),
-    sb.from('aufgaben').select('faelligkeitsdatum,status').neq('status','Completed').limit(2000),
-  ]);
-  const heute=heuteISO();
-  const offen=(auf.data||[]).length;
-  const faellig=(auf.data||[]).filter(t=>t.faelligkeitsdatum&&t.faelligkeitsdatum<=heute).length;
-  view.innerHTML=`
-    <h2 style="color:var(--accent);font-size:20px;margin:0 0 4px">Startseite</h2>
-    <div style="color:var(--muted);font-size:13px;margin-bottom:18px">Y.A.V.I.S. CRM — dein Überblick</div>
-    <div class="kacheln">
-      <div class="kachel" onclick="geheZuTab('wiedervorlagen')">
-        <div class="k-ic">📋</div><div class="k-zahl" style="${faellig?'color:var(--hot)':''}">${faellig}</div>
-        <div class="k-tit">Fällige Wiedervorlagen</div><div class="k-sub">${offen} offen insgesamt</div></div>
-      ${kachel('👤','Kandidaten',ka.count,'kandidaten')}
-      ${kachel('🏢','Firmen',ku.count,'kunden')}
-      ${kachel('📇','Ansprechpartner',ko.count,'kontakte')}
-      ${kachelPlatz('📅','Termine / Kalender')}
-      ${kachelPlatz('✉️','Newsletter')}
-      ${kachelPlatz('ℹ️','Infos')}
-    </div>`;
+  try {
+    const [ka,ku,ko,auf]=await Promise.all([
+      sb.from('kandidaten').select('*',{count:'exact',head:true}),
+      sb.from('kunden').select('*',{count:'exact',head:true}),
+      sb.from('kontakte').select('*',{count:'exact',head:true}),
+      sb.from('aufgaben').select('faelligkeitsdatum,status').neq('status','Completed').limit(2000),
+    ]);
+    const heute=heuteISO();
+    const offen=(auf.data||[]).length;
+    const faellig=(auf.data||[]).filter(t=>t.faelligkeitsdatum&&t.faelligkeitsdatum<=heute).length;
+    view.innerHTML=`
+      <h2 style="color:var(--accent);font-size:20px;margin:0 0 4px">Startseite</h2>
+      <div style="color:var(--muted);font-size:13px;margin-bottom:18px">Y.A.V.I.S. CRM — dein Überblick</div>
+      <div class="kacheln">
+        <div class="kachel" onclick="geheZuTab('wiedervorlagen')">
+          <div class="k-ic">📋</div><div class="k-zahl" style="${faellig?'color:var(--hot)':''}">${faellig}</div>
+          <div class="k-tit">Fällige Wiedervorlagen</div><div class="k-sub">${offen} offen insgesamt</div></div>
+        ${kachel('👤','Kandidaten',ka.count,'kandidaten')}
+        ${kachel('🏢','Firmen',ku.count,'kunden')}
+        ${kachel('📇','Ansprechpartner',ko.count,'kontakte')}
+        ${kachelPlatz('📅','Termine / Kalender')}
+        ${kachelPlatz('✉️','Newsletter')}
+        ${kachelPlatz('ℹ️','Infos')}
+      </div>`;
+  } catch(e) {
+    view.innerHTML='<div style="color:var(--muted);font-size:14px;padding:20px">Übersicht konnte nicht geladen werden. Bitte Seite neu laden.</div>';
+  }
   window.scrollTo(0,0);
 }
 
