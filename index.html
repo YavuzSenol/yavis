@@ -1568,11 +1568,14 @@ function aufgabenCardHtml(tasks, typ, id){
       ${istOffen(t.status)?`<button class="tab" style="white-space:nowrap" onclick="aufgabeErledigt('${t.id}','${typ}','${id}')">✓ Erledigt</button>`:''}
     </div>`;
   };
-  return `<div class="card"><h3>Aufgaben &amp; Wiedervorlagen ${offen.length?'('+offen.length+' offen)':''}</h3>
-    <button class="neuBtn" style="margin-bottom:12px" onclick="aufgabeNeuPopup()">+ Aufgabe / Wiedervorlage</button>
-    ${offen.length?offen.map(row).join(''):'<div style="color:var(--muted);font-size:13px">Keine offenen Aufgaben.</div>'}
-    ${erledigt.length?`<details style="margin-top:10px"><summary style="cursor:pointer;color:var(--muted);font-size:13px">Erledigte (${erledigt.length})</summary>${erledigt.slice(0,20).map(row).join('')}</details>`:''}
-  </div>`;
+  return `<details class="acc" open>
+    <summary><span>Aufgaben &amp; Wiedervorlagen<span class="acc-cnt">${offen.length?' ('+offen.length+' offen)':''}</span></span><span class="acc-arr">▶</span></summary>
+    <div class="acc-body">
+      <button class="neuBtn" style="margin-bottom:12px" onclick="aufgabeNeuPopup()">+ Aufgabe / Wiedervorlage</button>
+      ${offen.length?offen.map(row).join(''):'<div style="color:var(--muted);font-size:13px">Keine offenen Aufgaben.</div>'}
+      ${erledigt.length?`<details style="margin-top:10px"><summary style="cursor:pointer;color:var(--muted);font-size:13px">Erledigte (${erledigt.length})</summary>${erledigt.slice(0,20).map(row).join('')}</details>`:''}
+    </div>
+  </details>`;
 }
 function aufgabeNeuPopup(){
   if(!kontextDatensatz) return;
@@ -2077,9 +2080,9 @@ function initAbschnitteSortierung() {
 
 function fmtKandidatId(id) {
   if (!id) return '';
-  // Zoho-Import: "Z-Recruit_XXXXXXXXXX" → "KAN-XXXXXXXXXX"
-  const m = String(id).match(/Z-?[Rr]ecruit_?(.+)/);
-  if (m) return 'KAN-' + m[1];
+  // Zoho-Import: "Z-Recruit_1234567890" → "KAN-67890" (letzte 5 Ziffern)
+  const m = String(id).match(/(\d+)$/);
+  if (m) return 'KAN-' + m[1].slice(-5);
   return id;  // andere IDs unverändert
 }
 
