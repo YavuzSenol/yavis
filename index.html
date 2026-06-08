@@ -207,6 +207,27 @@
   </div>
 </div>
 
+<!-- MFA-Bestätigungs-Dialog (erscheint nach erfolgreichem Passwort-Login wenn 2FA aktiv) -->
+<div id="mfaDlg" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:101;align-items:center;justify-content:center">
+  <div style="background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:36px 32px;width:340px;max-width:92%;text-align:center">
+    <div style="font-size:36px;margin-bottom:12px">🔐</div>
+    <h2 style="margin:0 0 8px;font-size:18px;font-weight:700;color:var(--fg)">Zwei-Faktor-Code</h2>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 22px;line-height:1.5">Öffne deine Authenticator-App<br>und gib den 6-stelligen Code ein.</p>
+    <input id="mfaCode" type="text" inputmode="numeric" maxlength="6" placeholder="000 000"
+           style="width:100%;padding:12px;font-size:26px;text-align:center;letter-spacing:10px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;box-sizing:border-box;font-weight:700"
+           onkeydown="if(event.key==='Enter')loginMfaVerifizieren()">
+    <button onclick="loginMfaVerifizieren()"
+            style="width:100%;margin-top:14px;padding:11px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:15px;font-weight:700;cursor:pointer">
+      ✓ Bestätigen
+    </button>
+    <div id="mfaErr" style="color:var(--hot);font-size:12px;margin-top:10px;min-height:16px"></div>
+    <button onclick="mfaLoginAbbrechen()"
+            style="margin-top:8px;background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer">
+      ← Zurück zur Anmeldung
+    </button>
+  </div>
+</div>
+
 <div class="layout">
 <nav class="sidebar">
   <button class="tab active" data-view="start">🏠 Start</button>
@@ -975,6 +996,14 @@
       </div>
     </div>
 
+    <!-- 🔐 Sicherheit / 2FA -->
+    <div style="margin-bottom:20px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">🔐 Sicherheit</div>
+      <div style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;overflow:hidden">
+        <div id="mfaStatusBereich" style="padding:14px 16px;font-size:13px;color:var(--muted)">Lade …</div>
+      </div>
+    </div>
+
     <div style="border-top:1px solid var(--line);padding-top:14px;display:flex;justify-content:flex-end;gap:10px">
       <button onclick="document.getElementById('einstellungenDlg').close()" style="padding:8px 20px;border-radius:6px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);color:var(--ink)">Abbrechen</button>
       <button onclick="einstellungenSpeichern()" style="padding:8px 24px;border-radius:6px;cursor:pointer;background:var(--accent);color:#0f1115;border:none;font-weight:700;font-size:14px">💾 Speichern</button>
@@ -1118,12 +1147,126 @@ function zeigeApp(){
   } else { pruefeSoftDelete(); zeigeStart(); }
 }
 
+// ================================================================
+//  2FA — Login-Verifikation
+// ================================================================
+function zeigeMfaDialog(faktorId){
+  _mfaAktuellerFaktorId=faktorId;
+  const dlg=document.getElementById('mfaDlg');
+  dlg.style.display='flex';
+  document.getElementById('mfaCode').value='';
+  document.getElementById('mfaErr').textContent='';
+  setTimeout(()=>document.getElementById('mfaCode').focus(),80);
+}
+function mfaLoginAbbrechen(){
+  document.getElementById('mfaDlg').style.display='none';
+  sb.auth.signOut();
+}
+async function loginMfaVerifizieren(){
+  const code=(document.getElementById('mfaCode')?.value||'').replace(/\D/g,'');
+  const errEl=document.getElementById('mfaErr');
+  if(code.length!==6){errEl.textContent='Bitte genau 6 Ziffern eingeben.';return;}
+  errEl.textContent='Prüfe …';
+  const {data:ch,error:chErr}=await sb.auth.mfa.challenge({factorId:_mfaAktuellerFaktorId});
+  if(chErr){errEl.textContent='Fehler: '+chErr.message;return;}
+  const {error:vErr}=await sb.auth.mfa.verify({factorId:_mfaAktuellerFaktorId,challengeId:ch.id,code});
+  if(vErr){errEl.textContent='Ungültiger Code — bitte nochmal versuchen.';document.getElementById('mfaCode').value='';document.getElementById('mfaCode').focus();return;}
+  document.getElementById('mfaDlg').style.display='none';
+  zeigeApp();
+}
+
+// ================================================================
+//  2FA — Einstellungen: Status / Einrichten / Deaktivieren
+// ================================================================
+async function mfaStatusLaden(){
+  const bereich=document.getElementById('mfaStatusBereich');
+  if(!bereich)return;
+  bereich.innerHTML='<span style="color:var(--muted);font-size:13px">Lade …</span>';
+  try{
+    const {data}=await sb.auth.mfa.listFactors();
+    const aktiv=(data?.totp||[]).find(f=>f.status==='verified');
+    if(aktiv){
+      const datum=new Date(aktiv.created_at).toLocaleDateString('de-DE');
+      bereich.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div><b>2FA ist aktiv ✅</b><div style="font-size:12px;color:var(--muted)">Authenticator: ${esc(aktiv.friendly_name||'YAVIS')} &nbsp;·&nbsp; eingerichtet ${datum}</div></div>
+        <button onclick="mfaDeaktivieren('${aktiv.id}')" style="padding:6px 14px;border-radius:6px;cursor:pointer;background:var(--panel);border:1px solid rgba(168,162,158,.35);color:var(--hot);font-size:13px;white-space:nowrap">🗑️ Entfernen</button>
+      </div>`;
+    } else {
+      bereich.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div><b>2FA nicht aktiv</b><div style="font-size:12px;color:var(--muted)">Zusätzlicher Schutz mit Google Authenticator, Authy o.Ä.</div></div>
+        <button onclick="mfaEinrichten()" style="padding:6px 14px;border-radius:6px;cursor:pointer;background:var(--accent);color:#fff;border:none;font-size:13px;font-weight:600;white-space:nowrap">🔐 2FA einrichten</button>
+      </div>`;
+    }
+  }catch(e){bereich.innerHTML='<span style="color:var(--muted);font-size:12px">Nicht verfügbar</span>';}
+}
+async function mfaEinrichten(){
+  const bereich=document.getElementById('mfaStatusBereich');
+  if(!bereich)return;
+  bereich.innerHTML='<span style="color:var(--muted);font-size:13px">Erstelle QR-Code …</span>';
+  // Eventuell alte nicht-verifizierte Faktoren bereinigen
+  try{
+    const {data:old}=await sb.auth.mfa.listFactors();
+    for(const f of(old?.totp||[])){if(f.status!=='verified')await sb.auth.mfa.unenroll({factorId:f.id});}
+  }catch(e){}
+  const {data,error}=await sb.auth.mfa.enroll({factorType:'totp',friendlyName:'YAVIS'});
+  if(error){bereich.innerHTML='<span style="color:var(--hot)">Fehler: '+esc(error.message)+'</span>';return;}
+  const qrUrl='https://api.qrserver.com/v1/create-qr-code/?size=200x200&data='+encodeURIComponent(data.totp.uri);
+  const fId=data.id;
+  bereich.innerHTML=`
+    <div style="text-align:center;padding:4px 0">
+      <p style="font-size:13px;color:var(--muted);margin:0 0 12px;line-height:1.4">Scanne diesen QR-Code mit deiner Authenticator-App<br>(Google Authenticator, Authy, …):</p>
+      <img src="${qrUrl}" style="width:180px;height:180px;border-radius:6px;border:1px solid var(--line);margin-bottom:10px" alt="QR-Code">
+      <p style="font-size:11px;color:var(--muted);margin:0 0 14px">Kein QR-Scan möglich? Manuell eingeben:<br><code style="font-size:11px;word-break:break-all;user-select:all">${esc(data.totp.secret)}</code></p>
+      <p style="font-size:13px;margin:0 0 8px;font-weight:600">Code aus der App eingeben:</p>
+      <div style="display:flex;gap:8px;justify-content:center">
+        <input id="mfaSetupCode" type="text" inputmode="numeric" maxlength="6" placeholder="000000"
+               style="padding:10px;font-size:22px;text-align:center;letter-spacing:8px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:160px;font-weight:700"
+               onkeydown="if(event.key==='Enter')mfaEinrichtenBestaetigen('${fId}')">
+        <button onclick="mfaEinrichtenBestaetigen('${fId}')"
+                style="padding:10px 18px;background:var(--accent);color:#fff;border:none;border-radius:5px;font-size:15px;font-weight:700;cursor:pointer">✓</button>
+      </div>
+      <div id="mfaSetupErr" style="color:var(--hot);font-size:12px;margin-top:8px;min-height:16px"></div>
+      <button onclick="mfaStatusLaden()" style="margin-top:10px;background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer">Abbrechen</button>
+    </div>`;
+  setTimeout(()=>document.getElementById('mfaSetupCode')?.focus(),80);
+}
+async function mfaEinrichtenBestaetigen(faktorId){
+  const code=(document.getElementById('mfaSetupCode')?.value||'').replace(/\D/g,'');
+  const errEl=document.getElementById('mfaSetupErr');
+  if(code.length!==6){errEl.textContent='Bitte genau 6 Ziffern eingeben.';return;}
+  errEl.textContent='Prüfe …';
+  const {data:ch,error:chErr}=await sb.auth.mfa.challenge({factorId});
+  if(chErr){errEl.textContent='Fehler: '+chErr.message;return;}
+  const {error:vErr}=await sb.auth.mfa.verify({factorId,challengeId:ch.id,code});
+  if(vErr){errEl.textContent='Ungültiger Code — App neu öffnen, dann nochmal.';document.getElementById('mfaSetupCode').value='';return;}
+  zeigeMeldung('2FA erfolgreich eingerichtet ✓','ok');
+  mfaStatusLaden();
+}
+async function mfaDeaktivieren(faktorId){
+  if(!confirm('2FA wirklich entfernen?\n\nDanach reicht dein Passwort allein zum Einloggen.'))return;
+  const {error}=await sb.auth.mfa.unenroll({factorId});
+  if(error){zeigeMeldung('Fehler: '+error.message,'err');return;}
+  zeigeMeldung('2FA entfernt.','ok');
+  mfaStatusLaden();
+}
+
 async function login(){
   const email=document.getElementById('logEmail').value.trim();
   const pass=document.getElementById('logPass').value;
   const err=document.getElementById('logErr'); err.textContent='';
+  err.textContent='Anmeldung läuft …';
   const {error}=await sb.auth.signInWithPassword({email,password:pass});
   if(error){err.textContent='Anmeldung fehlgeschlagen: '+error.message;return;}
+  err.textContent='';
+  // 2FA prüfen
+  try {
+    const {data:aal}=await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+    if(aal?.nextLevel==='aal2'&&aal?.currentLevel!=='aal2'){
+      const {data:factors}=await sb.auth.mfa.listFactors();
+      const totp=factors?.totp?.find(f=>f.status==='verified');
+      if(totp){zeigeMfaDialog(totp.id);return;}
+    }
+  } catch(e){}
   zeigeApp();
 }
 
@@ -3511,7 +3654,7 @@ function oeffneEinstellungen(){
   const kb=document.getElementById('kompaktBtn');
   if(kb) kb.textContent=document.body.classList.contains('kompakt')?'✅ An':'⬜ Aus';
   document.getElementById('einstellungenDlg').showModal(); renderStatusVerwaltung(); einsZoomAnwenden();
-  msEinstellungenUI();
+  msEinstellungenUI(); mfaStatusLaden();
 }
 
 function einstellungenSpeichern(){
@@ -5919,6 +6062,7 @@ async function rechercheKontakteAusfuehren() {
 //  RECHERCHE-MASKE (Stufe-1-Suche)
 // ================================================================
 let _rmGewaehltePos = new Set();
+let _mfaAktuellerFaktorId = null;
 let _rmAktivesTab = 'kandidaten';
 const _rmFirmTyp = new Set();
 
