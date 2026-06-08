@@ -530,10 +530,6 @@
 
       <!-- Senden-Buttons -->
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-        <button id="nlDirektBtn" onclick="nlDirektSenden(this)"
-                disabled style="padding:9px 22px;border-radius:6px;cursor:pointer;background:#107c10;color:#fff;border:none;font-weight:700;font-size:14px;display:none">
-          ✅ Direkt senden (0)
-        </button>
         <button id="nlSendBtn" onclick="nlSerienMailOeffnen()"
                 disabled style="padding:9px 22px;border-radius:6px;cursor:pointer;background:var(--muted);color:#fff;border:none;font-weight:700;font-size:14px">
           📨 In Outlook öffnen
@@ -3406,12 +3402,11 @@ function serienMailDialog(rows, vorlage){
         <button onclick="this.closest('dialog').close();this.closest('dialog').remove();vorlagenPickerRendern();document.getElementById('vorlagenPickerDlg').showModal()" style="padding:6px 12px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);color:var(--ink);font-size:13px">📝 Andere Vorlage wählen</button>
       </div>`:''}
 
-      <!-- Senden -->
+      <!-- Outlook öffnen -->
       <div style="border-top:1px solid var(--line);padding-top:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-        ${msIstVerbunden()?`<button id="smDirektBtn" onclick="serienMailDirektSenden(this)" style="padding:9px 20px;border-radius:6px;cursor:pointer;background:#107c10;color:#fff;border:none;font-weight:700;font-size:14px">✅ Direkt senden (${mitMail.length})</button>`:''}
-        <button onclick="outlookOeffnen(this)" style="padding:9px 20px;border-radius:6px;cursor:pointer;background:${msIstVerbunden()?'var(--panel2)':'#0078d4'};color:${msIstVerbunden()?'var(--ink)':'#fff'};border:${msIstVerbunden()?'1px solid var(--line)':'none'};font-weight:700;font-size:14px">📨 In Outlook öffnen</button>
+        <button onclick="outlookOeffnen(this)" style="padding:9px 20px;border-radius:6px;cursor:pointer;background:#0078d4;color:#fff;border:none;font-weight:700;font-size:14px">📨 In Outlook öffnen</button>
         <button onclick="this.closest('dialog').close();this.closest('dialog').remove()" style="padding:9px 18px;border-radius:6px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);color:var(--ink)">Schließen</button>
-        ${msIstVerbunden()?'<span style="font-size:12px;color:var(--ok)">✓ Mit Outlook verbunden</span>':'<span style="font-size:12px;color:var(--muted)">Öffnet Outlook vorausgefüllt</span>'}
+        <span style="font-size:12px;color:var(--muted)">Öffnet Outlook mit BCC + Betreff vorausgefüllt</span>
       </div>
 
       <!-- Protokollieren (erscheint nach Outlook-Klick) -->
@@ -5067,14 +5062,9 @@ function mailSendenDialog(email, kandidatId, name) {
       <div style="display:flex;gap:10px">
         <button onclick="this.closest('dialog').close();this.closest('dialog').remove()"
                 style="padding:7px 18px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line)">Abbrechen</button>
-${msIstVerbunden() ? `<button data-direktsenden="1"
-                onclick="msMailDirektSenden('${esc(email||'')}','${esc(kandidatId)}','${esc(name)}',this.closest('dialog'))"
-                style="padding:7px 22px;border-radius:5px;cursor:pointer;background:#107c10;color:#fff;border:none;font-weight:700">
-          ✅ Direkt senden
-        </button>` : ''}
         <button ${!email ? 'disabled style="opacity:0.45;cursor:not-allowed"' : ''}
                 onclick="msMailOeffnen('${esc(email || '')}','${esc(kandidatId)}','${esc(name)}',this.closest('dialog'))"
-                style="padding:7px 22px;border-radius:5px;cursor:pointer;background:${msIstVerbunden()?'var(--panel2)':'var(--accent2)'};color:${msIstVerbunden()?'var(--ink)':'#fff'};border:${msIstVerbunden()?'1px solid var(--line)':'none'};font-weight:700">
+                style="padding:7px 22px;border-radius:5px;cursor:pointer;background:var(--accent2);color:#fff;border:none;font-weight:700">
           📨 In Outlook öffnen
         </button>
       </div>
@@ -5704,18 +5694,7 @@ function nlUpdateZaehler() {
       btn.textContent = '📨 In Outlook öffnen';
     }
   }
-  // Direkt-senden Button (Graph API)
-  const dBtn = document.getElementById('nlDirektBtn');
-  if (dBtn) {
-    if (msIstVerbunden()) {
-      dBtn.style.display = 'inline-flex';
-      dBtn.disabled = n === 0;
-      dBtn.style.background = n > 0 ? '#107c10' : 'var(--muted)';
-      dBtn.textContent = n > 0 ? '✅ Direkt senden (' + n + ')' : '✅ Direkt senden';
-    } else {
-      dBtn.style.display = 'none';
-    }
-  }
+
   nlVorschauAktualisieren();
 }
 
