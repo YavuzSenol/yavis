@@ -1851,7 +1851,7 @@ async function aufgabeErledigt(taskId, typ, id){
   else if(typ==='Kunde') detailKunde(id);
   else if(typ==='Kontakt') detailKontakt(id);
 }
-async let _wvSelected = new Set();
+let _wvSelected = new Set();
 
 function wvSelUpdate() {
   const bar = document.getElementById('wvSelBar');
