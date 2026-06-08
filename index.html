@@ -31,7 +31,7 @@
   .tabs{display:flex;gap:4px;margin-left:auto}
   .tab{padding:8px 16px;border:1px solid var(--line);background:transparent;color:var(--muted);
     cursor:pointer;font:inherit;font-size:12px;letter-spacing:.08em;text-transform:uppercase;border-radius:2px}
-  .tab.active{background:var(--accent);color:#0f1115;border-color:var(--accent);font-weight:600}
+  .tab.active{background:var(--panel2);color:var(--accent);border-color:var(--accent);font-weight:700}
   .layout{display:flex;align-items:flex-start}
   .sidebar{display:flex;flex-direction:column;gap:6px;padding:18px 12px;min-width:182px;
     border-right:1px solid var(--line);background:var(--panel);position:sticky;top:55px;
@@ -132,8 +132,8 @@
   .tag{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:10px;
     padding:2px 9px;font-size:11px;margin:2px 4px 2px 0}
   /* Bearbeiten */
-  .editbtn{background:var(--accent);color:#0f1115;border:none;padding:9px 18px;font:inherit;
-    font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;border-radius:2px;margin-left:auto}
+  .editbtn{background:var(--panel2);color:var(--ink);border:1px solid var(--line);padding:8px 16px;font:inherit;
+    font-size:12px;font-weight:500;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;border-radius:2px;margin-left:auto}
   .savebtn{background:var(--ok);color:#0f1115}
   .cancelbtn{background:var(--panel2);color:var(--ink);border:1px solid var(--line)}
   .edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 32px}
@@ -144,11 +144,11 @@
     border:1px solid var(--line);color:var(--ink);padding:8px 10px;font:inherit;font-size:13px;border-radius:2px;width:100%}
   .edit-field textarea{min-height:70px;resize:vertical}
   .edit-actions{display:flex;gap:10px;margin-top:18px}
-  .neuBtn{background:var(--ok);color:#0f1115;border:none;padding:10px 16px;font:inherit;font-size:12px;
-    font-weight:600;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;border-radius:2px}
+  .neuBtn{background:var(--panel2);color:var(--ink);border:1px solid var(--line);padding:8px 14px;font:inherit;font-size:12px;
+    font-weight:500;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;border-radius:4px}
   /* CV-Auslese */
-  .cvbtn{background:var(--panel2);color:var(--accent2);border:1px solid var(--accent2);padding:9px 14px;
-    font:inherit;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+  .cvbtn{background:var(--panel2);color:var(--muted);border:1px solid var(--line);padding:8px 14px;
+    font:inherit;font-size:12px;font-weight:500;letter-spacing:.04em;text-transform:uppercase;
     cursor:pointer;border-radius:2px}
   .cvbtn:hover{background:var(--accent2);color:#0f1115}
   .cvbtn:disabled{opacity:.5;cursor:not-allowed}
@@ -304,7 +304,7 @@
       <button onclick="selTagsModal('hinzu')" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">🏷️ Tags +</button>
       <button onclick="selTagsModal('entf')" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">🏷️ Tags −</button>
       <button onclick="selMassenupdate()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">✏️ Aktualisieren</button>
-      <button onclick="selLoeschen()" style="background:rgba(220,38,38,0.7);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">🗑️ Löschen</button>
+      <button onclick="selLoeschen()" style="background:rgba(168,162,158,0.3);color:#fff;border:1px solid rgba(255,255,255,0.4);padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">🗑️ Löschen</button>
       <button onclick="selAufheben()" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.4);padding:5px 10px;border-radius:4px;cursor:pointer;font-size:13px;margin-left:auto">✕ Aufheben</button>
     </div>
     <table><thead><tr id="kHead"></tr></thead><tbody id="kBody"></tbody></table>
@@ -1358,7 +1358,7 @@ async function exportiereAuswahl(){
 function zeigeMeldung(msg,typ='ok'){
   let el=document.getElementById('yavisToast');
   if(!el){el=document.createElement('div');el.id='yavisToast';el.style.cssText='position:fixed;bottom:26px;right:26px;z-index:9999;padding:12px 20px;border-radius:8px;font-size:14px;font-weight:600;box-shadow:0 4px 18px rgba(0,0,0,0.35);transition:opacity 0.5s;pointer-events:none';document.body.appendChild(el);}
-  el.style.background=typ==='err'?'#dc2626':typ==='warn'?'#d97706':'#16a34a';
+  el.style.background=typ==='err'?'#c0392b':typ==='warn'?'var(--panel2)':'var(--accent)';
   el.style.color='#fff'; el.style.opacity='1'; el.textContent=msg;
   clearTimeout(el._t); el._t=setTimeout(()=>{el.style.opacity='0';},3200);
 }
@@ -2273,16 +2273,16 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails)
       <div style="display:flex;gap:8px;margin-left:auto">
         <button class="cvbtn" id="cvBtn" onclick="cvAuslesen('${d.id}')">📄 CV einlesen</button>
         ${autoSchutz
-          ? `<button class="editbtn" style="margin-left:0;background:var(--hot);color:#fff;cursor:default" title="Automatisch geschützt: ${esc(d.arbeitgeber)} ist ein Auftraggeber">🔒 Auto-Schutz</button>`
-          : `<button class="editbtn" style="margin-left:0;background:${d.abwerbeschutz?'var(--hot)':'var(--panel2)'};color:${d.abwerbeschutz?'#fff':'inherit'}" title="${d.abwerbeschutz?'Abwerbeschutz manuell aufheben':'Abwerbeschutz manuell aktivieren'}" onclick="abwerbeschutzToggle('${d.id}',${d.abwerbeschutz?'true':'false'})">${d.abwerbeschutz?'🔒 Manuell':'🔓 Schützen'}</button>`
+          ? `<button class="editbtn" style="margin-left:0;cursor:default;opacity:.6" title="Automatisch geschützt: ${esc(d.arbeitgeber)} ist ein Auftraggeber">🔒 Auto-Schutz</button>`
+          : `<button class="editbtn" style="margin-left:0;font-weight:${d.abwerbeschutz?'700':'500'}" title="${d.abwerbeschutz?'Abwerbeschutz manuell aufheben':'Abwerbeschutz manuell aktivieren'}" onclick="abwerbeschutzToggle('${d.id}',${d.abwerbeschutz?'true':'false'})">${d.abwerbeschutz?'🔒 Manuell':'🔓 Schützen'}</button>`
         }
         <button class="editbtn" style="margin-left:0" onclick="bearbeiteKandidat('${d.id}')">✎ Bearbeiten</button>
-        <button class="editbtn" style="margin-left:0;color:var(--hot);border-color:rgba(168,162,158,.35)" onclick="kandidatLoeschen('${d.id}','${esc(d.voller_name)}')">🗑️ Löschen</button>
-        <button class="editbtn" style="margin-left:0;background:var(--accent2);color:#fff" onclick="mailSendenDialog('${esc(d.email||d.email_beruflich||'')}','${d.id}','${esc(d.voller_name)}','${esc(d.anrede||'')}','${esc(d.nachname||'')}')">📧 E-Mail senden</button>
+        <button class="editbtn" style="margin-left:0;color:var(--muted)" onclick="kandidatLoeschen('${d.id}','${esc(d.voller_name)}')">🗑️ Löschen</button>
+        <button class="editbtn" style="margin-left:0" onclick="mailSendenDialog('${esc(d.email||d.email_beruflich||'')}','${d.id}','${esc(d.voller_name)}','${esc(d.anrede||'')}','${esc(d.nachname||'')}')">📧 E-Mail senden</button>
       </div>
     </div>
 
-    ${geschuetzt?`<div style="background:#c0392b;color:#fff;border-radius:6px;padding:12px 18px;margin-bottom:14px;font-size:14px;font-weight:600">
+    ${geschuetzt?`<div style="background:var(--panel2);border-left:3px solid var(--hot);border-radius:4px;padding:10px 16px;margin-bottom:14px;font-size:13px;color:var(--ink)">
       🔒 Abwerbeschutz aktiv${autoSchutz?' (automatisch — Arbeitgeber ist Auftraggeber)':' (manuell gesetzt)'} — dieser Kandidat darf <u>nicht</u> kontaktiert oder für Stellen vorgeschlagen werden.
     </div>`:''}
 
@@ -2816,7 +2816,7 @@ async function detailKunde(id){
       <button class="back" onclick="zurueckZurListe()">← Zurück</button>
       <h2>${esc(d.name)||'Kunde'}</h2>
       <button class="editbtn" onclick="bearbeiteKunde('${d.id}')">✎ Bearbeiten</button>
-      <button class="editbtn" style="color:var(--hot);border-color:rgba(168,162,158,.35)" onclick="kundeLoeschen('${d.id}','${esc(d.name)}')">🗑️ Löschen</button>
+      <button class="editbtn" style="color:var(--muted)" onclick="kundeLoeschen('${d.id}','${esc(d.name)}')">🗑️ Löschen</button>
     </div>
     <div class="detail-sub" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <span style="font-size:11px;font-weight:700;padding:3px 12px;border-radius:12px;background:${FIRMEN_TYP_BG[d.typ]||'var(--muted)'};color:#fff;letter-spacing:.05em">
@@ -2938,7 +2938,7 @@ async function detailKontakt(id){
       <button class="back" onclick="zurueckZurListe()">← Zurück</button>
       <h2>${esc(d.voller_name)||'Kontakt'}</h2>
       <button class="editbtn" onclick="bearbeiteKontakt('${d.id}')">✎ Bearbeiten</button>
-      <button class="editbtn" style="color:var(--hot);border-color:rgba(168,162,158,.35)" onclick="kontaktLoeschen('${d.id}','${esc(d.voller_name)}')">🗑️ Löschen</button>
+      <button class="editbtn" style="color:var(--muted)" onclick="kontaktLoeschen('${d.id}','${esc(d.voller_name)}')">🗑️ Löschen</button>
     </div>
     <div class="detail-sub">${esc(d.berufsbezeichnung)||''}${kunde?' · '+esc(kunde.name):''}</div>
     <div class="card"><h3>Kontakt & Adresse</h3><div class="grid2">
