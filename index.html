@@ -9,12 +9,12 @@
   :root{
     --bg:#0f1115; --panel:#171a21; --panel2:#1d2129; --line:#2a2f3a;
     --ink:#e8eaf0; --muted:#9aa3b2; --accent:#f0855a; --accent2:#f0855a;
-    --hot:#ef4444; --ok:#f0855a; --fg:#e8eaf0;
+    --hot:#a8a29e; --ok:#f0855a; --fg:#e8eaf0;
   }
   body.hell{
     --bg:#f0f2f5; --panel:#ffffff; --panel2:#f5f7fa; --line:#dde1ea;
     --ink:#1a1d24; --fg:#1a1d24; --muted:#6b7280; --accent:#c85a28; --accent2:#c85a28;
-    --hot:#dc2626; --ok:#c85a28;
+    --hot:#78716c; --ok:#c85a28;
   }
   body.hell #logoDunkel{display:none!important}
   body.hell #logoHell{display:block!important}
@@ -66,7 +66,7 @@
   tr:hover td{background:var(--panel)}
   .pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;
     background:var(--panel2);border:1px solid var(--line)}
-  .pill.hot{background:rgba(224,104,60,.15);color:var(--hot);border-color:var(--hot)}
+  .pill.hot{background:rgba(168,162,158,.15);color:var(--hot);border-color:var(--hot)}
   .km{color:var(--accent);font-weight:600}
   .setup{background:var(--panel);border:1px solid var(--accent);padding:18px;border-radius:4px;margin-bottom:18px}
   .setup code{background:#000;padding:1px 5px;border-radius:2px;color:var(--accent)}
@@ -380,25 +380,40 @@
 
   <!-- Recherche-Maske -->
   <div id="view-recherche" style="display:none">
-    <div style="margin-bottom:16px">
-      <h2 style="font-size:20px;font-weight:700;margin:0 0 4px;color:var(--fg)">🔍 Kandidaten-Recherche</h2>
-      <div style="font-size:13px;color:var(--muted)">Interne Datenbank — Stufe-1-Suche vor LinkedIn/XING</div>
+    <div style="margin-bottom:14px">
+      <h2 style="font-size:20px;font-weight:700;margin:0 0 4px;color:var(--fg)">🔍 Recherche</h2>
+      <div style="font-size:13px;color:var(--muted)">Kandidaten · Firmen · Ansprechpartner — interne Datenbank</div>
     </div>
-    <div class="card" style="margin-bottom:16px">
-      <!-- Position Chips -->
+    <!-- Entity-Tabs -->
+    <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--line)">
+      <button id="rmTab-kandidaten" onclick="rmTabWechseln('kandidaten')"
+        style="padding:9px 20px;font-size:13px;font-weight:600;cursor:pointer;border:none;background:none;border-bottom:3px solid var(--accent);color:var(--accent);margin-bottom:-2px">
+        👤 Kandidaten
+      </button>
+      <button id="rmTab-firmen" onclick="rmTabWechseln('firmen')"
+        style="padding:9px 20px;font-size:13px;font-weight:600;cursor:pointer;border:none;background:none;border-bottom:3px solid transparent;color:var(--muted)">
+        🏢 Firmen
+      </button>
+      <button id="rmTab-kontakte" onclick="rmTabWechseln('kontakte')"
+        style="padding:9px 20px;font-size:13px;font-weight:600;cursor:pointer;border:none;background:none;border-bottom:3px solid transparent;color:var(--muted)">
+        🤝 Kontakte
+      </button>
+    </div>
+
+    <!-- ===== PANEL: KANDIDATEN ===== -->
+    <div id="rmPanel-kandidaten" class="card" style="margin-bottom:16px">
       <div style="margin-bottom:18px">
         <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Position (Mehrfachauswahl)</div>
         <div id="rmPosCont" style="display:flex;flex-wrap:wrap;gap:6px"></div>
       </div>
-      <!-- Zeile 2: PLZ, Radius, Status, Umzugsbereitschaft -->
-      <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;margin-bottom:18px">
+      <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;margin-bottom:14px">
         <div>
-          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">PLZ (optional)</div>
-          <input id="rmPlz" placeholder="z.B. 60311" onkeydown="if(event.key==='Enter')rechercheMaskeAusfuehren()"
-                 style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:120px">
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">PLZ</div>
+          <input id="rmPlz" placeholder="z.B. 50667" onkeydown="if(event.key==='Enter')rechercheAusfuehren()"
+                 style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:110px">
         </div>
         <div>
-          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Radius</div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Radius km</div>
           <select id="rmRadius" style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
             <option>25</option><option selected>50</option><option>75</option><option>100</option><option>150</option>
           </select>
@@ -411,38 +426,188 @@
         </div>
         <div>
           <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Umzugsbereitschaft</div>
-          <input id="rmUmzug" placeholder="z.B. bundesweit" onkeydown="if(event.key==='Enter')rechercheMaskeAusfuehren()"
-                 style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:160px">
+          <input id="rmUmzug" placeholder="z.B. bundesweit" onkeydown="if(event.key==='Enter')rechercheAusfuehren()"
+                 style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:150px">
         </div>
-      </div>
-      <!-- Zeile 3: Erreichbarkeit + Ausschluesse -->
-      <div style="display:flex;flex-wrap:wrap;gap:28px;margin-bottom:18px">
         <div>
           <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Erreichbarkeit</div>
-          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:6px">
-            <input type="checkbox" id="rmHatMail" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent2)"> ✉ hat E-Mail
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:5px">
+            <input type="checkbox" id="rmHatMail" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)"> ✉ E-Mail
           </label>
           <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
-            <input type="checkbox" id="rmHatTel" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent2)"> ☎ hat Telefon/Mobil
+            <input type="checkbox" id="rmHatTel" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)"> ☎ Tel/Mobil
           </label>
         </div>
-        <div style="flex:1;min-width:220px">
+        <div style="flex:1;min-width:200px">
           <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Ausschließen (int. Wertung)</div>
-          <textarea id="rmExWert" rows="3" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();rechercheMaskeAusfuehren();}"
-                    placeholder="Werte kommagetrennt, z.B.: vermittelt, gesperrt"
+          <textarea id="rmExWert" rows="2" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();rechercheAusfuehren();}"
+                    placeholder="vermittelt, gesperrt …"
                     style="width:100%;padding:7px 10px;font-size:12px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;resize:vertical;font-family:inherit;box-sizing:border-box;line-height:1.5">vermittelt, nicht vermittelbar, generell kein Interesse, kein Kontakt erwünscht</textarea>
-          <div style="font-size:11px;color:var(--muted);margin-top:4px">Kommagetrennt — Teilstring-Abgleich · leer lassen = kein Ausschluss</div>
         </div>
       </div>
-      <!-- Aktions-Buttons + Ergebnis-Zaehler -->
-      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        <button onclick="rechercheMaskeAusfuehren()"
-                style="padding:8px 22px;border-radius:5px;cursor:pointer;background:var(--accent2);color:#fff;border:none;font-size:14px;font-weight:700">🔍 Suchen</button>
-        <button onclick="rechercheMaskeZuruecksetzen()"
+      <!-- Erweiterte Filter -->
+      <details id="rmErweitert" style="margin-top:4px">
+        <summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);padding:8px 0;user-select:none;list-style:none">
+          ▶ Erweiterte Filter
+        </summary>
+        <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;padding:12px 0 4px;border-top:1px solid var(--line);margin-top:4px">
+          <div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Freitext</div>
+            <input id="rmFreitext" placeholder="Name, Arbeitgeber, Skills …" onkeydown="if(event.key==='Enter')rechercheAusfuehren()"
+                   style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:200px">
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Arbeitgeber</div>
+            <input id="rmArbeitgeber" placeholder="Firmenname" onkeydown="if(event.key==='Enter')rechercheAusfuehren()"
+                   style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:150px">
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Tags enthält</div>
+            <input id="rmTags" placeholder="z.B. TGA" onkeydown="if(event.key==='Enter')rechercheAusfuehren()"
+                   style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:120px">
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Bundesland</div>
+            <input id="rmBundesland" placeholder="z.B. NRW" onkeydown="if(event.key==='Enter')rechercheAusfuehren()"
+                   style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:110px">
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Wertung mind.</div>
+            <select id="rmWertung" style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
+              <option value="">egal</option><option value="1">★ 1+</option><option value="2">★★ 2+</option>
+              <option value="3">★★★ 3+</option><option value="4">★★★★ 4+</option><option value="5">★★★★★ 5</option>
+            </select>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Kein Kontakt seit</div>
+            <select id="rmKeinKontakt" style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
+              <option value="">egal</option><option value="30">30 Tagen</option><option value="60">60 Tagen</option>
+              <option value="90">90 Tagen</option><option value="180">180 Tagen</option><option value="365">1 Jahr</option>
+            </select>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Gehalt erw. bis €</div>
+            <input id="rmGehalt" placeholder="80000" type="number" min="0" step="5000" onkeydown="if(event.key==='Enter')rechercheAusfuehren()"
+                   style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:100px">
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Erfahrung mind.</div>
+            <input id="rmErfahrung" placeholder="Jahre" type="number" min="0" max="40" onkeydown="if(event.key==='Enter')rechercheAusfuehren()"
+                   style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:80px">
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Abwerbeschutz</div>
+            <select id="rmAbwerbeschutz" style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
+              <option value="">egal</option><option value="ja">🔒 Ja</option><option value="nein">🔓 Nein</option>
+            </select>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Quelle</div>
+            <input id="rmQuelle" placeholder="z.B. XING" onkeydown="if(event.key==='Enter')rechercheAusfuehren()"
+                   style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:110px">
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Weitere</div>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:6px">
+              <input type="checkbox" id="rmIstHot" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)"> 🔥 Ist Hot
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+              <input type="checkbox" id="rmHatProfil" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)"> 🔗 XING/LinkedIn
+            </label>
+          </div>
+        </div>
+      </details>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px">
+        <button onclick="rechercheAusfuehren()"
+                style="padding:8px 22px;border-radius:5px;cursor:pointer;background:var(--accent);color:#fff;border:none;font-size:14px;font-weight:700">🔍 Suchen</button>
+        <button onclick="rechercheZuruecksetzen()"
                 style="padding:8px 16px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);font-size:13px">↺ Zurücksetzen</button>
         <span id="rmAnzahl" style="font-size:13px;color:var(--muted);margin-left:4px"></span>
       </div>
     </div>
+
+    <!-- ===== PANEL: FIRMEN ===== -->
+    <div id="rmPanel-firmen" class="card" style="display:none;margin-bottom:16px">
+      <div style="margin-bottom:14px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Typ (Mehrfachauswahl)</div>
+        <div id="rmFirmTypCont" style="display:flex;flex-wrap:wrap;gap:6px">
+          <button data-typ="Auftraggeber" onclick="rmFirmTypToggle(this)" style="padding:5px 12px;border-radius:20px;cursor:pointer;font-size:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink)">Auftraggeber</button>
+          <button data-typ="Auftraggeber-Potenzial" onclick="rmFirmTypToggle(this)" style="padding:5px 12px;border-radius:20px;cursor:pointer;font-size:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink)">Auftraggeber-Potenzial</button>
+          <button data-typ="Lieferant" onclick="rmFirmTypToggle(this)" style="padding:5px 12px;border-radius:20px;cursor:pointer;font-size:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink)">Lieferant</button>
+          <button data-typ="Sonstige" onclick="rmFirmTypToggle(this)" style="padding:5px 12px;border-radius:20px;cursor:pointer;font-size:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink)">Sonstige</button>
+        </div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;margin-bottom:14px">
+        <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Freitext (Name/Ort/Branche)</div>
+          <input id="rmFirmSuche" placeholder="z.B. Ingenieurbüro Köln" onkeydown="if(event.key==='Enter')rechercheAusfuehren()"
+                 style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:220px">
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Branche</div>
+          <input id="rmFirmBranche" placeholder="z.B. TGA" onkeydown="if(event.key==='Enter')rechercheAusfuehren()"
+                 style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:130px">
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Bundesland / Stadt</div>
+          <input id="rmFirmOrt" placeholder="z.B. NRW oder Köln" onkeydown="if(event.key==='Enter')rechercheAusfuehren()"
+                 style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:150px">
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">PLZ (Umkreis)</div>
+          <input id="rmFirmPlz" maxlength="5" placeholder="50667" onkeydown="if(event.key==='Enter')rechercheAusfuehren()"
+                 style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:90px">
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Radius km</div>
+          <select id="rmFirmRadius" style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
+            <option value="25">25</option><option value="50" selected>50</option><option value="100">100</option><option value="150">150</option><option value="200">200</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button onclick="rechercheAusfuehren()"
+                style="padding:8px 22px;border-radius:5px;cursor:pointer;background:var(--accent);color:#fff;border:none;font-size:14px;font-weight:700">🔍 Suchen</button>
+        <button onclick="rechercheZuruecksetzen()"
+                style="padding:8px 16px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);font-size:13px">↺ Zurücksetzen</button>
+        <span id="rmAnzahlFirm" style="font-size:13px;color:var(--muted);margin-left:4px"></span>
+      </div>
+    </div>
+
+    <!-- ===== PANEL: KONTAKTE ===== -->
+    <div id="rmPanel-kontakte" class="card" style="display:none;margin-bottom:16px">
+      <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;margin-bottom:14px">
+        <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Name</div>
+          <input id="rmKontName" placeholder="z.B. Müller" onkeydown="if(event.key==='Enter')rechercheAusfuehren()"
+                 style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:170px">
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Funktion / Berufsbezeichnung</div>
+          <input id="rmKontFunktion" placeholder="z.B. Geschäftsführer" onkeydown="if(event.key==='Enter')rechercheAusfuehren()"
+                 style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:200px">
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Firma (enthält)</div>
+          <input id="rmKontFirma" placeholder="z.B. Planungsbüro" onkeydown="if(event.key==='Enter')rechercheAusfuehren()"
+                 style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:180px">
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Optionen</div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+            <input type="checkbox" id="rmKontHatMail" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)"> ✉ hat E-Mail
+          </label>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button onclick="rechercheAusfuehren()"
+                style="padding:8px 22px;border-radius:5px;cursor:pointer;background:var(--accent);color:#fff;border:none;font-size:14px;font-weight:700">🔍 Suchen</button>
+        <button onclick="rechercheZuruecksetzen()"
+                style="padding:8px 16px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);font-size:13px">↺ Zurücksetzen</button>
+        <span id="rmAnzahlKont" style="font-size:13px;color:var(--muted);margin-left:4px"></span>
+      </div>
+    </div>
+
     <!-- Ergebnisbereich -->
     <div id="rmBody"></div>
   </div>
@@ -1876,7 +2041,7 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails)
           : `<button class="editbtn" style="margin-left:0;background:${d.abwerbeschutz?'var(--hot)':'var(--panel2)'};color:${d.abwerbeschutz?'#fff':'inherit'}" title="${d.abwerbeschutz?'Abwerbeschutz manuell aufheben':'Abwerbeschutz manuell aktivieren'}" onclick="abwerbeschutzToggle('${d.id}',${d.abwerbeschutz?'true':'false'})">${d.abwerbeschutz?'🔒 Manuell':'🔓 Schützen'}</button>`
         }
         <button class="editbtn" style="margin-left:0" onclick="bearbeiteKandidat('${d.id}')">✎ Bearbeiten</button>
-        <button class="editbtn" style="margin-left:0;color:var(--hot);border-color:rgba(192,64,42,.35)" onclick="kandidatLoeschen('${d.id}','${esc(d.voller_name)}')">🗑️ Löschen</button>
+        <button class="editbtn" style="margin-left:0;color:var(--hot);border-color:rgba(168,162,158,.35)" onclick="kandidatLoeschen('${d.id}','${esc(d.voller_name)}')">🗑️ Löschen</button>
         <button class="editbtn" style="margin-left:0;background:var(--accent2);color:#fff" onclick="mailSendenDialog('${esc(d.email||d.email_beruflich||'')}','${d.id}','${esc(d.voller_name)}','${esc(d.anrede||'')}','${esc(d.nachname||'')}')">📧 E-Mail senden</button>
       </div>
     </div>
@@ -2415,7 +2580,7 @@ async function detailKunde(id){
       <button class="back" onclick="zurueckZurListe()">← Zurück</button>
       <h2>${esc(d.name)||'Kunde'}</h2>
       <button class="editbtn" onclick="bearbeiteKunde('${d.id}')">✎ Bearbeiten</button>
-      <button class="editbtn" style="color:var(--hot);border-color:rgba(192,64,42,.35)" onclick="kundeLoeschen('${d.id}','${esc(d.name)}')">🗑️ Löschen</button>
+      <button class="editbtn" style="color:var(--hot);border-color:rgba(168,162,158,.35)" onclick="kundeLoeschen('${d.id}','${esc(d.name)}')">🗑️ Löschen</button>
     </div>
     <div class="detail-sub" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <span style="font-size:11px;font-weight:700;padding:3px 12px;border-radius:12px;background:${FIRMEN_TYP_BG[d.typ]||'var(--muted)'};color:#fff;letter-spacing:.05em">
@@ -2537,7 +2702,7 @@ async function detailKontakt(id){
       <button class="back" onclick="zurueckZurListe()">← Zurück</button>
       <h2>${esc(d.voller_name)||'Kontakt'}</h2>
       <button class="editbtn" onclick="bearbeiteKontakt('${d.id}')">✎ Bearbeiten</button>
-      <button class="editbtn" style="color:var(--hot);border-color:rgba(192,64,42,.35)" onclick="kontaktLoeschen('${d.id}','${esc(d.voller_name)}')">🗑️ Löschen</button>
+      <button class="editbtn" style="color:var(--hot);border-color:rgba(168,162,158,.35)" onclick="kontaktLoeschen('${d.id}','${esc(d.voller_name)}')">🗑️ Löschen</button>
     </div>
     <div class="detail-sub">${esc(d.berufsbezeichnung)||''}${kunde?' · '+esc(kunde.name):''}</div>
     <div class="card"><h3>Kontakt & Adresse</h3><div class="grid2">
@@ -3478,7 +3643,7 @@ function vorlagenListeRendern(){
             <button onclick="vorlagenRunter(${i})" title="Nach unten" ${i===vl.length-1?'disabled':''} style="padding:2px 7px;border-radius:3px;cursor:${i===vl.length-1?'default':'pointer'};background:var(--panel);border:1px solid var(--line);color:${i===vl.length-1?'var(--muted)':'var(--ink)'};font-size:11px;line-height:1.4">▼</button>
           </div>
           <button onclick="vorlagenBearbeiten(${v.id})" title="Bearbeiten" style="padding:4px 10px;border-radius:4px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:12px">✏️</button>
-          <button onclick="vorlagenLoeschen(${v.id})" title="Löschen" style="padding:4px 10px;border-radius:4px;cursor:pointer;background:rgba(220,38,38,0.15);border:1px solid rgba(220,38,38,0.3);color:var(--hot);font-size:12px">🗑️</button>
+          <button onclick="vorlagenLoeschen(${v.id})" title="Löschen" style="padding:4px 10px;border-radius:4px;cursor:pointer;background:rgba(168,162,158,.15);border:1px solid rgba(168,162,158,.30);color:var(--hot);font-size:12px">🗑️</button>
         </div>
       </div>
     </div>`).join('');
@@ -5619,9 +5784,186 @@ async function _kundeWirklichLoeschen(id, dlg) {
 
 
 // ================================================================
+//  RECHERCHE — Firmen
+// ================================================================
+async function rechercheFirmenAusfuehren() {
+  const anzEl = document.getElementById('rmAnzahlFirm');
+  const bodyEl = document.getElementById('rmBody');
+  if (!anzEl || !bodyEl) return;
+  anzEl.textContent = 'Suche läuft …'; bodyEl.innerHTML = '';
+  const suche   = (document.getElementById('rmFirmSuche')?.value   || '').trim();
+  const branche = (document.getElementById('rmFirmBranche')?.value || '').trim();
+  const ort     = (document.getElementById('rmFirmOrt')?.value     || '').trim();
+  const plz     = (document.getElementById('rmFirmPlz')?.value     || '').trim();
+  const radius  = parseInt(document.getElementById('rmFirmRadius')?.value||'50')||50;
+  const typen   = [..._rmFirmTyp];
+
+  if (plz) {
+    const {data:geo,error:geoErr} = await sb.from('plz_geo').select('lat,lng').eq('plz',plz).limit(1);
+    if (geoErr||!geo||!geo.length) { anzEl.textContent='PLZ '+plz+' nicht gefunden.'; return; }
+    const cLat=geo[0].lat, cLng=geo[0].lng;
+    let q = sb.from('kunden').select('*');
+    if (softDeleteAktiv) q=q.is('geloescht_am',null);
+    if (typen.length===1) q=q.eq('typ',typen[0]);
+    const {data,error}=await q;
+    if (error) { anzEl.textContent='Fehler: '+error.message; return; }
+    const ohneLl=data.filter(r=>r.plz&&(r.lat==null||r.lng==null));
+    if (ohneLl.length) {
+      const plzSet=[...new Set(ohneLl.map(r=>r.plz))];
+      const {data:geos}=await sb.from('plz_geo').select('plz,lat,lng').in('plz',plzSet);
+      const geoMap={}; (geos||[]).forEach(g=>geoMap[g.plz]={lat:g.lat,lng:g.lng});
+      ohneLl.forEach(r=>{if(geoMap[r.plz]){r.lat=geoMap[r.plz].lat;r.lng=geoMap[r.plz].lng;}});
+    }
+    let rows=data.filter(r=>r.lat!=null&&r.lng!=null&&haversineKm(cLat,cLng,r.lat,r.lng)<=radius);
+    if (typen.length>1) rows=rows.filter(r=>typen.includes(r.typ));
+    if (suche) {const sl=suche.toLowerCase();rows=rows.filter(r=>(r.name||'').toLowerCase().includes(sl)||(r.branche||'').toLowerCase().includes(sl)||(r.stadt||'').toLowerCase().includes(sl));}
+    if (branche){const bl=branche.toLowerCase();rows=rows.filter(r=>(r.branche||'').toLowerCase().includes(bl));}
+    if (ort) {const ol=ort.toLowerCase();rows=rows.filter(r=>(r.stadt||'').toLowerCase().includes(ol)||(r.bundesland||'').toLowerCase().includes(ol));}
+    rows.sort((a,b)=>haversineKm(cLat,cLng,a.lat,a.lng)-haversineKm(cLat,cLng,b.lat,b.lng));
+    anzEl.textContent=rows.length+' Firmen im Umkreis von '+radius+' km um '+plz;
+    rmRenderFirmen(bodyEl,rows,cLat,cLng); return;
+  }
+  let q=sb.from('kunden').select('*').limit(300).order('name');
+  if (softDeleteAktiv) q=q.is('geloescht_am',null);
+  if (typen.length===1) q=q.eq('typ',typen[0]);
+  if (suche) q=q.or(`name.ilike.%${suche}%,branche.ilike.%${suche}%,stadt.ilike.%${suche}%`);
+  if (branche&&!suche) q=q.ilike('branche',`%${branche}%`);
+  if (ort) q=q.or(`stadt.ilike.%${ort}%,bundesland.ilike.%${ort}%`);
+  const {data,error}=await q;
+  if (error) { anzEl.textContent='Fehler: '+error.message; return; }
+  let rows=data||[];
+  if (typen.length>1) rows=rows.filter(r=>typen.includes(r.typ));
+  if (branche&&suche){const bl=branche.toLowerCase();rows=rows.filter(r=>(r.branche||'').toLowerCase().includes(bl));}
+  anzEl.textContent=rows.length+' Firmen gefunden';
+  rmRenderFirmen(bodyEl,rows,null,null);
+}
+function rmRenderFirmen(bodyEl,rows,cLat,cLng){
+  if(!rows.length){bodyEl.innerHTML='<div style="color:var(--muted);font-size:14px;padding:16px 0">Keine Treffer.</div>';return;}
+  const hatKm=cLat!=null;
+  let htm='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">'
+    +'<thead><tr style="border-bottom:2px solid var(--line);text-align:left">'
+    +'<th style="padding:7px 10px 8px;color:var(--muted);font-weight:600">Firma</th>'
+    +'<th style="padding:7px 10px 8px;color:var(--muted);font-weight:600">Typ</th>'
+    +'<th style="padding:7px 10px 8px;color:var(--muted);font-weight:600">Branche</th>'
+    +'<th style="padding:7px 10px 8px;color:var(--muted);font-weight:600">PLZ / Ort</th>'
+    +(hatKm?'<th style="padding:7px 10px 8px;color:var(--muted);font-weight:600">Entfernung</th>':'')
+    +'<th style="padding:7px 10px 8px;color:var(--muted);font-weight:600">Telefon</th>'
+    +'</tr></thead><tbody>';
+  rows.forEach(r=>{
+    const km=hatKm&&r.lat!=null&&r.lng!=null?Math.round(haversineKm(cLat,cLng,r.lat,r.lng))+' km':'';
+    htm+='<tr onclick="detailKunde(\''+r.id+'\')" style="cursor:pointer;border-bottom:1px solid var(--line)" onmouseover="this.style.background=\'var(--panel2)\'" onmouseout="this.style.background=\'\'">'
+      +'<td style="padding:7px 10px;font-weight:600">'+esc(r.name||'–')+'</td>'
+      +'<td style="padding:7px 10px"><span class="pill">'+esc(r.typ||'–')+'</span></td>'
+      +'<td style="padding:7px 10px;color:var(--muted);font-size:12px">'+esc(r.branche||'–')+'</td>'
+      +'<td style="padding:7px 10px;color:var(--muted);font-size:12px">'+esc((r.plz||'')+' '+(r.stadt||''))+'</td>'
+      +(hatKm?'<td style="padding:7px 10px;color:var(--muted);font-size:12px">'+km+'</td>':'')
+      +'<td style="padding:7px 10px;color:var(--muted);font-size:12px">'+esc(r.telefon||'–')+'</td>'
+      +'</tr>';
+  });
+  bodyEl.innerHTML=htm+'</tbody></table></div>';
+}
+
+// ================================================================
+//  RECHERCHE — Kontakte / Ansprechpartner
+// ================================================================
+async function rechercheKontakteAusfuehren() {
+  const anzEl=document.getElementById('rmAnzahlKont');
+  const bodyEl=document.getElementById('rmBody');
+  if(!anzEl||!bodyEl) return;
+  anzEl.textContent='Suche läuft …'; bodyEl.innerHTML='';
+  const name    =(document.getElementById('rmKontName')?.value    ||'').trim();
+  const funktion=(document.getElementById('rmKontFunktion')?.value||'').trim();
+  const firma   =(document.getElementById('rmKontFirma')?.value   ||'').trim();
+  const hatMail =!!(document.getElementById('rmKontHatMail')?.checked);
+  let kundeIds=null;
+  if(firma){
+    const {data:kd}=await sb.from('kunden').select('id').ilike('name','%'+firma+'%');
+    kundeIds=(kd||[]).map(k=>k.id);
+    if(!kundeIds.length){anzEl.textContent='0 Treffer';bodyEl.innerHTML='<div style="color:var(--muted);font-size:14px;padding:16px 0">Keine Firma "'+esc(firma)+'" gefunden.</div>';return;}
+  }
+  let q=sb.from('kontakte').select('*').limit(300);
+  if(softDeleteAktiv) q=q.is('geloescht_am',null);
+  if(name)    q=q.ilike('voller_name','%'+name+'%');
+  if(funktion)q=q.ilike('berufsbezeichnung','%'+funktion+'%');
+  if(hatMail) q=q.not('email','is',null).neq('email','');
+  if(kundeIds)q=q.in('kunde_id',kundeIds);
+  const {data,error}=await q;
+  if(error){anzEl.textContent='Fehler: '+error.message;return;}
+  const firmaIds=[...new Set((data||[]).map(r=>r.kunde_id).filter(Boolean))];
+  const firmaMap={};
+  if(firmaIds.length){const {data:fd}=await sb.from('kunden').select('id,name').in('id',firmaIds);(fd||[]).forEach(f=>firmaMap[f.id]=f.name);}
+  anzEl.textContent=data.length+' Kontakte gefunden';
+  if(!data.length){bodyEl.innerHTML='<div style="color:var(--muted);font-size:14px;padding:16px 0">Keine Treffer.</div>';return;}
+  let htm='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">'
+    +'<thead><tr style="border-bottom:2px solid var(--line);text-align:left">'
+    +'<th style="padding:7px 10px 8px;color:var(--muted);font-weight:600">Name</th>'
+    +'<th style="padding:7px 10px 8px;color:var(--muted);font-weight:600">Funktion</th>'
+    +'<th style="padding:7px 10px 8px;color:var(--muted);font-weight:600">Firma</th>'
+    +'<th style="padding:7px 10px 8px;color:var(--muted);font-weight:600">E-Mail</th>'
+    +'<th style="padding:7px 10px 8px;color:var(--muted);font-weight:600">Telefon</th>'
+    +'</tr></thead><tbody>';
+  (data||[]).forEach(r=>{
+    const f=r.kunde_id?(firmaMap[r.kunde_id]||'–'):'–';
+    htm+='<tr onclick="detailKontakt(\''+r.id+'\')" style="cursor:pointer;border-bottom:1px solid var(--line)" onmouseover="this.style.background=\'var(--panel2)\'" onmouseout="this.style.background=\'\'">'
+      +'<td style="padding:7px 10px;font-weight:600">'+esc(r.voller_name||'–')+'</td>'
+      +'<td style="padding:7px 10px;color:var(--muted);font-size:12px">'+esc(r.berufsbezeichnung||'–')+'</td>'
+      +'<td style="padding:7px 10px;color:var(--muted);font-size:12px">'+esc(f)+'</td>'
+      +'<td style="padding:7px 10px;font-size:12px">'+(r.email?'<a href="mailto:'+esc(r.email)+'" onclick="event.stopPropagation()" class="calllink">'+esc(r.email)+'</a>':'–')+'</td>'
+      +'<td style="padding:7px 10px;color:var(--muted);font-size:12px">'+esc(r.telefon_beruflich||r.mobil||'–')+'</td>'
+      +'</tr>';
+  });
+  bodyEl.innerHTML=htm+'</tbody></table></div>';
+}
+
+// ================================================================
 //  RECHERCHE-MASKE (Stufe-1-Suche)
 // ================================================================
 let _rmGewaehltePos = new Set();
+let _rmAktivesTab = 'kandidaten';
+const _rmFirmTyp = new Set();
+
+function rechercheAusfuehren() {
+  if (_rmAktivesTab === 'firmen') rechercheFirmenAusfuehren();
+  else if (_rmAktivesTab === 'kontakte') rechercheKontakteAusfuehren();
+  else rechercheMaskeAusfuehren();
+}
+function rechercheZuruecksetzen() {
+  document.getElementById('rmBody').innerHTML = '';
+  if (_rmAktivesTab === 'firmen') {
+    _rmFirmTyp.clear();
+    document.querySelectorAll('#rmFirmTypCont [data-typ]').forEach(c=>{c.style.background='var(--bg)';c.style.borderColor='var(--line)';c.style.color='var(--ink)';});
+    ['rmFirmSuche','rmFirmBranche','rmFirmOrt','rmFirmPlz'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+    const el=document.getElementById('rmAnzahlFirm'); if(el)el.textContent='';
+  } else if (_rmAktivesTab === 'kontakte') {
+    ['rmKontName','rmKontFunktion','rmKontFirma'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+    const cb=document.getElementById('rmKontHatMail'); if(cb)cb.checked=false;
+    const el=document.getElementById('rmAnzahlKont'); if(el)el.textContent='';
+  } else {
+    rechercheMaskeZuruecksetzen();
+  }
+}
+function rmTabWechseln(tab) {
+  _rmAktivesTab = tab;
+  ['kandidaten','firmen','kontakte'].forEach(t => {
+    const btn = document.getElementById('rmTab-'+t);
+    const panel = document.getElementById('rmPanel-'+t);
+    const aktiv = t === tab;
+    if (btn) { btn.style.borderBottomColor = aktiv?'var(--accent)':'transparent'; btn.style.color = aktiv?'var(--accent)':'var(--muted)'; }
+    if (panel) panel.style.display = aktiv ? '' : 'none';
+  });
+  document.getElementById('rmBody').innerHTML = '';
+  const anzEl = document.getElementById('rmAnzahl'); if(anzEl) anzEl.textContent='';
+}
+function rmFirmTypToggle(chip) {
+  const typ = chip.dataset.typ;
+  if (_rmFirmTyp.has(typ)) {
+    _rmFirmTyp.delete(typ);
+    chip.style.background='var(--bg)'; chip.style.borderColor='var(--line)'; chip.style.color='var(--ink)';
+  } else {
+    _rmFirmTyp.add(typ);
+    chip.style.background='var(--accent)'; chip.style.borderColor='var(--accent)'; chip.style.color='#fff';
+  }
+}
 
 function zeigeRechercheMaske() {
   const cont = document.getElementById('rmPosCont');
@@ -5691,6 +6033,18 @@ async function rechercheMaskeAusfuehren() {
   const ausschluss = exText
     ? exText.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
     : [];
+  const freitext    = (document.getElementById('rmFreitext')?.value    || '').trim();
+  const arbeitgeber = (document.getElementById('rmArbeitgeber')?.value || '').trim();
+  const tags        = (document.getElementById('rmTags')?.value        || '').trim();
+  const bundesland  = (document.getElementById('rmBundesland')?.value  || '').trim();
+  const wertung     = parseInt(document.getElementById('rmWertung')?.value||'0')||0;
+  const keinKontakt = parseInt(document.getElementById('rmKeinKontakt')?.value||'0')||0;
+  const gehalt      = parseInt(document.getElementById('rmGehalt')?.value||'0')||0;
+  const erfahrung   = parseInt(document.getElementById('rmErfahrung')?.value||'0')||0;
+  const istHot      = !!(document.getElementById('rmIstHot')?.checked);
+  const hatProfil   = !!(document.getElementById('rmHatProfil')?.checked);
+  const abwSchutz   = document.getElementById('rmAbwerbeschutz')?.value||'';
+  const quelle      = (document.getElementById('rmQuelle')?.value      || '').trim();
 
   let rows = [];
 
@@ -5717,8 +6071,21 @@ async function rechercheMaskeAusfuehren() {
     // Serverseite: Position + Status direkt in Supabase-Query
     let q = sb.from('kandidaten').select('*').limit(500)
               .order('nachname', { ascending: true, nullsFirst: false });
+    if (softDeleteAktiv)       q = q.is('geloescht_am', null);
     if (_rmGewaehltePos.size) q = q.in('berufsbezeichnung', [..._rmGewaehltePos]);
     if (statusVal)            q = q.eq('status', statusVal);
+    if (arbeitgeber)  q = q.ilike('arbeitgeber', `%${arbeitgeber}%`);
+    if (tags)         q = q.ilike('tags', `%${tags}%`);
+    if (bundesland)   q = q.ilike('bundesland', `%${bundesland}%`);
+    if (wertung)      q = q.gte('wertung', wertung);
+    if (gehalt)       q = q.lte('gehalt_erwartet', gehalt);
+    if (erfahrung)    q = q.gte('erfahrung_jahre', erfahrung);
+    if (istHot)       q = q.eq('ist_hot', true);
+    if (hatProfil)    q = q.or('xing_profil.ilike.%http%,linkedin_profil.ilike.%http%');
+    if (abwSchutz==='ja')   q = q.eq('abwerbeschutz', true);
+    if (abwSchutz==='nein') q = q.eq('abwerbeschutz', false);
+    if (quelle)       q = q.ilike('quelle', `%${quelle}%`);
+    if (freitext)     q = q.or(`voller_name.ilike.%${freitext}%,arbeitgeber.ilike.%${freitext}%,faehigkeiten.ilike.%${freitext}%,stadt.ilike.%${freitext}%`);
     const { data, error } = await q;
     if (error) { anzEl.textContent = 'Fehler: ' + error.message; return; }
     rows = data || [];
@@ -5739,6 +6106,20 @@ async function rechercheMaskeAusfuehren() {
       return !ausschluss.some(a => wi.includes(a));
     });
   }
+  // Neue erweiterte Filter (client-seitig, vor allem für PLZ-Pfad)
+  if (freitext)    { const fl=freitext.toLowerCase(); rows=rows.filter(r=>(r.voller_name||'').toLowerCase().includes(fl)||(r.arbeitgeber||'').toLowerCase().includes(fl)||(r.faehigkeiten||'').toLowerCase().includes(fl)||(r.stadt||'').toLowerCase().includes(fl)); }
+  if (arbeitgeber) { const al=arbeitgeber.toLowerCase(); rows=rows.filter(r=>(r.arbeitgeber||'').toLowerCase().includes(al)); }
+  if (tags)        { const tl=tags.toLowerCase(); rows=rows.filter(r=>(r.tags||'').toLowerCase().includes(tl)); }
+  if (bundesland)  { const bl=bundesland.toLowerCase(); rows=rows.filter(r=>(r.bundesland||'').toLowerCase().includes(bl)); }
+  if (wertung)     rows=rows.filter(r=>(r.wertung||0)>=wertung);
+  if (gehalt)      rows=rows.filter(r=>!r.gehalt_erwartet||(r.gehalt_erwartet<=gehalt));
+  if (erfahrung)   rows=rows.filter(r=>(r.erfahrung_jahre||0)>=erfahrung);
+  if (istHot)      rows=rows.filter(r=>r.ist_hot);
+  if (hatProfil)   rows=rows.filter(r=>(r.xing_profil||'').includes('http')||(r.linkedin_profil||'').includes('http'));
+  if (abwSchutz==='ja')   rows=rows.filter(r=>r.abwerbeschutz);
+  if (abwSchutz==='nein') rows=rows.filter(r=>!r.abwerbeschutz);
+  if (quelle)      { const ql=quelle.toLowerCase(); rows=rows.filter(r=>(r.quelle||'').toLowerCase().includes(ql)); }
+  if (keinKontakt) { const cutoff=new Date(); cutoff.setDate(cutoff.getDate()-keinKontakt); rows=rows.filter(r=>!r.letzte_aktivitaet||new Date(r.letzte_aktivitaet)<cutoff); }
 
   // ----------- Ergebnis-Label -----------
   const n = rows.length;
@@ -5802,6 +6183,9 @@ function rechercheMaskeZuruecksetzen() {
   });
   const exEl = document.getElementById('rmExWert');
   if (exEl) exEl.value = 'vermittelt, nicht vermittelbar, generell kein Interesse, kein Kontakt erwünscht';
+  ['rmFreitext','rmArbeitgeber','rmTags','rmBundesland','rmGehalt','rmErfahrung','rmQuelle'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  ['rmWertung','rmKeinKontakt','rmAbwerbeschutz'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  ['rmIstHot','rmHatProfil'].forEach(id=>{const e=document.getElementById(id);if(e)e.checked=false;});
   const anzEl = document.getElementById('rmAnzahl'); if (anzEl) anzEl.textContent = '';
   const bodyEl = document.getElementById('rmBody'); if (bodyEl) bodyEl.innerHTML = '';
 }
