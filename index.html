@@ -1192,6 +1192,26 @@ function istGeschuetzt(r){
   if(!ag) return false;
   return auftraggeberNamen.some(n=>n&&(ag.includes(n)||n.includes(ag)));
 }
+
+// Klick auf Arbeitgeber im Kandidatenprofil → öffnet zugehörige Firma in Kunden
+async function oeffneFirmaVonKandidat(name) {
+  if (!name) return;
+  // 1. Exakter Match (case-insensitive)
+  let { data } = await sb.from('kunden').select('id,name').ilike('name', name.trim()).limit(1);
+  if (data && data.length) { detailKunde(data[0].id); return; }
+  // 2. Normalisierter Match (ohne GmbH etc.)
+  const { data: alle } = await sb.from('kunden').select('id,name');
+  const normSuche = normFirma(name);
+  if (normSuche) {
+    const treffer = (alle || []).find(k => {
+      const n = normFirma(k.name || '');
+      return n && (n.includes(normSuche) || normSuche.includes(n));
+    });
+    if (treffer) { detailKunde(treffer.id); return; }
+  }
+  zeigeMeldung('Firma „' + name + '" nicht unter Kunden gefunden', 'err');
+}
+
 let alleTagsCache=null;
 function tagModusWert(){ const el=document.getElementById('tagModus'); return el?el.value:'und'; }
 async function ladeAlleTags(){
@@ -1831,7 +1851,7 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails)
       <!-- LINKS: Arbeitgeber & Status -->
       <div class="dpanel">
         <span class="dcol-h">Arbeitgeber</span>
-        ${zeile('Firma', esc(d.arbeitgeber))}
+        ${zeile('Firma', d.arbeitgeber ? `<a href="#" onclick="event.preventDefault();oeffneFirmaVonKandidat('${esc(d.arbeitgeber)}')" style="color:var(--accent2)" title="Zur Firma springen">${esc(d.arbeitgeber)}</a>` : '')}
         ${zeile('Bei Firma seit', esc(d.bei_firma_seit))}
         ${zeile('In Pos. seit', esc(d.in_position_seit))}
         ${zeile('Adresse berufl.', esc(adrBerufl))}
@@ -2144,6 +2164,13 @@ function statusListe() {
 }
 const ANREDE_OPTS=['Keine','Herr','Herr Dr.','Frau','Frau Dr.'];
 const FIRMEN_TYPEN=['Auftraggeber','Auftraggeber-Potenzial','Lieferant','Sonstige'];
+const FIRMEN_TYP_BG={
+  'Auftraggeber':'#c0392b',
+  'Auftraggeber-Potenzial':'#e67e22',
+  'Auftraggeber Potenzial':'#e67e22',
+  'Lieferant':'#0078d4',
+  'Sonstige':'var(--muted)'
+};
 
 function ef(label,id,val,type='text'){
   return `<div class="edit-field"><label>${label}</label><input id="ef_${id}" type="${type}" value="${val?String(val).replace(/"/g,'&quot;'):''}"></div>`;
@@ -2343,7 +2370,12 @@ async function detailKunde(id){
       <button class="editbtn" onclick="bearbeiteKunde('${d.id}')">✎ Bearbeiten</button>
       <button class="editbtn" style="color:var(--hot);border-color:rgba(192,64,42,.35)" onclick="kundeLoeschen('${d.id}','${esc(d.name)}')">🗑️ Löschen</button>
     </div>
-    <div class="detail-sub"><span class="pill">${esc(d.typ)||'Auftraggeber'}</span>${d.branche?' · '+esc(d.branche):''}</div>
+    <div class="detail-sub" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:11px;font-weight:700;padding:3px 12px;border-radius:12px;background:${FIRMEN_TYP_BG[d.typ]||'var(--muted)'};color:#fff;letter-spacing:.05em">
+        ${esc(d.typ)||'Sonstige'}
+      </span>
+      ${d.branche?`<span style="color:var(--muted);font-size:13px">${esc(d.branche)}</span>`:''}
+    </div>
     <div class="card"><h3>Kontakt & Adresse</h3><div class="grid2">
       <div>
         ${zeile('Telefon', tel(d.telefon))}
