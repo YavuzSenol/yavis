@@ -530,9 +530,13 @@
 
       <!-- Senden-Buttons -->
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button id="nlDirektBtn" onclick="nlDirektSenden(this)"
+                disabled style="padding:9px 22px;border-radius:6px;cursor:pointer;background:#107c10;color:#fff;border:none;font-weight:700;font-size:14px;display:none">
+          ✅ Direkt senden (0)
+        </button>
         <button id="nlSendBtn" onclick="nlSerienMailOeffnen()"
                 disabled style="padding:9px 22px;border-radius:6px;cursor:pointer;background:var(--muted);color:#fff;border:none;font-weight:700;font-size:14px">
-          📨 Serien-Mail öffnen (erst Kandidaten auswählen)
+          📨 In Outlook öffnen
         </button>
         <button onclick="nlAdressenKopieren()"
                 style="padding:9px 16px;border-radius:6px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);font-size:13px;color:var(--ink)">
@@ -3402,11 +3406,12 @@ function serienMailDialog(rows, vorlage){
         <button onclick="this.closest('dialog').close();this.closest('dialog').remove();vorlagenPickerRendern();document.getElementById('vorlagenPickerDlg').showModal()" style="padding:6px 12px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);color:var(--ink);font-size:13px">📝 Andere Vorlage wählen</button>
       </div>`:''}
 
-      <!-- Outlook öffnen -->
+      <!-- Senden -->
       <div style="border-top:1px solid var(--line);padding-top:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-        <button onclick="outlookOeffnen(this)" style="padding:9px 20px;border-radius:6px;cursor:pointer;background:#0078d4;color:#fff;border:none;font-weight:700;font-size:14px">📨 In Outlook öffnen</button>
+        ${msIstVerbunden()?`<button id="smDirektBtn" onclick="serienMailDirektSenden(this)" style="padding:9px 20px;border-radius:6px;cursor:pointer;background:#107c10;color:#fff;border:none;font-weight:700;font-size:14px">✅ Direkt senden (${mitMail.length})</button>`:''}
+        <button onclick="outlookOeffnen(this)" style="padding:9px 20px;border-radius:6px;cursor:pointer;background:${msIstVerbunden()?'var(--panel2)':'#0078d4'};color:${msIstVerbunden()?'var(--ink)':'#fff'};border:${msIstVerbunden()?'1px solid var(--line)':'none'};font-weight:700;font-size:14px">📨 In Outlook öffnen</button>
         <button onclick="this.closest('dialog').close();this.closest('dialog').remove()" style="padding:9px 18px;border-radius:6px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);color:var(--ink)">Schließen</button>
-        <span style="font-size:12px;color:var(--muted)">Öffnet Outlook mit BCC + Betreff vorausgefüllt</span>
+        ${msIstVerbunden()?'<span style="font-size:12px;color:var(--ok)">✓ Mit Outlook verbunden</span>':'<span style="font-size:12px;color:var(--muted)">Öffnet Outlook vorausgefüllt</span>'}
       </div>
 
       <!-- Protokollieren (erscheint nach Outlook-Klick) -->
@@ -5062,9 +5067,14 @@ function mailSendenDialog(email, kandidatId, name) {
       <div style="display:flex;gap:10px">
         <button onclick="this.closest('dialog').close();this.closest('dialog').remove()"
                 style="padding:7px 18px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line)">Abbrechen</button>
+${msIstVerbunden() ? `<button data-direktsenden="1"
+                onclick="msMailDirektSenden('${esc(email||'')}','${esc(kandidatId)}','${esc(name)}',this.closest('dialog'))"
+                style="padding:7px 22px;border-radius:5px;cursor:pointer;background:#107c10;color:#fff;border:none;font-weight:700">
+          ✅ Direkt senden
+        </button>` : ''}
         <button ${!email ? 'disabled style="opacity:0.45;cursor:not-allowed"' : ''}
                 onclick="msMailOeffnen('${esc(email || '')}','${esc(kandidatId)}','${esc(name)}',this.closest('dialog'))"
-                style="padding:7px 22px;border-radius:5px;cursor:pointer;background:var(--accent2);color:#fff;border:none;font-weight:700">
+                style="padding:7px 22px;border-radius:5px;cursor:pointer;background:${msIstVerbunden()?'var(--panel2)':'var(--accent2)'};color:${msIstVerbunden()?'var(--ink)':'#fff'};border:${msIstVerbunden()?'1px solid var(--line)':'none'};font-weight:700">
           📨 In Outlook öffnen
         </button>
       </div>
@@ -5687,11 +5697,23 @@ function nlUpdateZaehler() {
     if (n > 0) {
       btn.disabled = false;
       btn.style.background = '#0078d4';
-      btn.textContent = '📨 Serien-Mail an ' + n + ' Empfänger öffnen';
+      btn.textContent = '📨 In Outlook öffnen (' + n + ')';
     } else {
       btn.disabled = true;
       btn.style.background = 'var(--muted)';
-      btn.textContent = '📨 Serien-Mail öffnen (erst Kandidaten auswählen)';
+      btn.textContent = '📨 In Outlook öffnen';
+    }
+  }
+  // Direkt-senden Button (Graph API)
+  const dBtn = document.getElementById('nlDirektBtn');
+  if (dBtn) {
+    if (msIstVerbunden()) {
+      dBtn.style.display = 'inline-flex';
+      dBtn.disabled = n === 0;
+      dBtn.style.background = n > 0 ? '#107c10' : 'var(--muted)';
+      dBtn.textContent = n > 0 ? '✅ Direkt senden (' + n + ')' : '✅ Direkt senden';
+    } else {
+      dBtn.style.display = 'none';
     }
   }
   nlVorschauAktualisieren();
@@ -5903,6 +5925,199 @@ function vorlagenRunter(idx) {
   _vorlagenData = vl;
   vorlagenSpeichernLS();
   vorlagenListeRendern();
+}
+
+
+// ================================================================
+//  MICROSOFT GRAPH — DIREKT SENDEN
+// ================================================================
+
+// Hilfsfunktion: eine Mail via Graph API senden
+async function _graphSendMail(token, payload) {
+  const resp = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (resp.status === 202 || resp.ok) return { ok: true };
+  let errMsg = 'HTTP ' + resp.status;
+  try { const e = await resp.json(); errMsg = e.error?.message || errMsg; } catch(e) {}
+  return { ok: false, msg: errMsg };
+}
+
+// Einzelmail direkt senden (aus Kandidaten-Profil-Dialog)
+async function msMailDirektSenden(email, kandidatId, name, dlg) {
+  if (!email) { zeigeMeldung('Keine E-Mail-Adresse vorhanden', 'err'); return; }
+  const token = await msGetToken();
+  if (!token) { zeigeMeldung('Outlook-Verbindung abgelaufen — bitte unter ⚙️ neu verbinden', 'err'); return; }
+
+  const betreff    = dlg.querySelector('#msBetreff')?.value?.trim() || '';
+  const text       = dlg.querySelector('#msText')?.value?.trim()    || '';
+  const signatur   = localStorage.getItem('yavis_signatur') || '';
+  const vollerText = text + (signatur ? '\n\n' + signatur : '');
+
+  const btn = dlg.querySelector('[data-direktsenden]');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ …'; }
+
+  const result = await _graphSendMail(token, {
+    message: {
+      subject: betreff,
+      body: { contentType: 'Text', content: vollerText },
+      toRecipients: [{ emailAddress: { address: email } }]
+    },
+    saveToSentItems: true
+  });
+
+  if (!result.ok) {
+    zeigeMeldung('Sendefehler: ' + result.msg, 'err');
+    if (btn) { btn.disabled = false; btn.textContent = '✅ Direkt senden'; }
+    return;
+  }
+
+  // Protokollieren
+  const { data: user } = await sb.auth.getUser();
+  await sb.from('emails').insert({
+    id: 'yavis_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
+    betreff: '📤 ' + (betreff || 'E-Mail direkt gesendet'),
+    entity_id: kandidatId,
+    besitzer_id: user?.user?.id || null,
+    erstellt_am: new Date().toISOString(),
+  });
+
+  dlg.close(); dlg.remove();
+  zeigeMeldung('✅ E-Mail gesendet + protokolliert', 'ok');
+
+  // E-Mail-Historie im Detail-View auffrischen
+  setTimeout(async () => {
+    const { data: mails } = await sb.from('emails').select('*')
+      .eq('entity_id', kandidatId).order('erstellt_am', { ascending: false }).limit(100);
+    const hist = document.getElementById('mailHistorie');
+    if (hist) hist.innerHTML = mailHistorieHtml(mails || []);
+    const acc = document.getElementById('mailAcc');
+    if (acc) { const cnt = acc.querySelector('.acc-cnt'); if (cnt) cnt.textContent = '(' + (mails?.length||0) + ')'; }
+  }, 400);
+}
+
+// Serien-Mail direkt senden (aus Serien-Mail-Dialog)
+async function serienMailDirektSenden(btn) {
+  const token = await msGetToken();
+  if (!token) { zeigeMeldung('Outlook-Verbindung abgelaufen — bitte unter ⚙️ neu verbinden', 'err'); return; }
+
+  const bccStr   = document.getElementById('smBcc').value;
+  const betreff  = document.getElementById('smBetreff').value.trim();
+  const text     = document.getElementById('smText').value;
+  const meinBccEl = document.getElementById('smMeinBcc');
+  const meinBcc  = meinBccEl ? meinBccEl.value.trim() : '';
+
+  if (!betreff) { zeigeMeldung('Bitte einen Betreff eingeben', 'warn'); return; }
+  const empfaenger = bccStr.split(';').map(e => e.trim()).filter(Boolean);
+  if (!empfaenger.length) { zeigeMeldung('Keine Empfaenger mit E-Mail-Adresse', 'err'); return; }
+
+  btn.disabled = true; btn.textContent = '⏳ Wird gesendet …';
+
+  const signatur   = localStorage.getItem('yavis_signatur') || '';
+  const vollerText = text + (signatur ? '\n\n' + signatur : '');
+
+  // An sich selbst (oder BCC-Adresse), alle Kandidaten im BCC
+  const toAddr = meinBcc || empfaenger[0];
+  const bccRecipients = empfaenger
+    .filter(e => e !== toAddr)
+    .map(e => ({ emailAddress: { address: e } }));
+  if (meinBcc && !bccRecipients.find(r => r.emailAddress.address === meinBcc)) {
+    // meinBcc ist already in toAddr, alle anderen als BCC
+  }
+  // Wenn kein meinBcc: erste Adresse als To, Rest als BCC
+  const allBcc = meinBcc
+    ? empfaenger.map(e => ({ emailAddress: { address: e } }))
+    : empfaenger.slice(1).map(e => ({ emailAddress: { address: e } }));
+
+  const result = await _graphSendMail(token, {
+    message: {
+      subject: betreff,
+      body: { contentType: 'Text', content: vollerText },
+      toRecipients: [{ emailAddress: { address: toAddr } }],
+      bccRecipients: allBcc
+    },
+    saveToSentItems: true
+  });
+
+  if (!result.ok) {
+    zeigeMeldung('Sendefehler: ' + result.msg, 'err');
+    btn.disabled = false; btn.textContent = '✅ Direkt senden (' + empfaenger.length + ')';
+    return;
+  }
+
+  // Protokollieren
+  if (_serienMailKandidaten && _serienMailKandidaten.length) {
+    await serienMailProtokollieren(btn);
+  }
+  btn.closest('dialog').close(); btn.closest('dialog').remove();
+  zeigeMeldung('✅ Serien-Mail gesendet + ' + empfaenger.length + ' protokolliert', 'ok');
+}
+
+// Newsletter direkt senden (Newsletter-Tab)
+async function nlDirektSenden(btn) {
+  const token = await msGetToken();
+  if (!token) { zeigeMeldung('Outlook-Verbindung abgelaufen — bitte unter ⚙️ neu verbinden', 'err'); return; }
+
+  const betreff  = (document.getElementById('nlBetreff')?.value || '').trim();
+  const text     = (document.getElementById('nlText')?.value    || '').trim();
+  const signatur = localStorage.getItem('yavis_signatur') || '';
+  const vollerText = text + (signatur ? '\n\n' + signatur : '');
+  const bcc      = localStorage.getItem('yavis_bcc') || '';
+
+  if (!betreff) { zeigeMeldung('Bitte einen Betreff eingeben', 'err'); return; }
+
+  const empfaenger = [..._nlAusgewaehlt]
+    .map(id => _nlKandidaten.find(r => r.id === id))
+    .filter(Boolean)
+    .map(r => ({ id: r.id, email: r.email || r.email_beruflich || r.email_zweit || '' }))
+    .filter(r => r.email);
+
+  if (!empfaenger.length) { zeigeMeldung('Keine Empfaenger mit E-Mail-Adresse', 'err'); return; }
+
+  btn.disabled = true; btn.textContent = '⏳ Wird gesendet …';
+
+  // An BCC-Adresse (oder ersten Kandidaten), alle im BCC
+  const toAddr = bcc || empfaenger[0].email;
+  const bccList = empfaenger.map(r => ({ emailAddress: { address: r.email } }));
+
+  const result = await _graphSendMail(token, {
+    message: {
+      subject: betreff,
+      body: { contentType: 'Text', content: vollerText },
+      toRecipients: [{ emailAddress: { address: toAddr } }],
+      bccRecipients: bcc
+        ? bccList
+        : bccList.slice(1)
+    },
+    saveToSentItems: true
+  });
+
+  if (!result.ok) {
+    zeigeMeldung('Sendefehler: ' + result.msg, 'err');
+    btn.disabled = false;
+    btn.textContent = '✅ Direkt senden (' + empfaenger.length + ')';
+    return;
+  }
+
+  // Protokollieren
+  const { data: user } = await sb.auth.getUser();
+  const ts = Date.now();
+  const eintraege = empfaenger.map((r, i) => ({
+    id: 'nl_' + ts + '_' + i,
+    betreff: '📤 ' + betreff,
+    entity_id: r.id,
+    besitzer_id: user?.user?.id || null,
+    erstellt_am: new Date().toISOString(),
+  }));
+  for (let i = 0; i < eintraege.length; i += 50) {
+    await sb.from('emails').insert(eintraege.slice(i, i + 50));
+  }
+
+  btn.disabled = false;
+  btn.textContent = '✅ Direkt senden (' + empfaenger.length + ')';
+  zeigeMeldung('✅ Newsletter gesendet · ' + empfaenger.length + ' Mails + protokolliert', 'ok');
 }
 
 </script>
