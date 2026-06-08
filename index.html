@@ -300,6 +300,16 @@
           <option>Auftraggeber</option><option>Auftraggeber-Potenzial</option>
           <option>Lieferant</option><option>Sonstige</option>
         </select></div>
+      <div class="field"><label>PLZ (Umkreis)</label>
+        <input id="cPlz" placeholder="z.B. 50667" style="width:90px" maxlength="5"></div>
+      <div class="field"><label>Radius km</label>
+        <select id="cRadius">
+          <option value="25">25 km</option>
+          <option value="50" selected>50 km</option>
+          <option value="100">100 km</option>
+          <option value="150">150 km</option>
+          <option value="200">200 km</option>
+        </select></div>
       <button class="go" onclick="ladeKunden()">Suchen</button>
       <button class="neuBtn" onclick="neuerKunde()">+ Neue Firma</button>
     </div>
@@ -771,9 +781,13 @@
           <div><b>Duplikate finden</b><div style="font-size:12px;color:var(--muted)">Doppelte Kandidaten nach Name oder E-Mail suchen</div></div>
           <button onclick="document.getElementById('einstellungenDlg').close();duplikateFinden()" style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:13px">🔍 Suchen</button>
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--line)">
           <div><b>Alle Kandidaten exportieren</b><div style="font-size:12px;color:var(--muted)">Vollständige Kandidatenliste als CSV-Datei</div></div>
           <button onclick="exportAlleKandidaten()" style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:13px">📥 CSV</button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px">
+          <div><b>Papierkorb</b><div style="font-size:12px;color:var(--muted)">Gelöschte Kandidaten, Firmen und Ansprechpartner wiederherstellen oder endgültig löschen</div></div>
+          <button onclick="document.getElementById('einstellungenDlg').close();ladePapierkorb()" style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:13px">🗑️ Öffnen</button>
         </div>
       </div>
     </div>
@@ -907,6 +921,13 @@ async function pruefeLogin(){
   }
 }
 
+async function pruefeSoftDelete(){
+  try {
+    const {error}=await sb.from('kandidaten').select('geloescht_am').limit(1);
+    if(!error){ softDeleteAktiv=true; console.log('YAVIS: Papierkorb aktiv'); }
+  } catch(e){}
+}
+
 function zeigeApp(){
   document.getElementById('login').style.display='none';
   document.getElementById('einstellungenBtn').style.display='inline-block';
@@ -929,7 +950,7 @@ function zeigeApp(){
     document.querySelectorAll('.tab[data-view]').forEach(x=>x.classList.remove('active'));
     const kt=document.querySelector('.tab[data-view="kandidaten"]'); if(kt) kt.classList.add('active');
     pruefeAnruf(anruf);
-  } else { zeigeStart(); }
+  } else { pruefeSoftDelete(); zeigeStart(); }
 }
 
 async function login(){
@@ -992,6 +1013,7 @@ function normTag(raw){ if(!raw) return null; let t=String(raw).trim().replace(/^
 function parseTags(raw){ if(!raw) return []; const out=[]; String(raw).split(/[;,]/).forEach(p=>{ const t=normTag(p); if(t&&!out.includes(t)) out.push(t); }); return out; }
 function kategorieVon(tag){ for(const k in TAG_KATEGORIEN){ if(TAG_KATEGORIEN[k].includes(tag)) return k; } return 'Sonstige'; }
 let tagFilter=new Set();
+let softDeleteAktiv=false; // Papierkorb: wird in pruefeSoftDelete() gesetzt
 let selectedKandIds=new Set();
 function updateSelBar(){
   const bar=document.getElementById('selBar'); if(!bar) return;
@@ -1424,6 +1446,7 @@ async function ladeKandidaten(){
 
   // Normale Suche
   let query=sb.from('kandidaten').select('*').limit(200);
+  if(softDeleteAktiv) query=query.is('geloescht_am',null);
   if(posListe) query=query.in('berufsbezeichnung',posListe);
   if(luecke) query=lueckeQuery(query,luecke);
   if(mitProfil) query=query.or('xing_profil.ilike.%http%,linkedin_profil.ilike.%http%');
@@ -2614,11 +2637,58 @@ async function speichereKontakt(id){
 }
 
 
+function haversineKm(lat1,lon1,lat2,lon2){
+  const R=6371,dLat=(lat2-lat1)*Math.PI/180,dLon=(lon2-lon1)*Math.PI/180;
+  const a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
 async function ladeKunden(){
   const q=document.getElementById('cSuche').value.trim();
   const typ=document.getElementById('cTyp').value;
+  const cPlzEl=document.getElementById('cPlz');
+  const plz=cPlzEl?cPlzEl.value.trim():'';
+  const radius=parseInt((document.getElementById('cRadius')||{}).value||'50')||50;
   const body=document.getElementById('cBody'); body.innerHTML='';
+
+  // ---- Umkreissuche ----
+  if(plz){
+    const {data:geo,error:geoErr}=await sb.from('plz_geo').select('lat,lng').eq('plz',plz).limit(1);
+    if(geoErr||!geo||!geo.length){
+      document.getElementById('cCount').textContent='PLZ '+plz+' nicht gefunden.'; return;
+    }
+    const cLat=geo[0].lat, cLng=geo[0].lng;
+    let query=sb.from('kunden').select('*');
+    if(softDeleteAktiv) query=query.is('geloescht_am',null);
+    if(typ) query=query.eq('typ',typ);
+    const {data,error}=await query;
+    if(error){document.getElementById('cCount').textContent='Fehler: '+error.message;return;}
+    // Fehlende Koordinaten aus plz_geo nachladen
+    const ohneLl=data.filter(r=>r.plz&&(r.lat==null||r.lng==null));
+    if(ohneLl.length){
+      const plzSet=[...new Set(ohneLl.map(r=>r.plz))];
+      const {data:geos}=await sb.from('plz_geo').select('plz,lat,lng').in('plz',plzSet);
+      const geoMap={}; (geos||[]).forEach(g=>geoMap[g.plz]={lat:g.lat,lng:g.lng});
+      ohneLl.forEach(r=>{ if(geoMap[r.plz]){r.lat=geoMap[r.plz].lat;r.lng=geoMap[r.plz].lng;} });
+    }
+    const rows=data.filter(r=>r.lat!=null&&r.lng!=null&&haversineKm(cLat,cLng,r.lat,r.lng)<=radius);
+    rows.sort((a,b)=>haversineKm(cLat,cLng,a.lat,a.lng)-haversineKm(cLat,cLng,b.lat,b.lng));
+    document.getElementById('cCount').textContent=rows.length+' Firmen im Umkreis von '+radius+' km um '+plz+(typ?' · '+typ:'');
+    rows.forEach(r=>{
+      const tr=document.createElement('tr');tr.className='row-click';
+      const km=Math.round(haversineKm(cLat,cLng,r.lat,r.lng));
+      tr.innerHTML=`<td>${esc(r.name)||'–'}</td><td><span class="pill">${esc(r.typ)||'Auftraggeber'}</span></td><td>${esc(r.branche)||'–'}</td>
+        <td>${esc(r.plz)||''} ${esc(r.stadt)||''}<span style="color:var(--muted);font-size:12px;margin-left:5px">(${km} km)</span></td><td>${esc(r.telefon)||'–'}</td>`;
+      tr.onclick=()=>detailKunde(r.id);
+      body.appendChild(tr);
+    });
+    if(!rows.length) body.innerHTML='<tr><td colspan="5" class="empty">Keine Firmen in diesem Umkreis gefunden.</td></tr>';
+    return;
+  }
+
+  // ---- Normale Suche ----
   let query=sb.from('kunden').select('*').limit(200).order('name');
+  if(softDeleteAktiv) query=query.is('geloescht_am',null);
   if(q) query=query.or(`name.ilike.%${q}%,branche.ilike.%${q}%,stadt.ilike.%${q}%`);
   if(typ) query=query.eq('typ',typ);
   const {data,error}=await query;
@@ -2638,6 +2708,7 @@ async function ladeKontakte(){
   const q=document.getElementById('ktSuche').value.trim();
   const body=document.getElementById('ktBody'); body.innerHTML='';
   let query=sb.from('kontakte').select('*').limit(200).order('nachname');
+  if(softDeleteAktiv) query=query.is('geloescht_am',null);
   if(q) query=query.or(`voller_name.ilike.%${q}%,berufsbezeichnung.ilike.%${q}%`);
   const {data,error}=await query;
   if(error){document.getElementById('ktCount').textContent='Fehler: '+error.message;return;}
@@ -5363,22 +5434,98 @@ async function msMailOeffnen(email, kandidatId, name, dlg) {
   }, 800);
 }
 
+// ================================================================
+//  PAPIERKORB
+// ================================================================
+async function ladePapierkorb() {
+  if (!softDeleteAktiv) {
+    zeigeMeldung('Papierkorb-Spalte fehlt noch. Bitte zuerst das SQL in Supabase ausführen (siehe Einrichtung).', 'err');
+    return;
+  }
+  const [kanRes, kdRes, ktRes] = await Promise.all([
+    sb.from('kandidaten').select('id,voller_name,geloescht_am').not('geloescht_am','is',null).order('geloescht_am',{ascending:false}),
+    sb.from('kunden').select('id,name,geloescht_am').not('geloescht_am','is',null).order('geloescht_am',{ascending:false}),
+    sb.from('kontakte').select('id,voller_name,geloescht_am').not('geloescht_am','is',null).order('geloescht_am',{ascending:false}),
+  ]);
+  let existing = document.getElementById('papierkorbDlg');
+  if (existing) { existing.close(); existing.remove(); }
+  const rows = [];
+  (kanRes.data||[]).forEach(r=>rows.push({typ:'Kandidat', id:r.id, name:r.voller_name, ts:r.geloescht_am}));
+  (kdRes.data||[]).forEach(r=>rows.push({typ:'Firma', id:r.id, name:r.name, ts:r.geloescht_am}));
+  (ktRes.data||[]).forEach(r=>rows.push({typ:'Kontakt', id:r.id, name:r.voller_name, ts:r.geloescht_am}));
+  rows.sort((a,b)=>b.ts.localeCompare(a.ts));
+  const tableRows = rows.length ? rows.map(r=>`
+    <tr>
+      <td style="font-weight:500">${esc(r.name)||'–'}</td>
+      <td><span class="pill">${r.typ}</span></td>
+      <td style="color:var(--muted);font-size:12px">${r.ts.slice(0,10)}</td>
+      <td style="white-space:nowrap;text-align:right">
+        <button class="tab" style="padding:4px 10px;margin-right:6px" onclick="datensatzWiederherstellen('${r.typ}','${r.id}')">♻️ Wiederherstellen</button>
+        <button class="tab" style="padding:4px 10px;color:var(--hot)" onclick="datensatzEndgueltigLoeschen('${r.typ}','${r.id}','${esc(r.name||'')}')">🗑️ Endgültig</button>
+      </td>
+    </tr>`).join('') : '<tr><td colspan="4" class="empty" style="padding:20px">Papierkorb ist leer.</td></tr>';
+  const dlg = document.createElement('dialog');
+  dlg.id = 'papierkorbDlg';
+  dlg.style.cssText = 'background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:0;width:min(760px,96vw);max-height:90vh;overflow-y:auto';
+  dlg.innerHTML = `<div style="padding:22px 26px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid var(--line);padding-bottom:12px">
+      <h2 style="margin:0;font-size:18px;font-weight:700">🗑️ Papierkorb</h2>
+      <button onclick="this.closest('dialog').close()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1">✕</button>
+    </div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:14px">${rows.length} Einträge im Papierkorb</div>
+    <table style="width:100%"><thead><tr><th style="text-align:left">Name</th><th style="text-align:left">Typ</th><th style="text-align:left">Gelöscht am</th><th></th></tr></thead>
+    <tbody>${tableRows}</tbody></table>
+  </div>`;
+  document.body.appendChild(dlg);
+  dlg.showModal();
+}
+
+async function datensatzWiederherstellen(typ, id) {
+  const tbl = typ==='Kandidat'?'kandidaten':typ==='Firma'?'kunden':'kontakte';
+  const {error} = await sb.from(tbl).update({geloescht_am:null}).eq('id',id);
+  if (error) { zeigeMeldung('Fehler: '+error.message,'err'); return; }
+  zeigeMeldung(typ+' wiederhergestellt ✓','ok');
+  ladePapierkorb();
+}
+
+async function datensatzEndgueltigLoeschen(typ, id, name) {
+  if (!confirm('Endgültig und unwiderruflich löschen?\n"'+name+'"')) return;
+  if (typ==='Kandidat') {
+    for (const [tbl,col] of [['erfahrung','kandidat_id'],['ausbildung','kandidat_id'],['notizen','kandidat_id'],['bewerbungen','kandidat_id'],['aufgaben','verknuepft_mit'],['dokumente','kandidat_id'],['emails','entity_id']]) {
+      await sb.from(tbl).delete().eq(col,id);
+    }
+    await sb.from('kandidaten').delete().eq('id',id);
+  } else if (typ==='Kontakt') {
+    for (const [tbl,col] of [['notizen','kontakt_id'],['aufgaben','verknuepft_mit'],['emails','entity_id']]) {
+      await sb.from(tbl).delete().eq(col,id);
+    }
+    await sb.from('kontakte').delete().eq('id',id);
+  } else if (typ==='Firma') {
+    for (const [tbl,col] of [['aufgaben','verknuepft_mit'],['emails','entity_id']]) {
+      await sb.from(tbl).delete().eq(col,id);
+    }
+    await sb.from('kunden').delete().eq('id',id);
+  }
+  zeigeMeldung(typ+' endgültig gelöscht ✓','ok');
+  ladePapierkorb();
+}
+
 // ---- Kandidat löschen ----
 function kandidatLoeschen(id, name) {
   const dlg = document.createElement('dialog');
   dlg.style.cssText = 'background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:24px;max-width:440px;width:95vw';
   dlg.innerHTML = `
-    <div style="font-size:16px;font-weight:700;margin-bottom:10px">🗑️ Kandidat löschen?</div>
+    <div style="font-size:16px;font-weight:700;margin-bottom:10px">🗑️ In Papierkorb verschieben?</div>
     <div style="font-size:14px;font-weight:600;margin-bottom:8px">${esc(name)}</div>
     <div style="font-size:13px;color:var(--muted);margin-bottom:18px;line-height:1.5">
-      Alle zugehörigen Daten werden unwiderruflich gelöscht:<br>
-      Erfahrungen, Ausbildungen, Notizen, Bewerbungen, Aufgaben, Dokumente, E-Mail-Protokolle.
+      Kandidat wird in den Papierkorb verschoben und kann dort wiederhergestellt werden.<br>
+      Alle Daten bleiben erhalten (Notizen, Bewerbungen, Aufgaben usw.).
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
       <button onclick="this.closest('dialog').close();this.closest('dialog').remove()"
               style="padding:7px 18px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line)">Abbrechen</button>
       <button onclick="_kandidatWirklichLoeschen('${esc(id)}',this.closest('dialog'))"
-              style="padding:7px 22px;border-radius:5px;cursor:pointer;background:var(--hot);color:#fff;border:none;font-weight:700">Ja, endgültig löschen</button>
+              style="padding:7px 22px;border-radius:5px;cursor:pointer;background:var(--hot);color:#fff;border:none;font-weight:700">In Papierkorb</button>
     </div>`;
   document.body.appendChild(dlg);
   dlg.showModal();
@@ -5386,28 +5533,15 @@ function kandidatLoeschen(id, name) {
 
 async function _kandidatWirklichLoeschen(id, dlg) {
   const btn = dlg.querySelector('button:last-child');
-  btn.textContent = 'Lösche …'; btn.disabled = true;
-  const tables = [
-    ['erfahrung',   'kandidat_id'],
-    ['ausbildung',  'kandidat_id'],
-    ['notizen',     'kandidat_id'],
-    ['bewerbungen', 'kandidat_id'],
-    ['aufgaben',    'verknuepft_mit'],
-    ['dokumente',   'kandidat_id'],
-    ['emails',      'entity_id'],
-  ];
-  for (const [tbl, col] of tables) {
-    const { error } = await sb.from(tbl).delete().eq(col, id);
-    if (error) console.warn('Löschen ' + tbl + ':', error.message);
-  }
-  const { error } = await sb.from('kandidaten').delete().eq('id', id);
+  btn.textContent = 'Verschiebe …'; btn.disabled = true;
+  const { error } = await sb.from('kandidaten').update({geloescht_am: new Date().toISOString()}).eq('id', id);
   if (error) {
     zeigeMeldung('Fehler: ' + error.message, 'err');
-    btn.disabled = false; btn.textContent = 'Ja, endgültig löschen';
+    btn.disabled = false; btn.textContent = 'In Papierkorb';
     return;
   }
   dlg.close(); dlg.remove();
-  zeigeMeldung('Kandidat gelöscht ✓', 'ok');
+  zeigeMeldung('Kandidat in Papierkorb verschoben ✓', 'ok');
   zurueckZurListe();
 }
 
@@ -5416,18 +5550,17 @@ function kontaktLoeschen(id, name) {
   const dlg = document.createElement('dialog');
   dlg.style.cssText = 'background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:24px;max-width:440px;width:95vw';
   dlg.innerHTML = `
-    <div style="font-size:16px;font-weight:700;margin-bottom:10px">🗑️ Ansprechpartner löschen?</div>
+    <div style="font-size:16px;font-weight:700;margin-bottom:10px">🗑️ In Papierkorb verschieben?</div>
     <div style="font-size:14px;font-weight:600;margin-bottom:8px">${esc(name)}</div>
     <div style="font-size:13px;color:var(--muted);margin-bottom:18px;line-height:1.5">
-      Alle zugehörigen Daten werden unwiderruflich gelöscht:<br>
-      Notizen, Aufgaben und E-Mail-Protokolle.<br>
-      <span style="color:var(--fg)">Die verknüpfte Firma bleibt erhalten.</span>
+      Ansprechpartner wird in den Papierkorb verschoben.<br>
+      <span style="color:var(--fg)">Notizen und Aufgaben bleiben erhalten. Die Firma bleibt unberührt.</span>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
       <button onclick="this.closest('dialog').close();this.closest('dialog').remove()"
               style="padding:7px 18px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line)">Abbrechen</button>
       <button onclick="_kontaktWirklichLoeschen('${esc(id)}',this.closest('dialog'))"
-              style="padding:7px 22px;border-radius:5px;cursor:pointer;background:var(--hot);color:#fff;border:none;font-weight:700">Ja, löschen</button>
+              style="padding:7px 22px;border-radius:5px;cursor:pointer;background:var(--hot);color:#fff;border:none;font-weight:700">In Papierkorb</button>
     </div>`;
   document.body.appendChild(dlg);
   dlg.showModal();
@@ -5435,23 +5568,15 @@ function kontaktLoeschen(id, name) {
 
 async function _kontaktWirklichLoeschen(id, dlg) {
   const btn = dlg.querySelector('button:last-child');
-  btn.textContent = 'Lösche …'; btn.disabled = true;
-  for (const [tbl, col] of [
-    ['notizen',  'kontakt_id'],
-    ['aufgaben', 'verknuepft_mit'],
-    ['emails',   'entity_id'],
-  ]) {
-    const { error } = await sb.from(tbl).delete().eq(col, id);
-    if (error) console.warn('Löschen ' + tbl + ':', error.message);
-  }
-  const { error } = await sb.from('kontakte').delete().eq('id', id);
+  btn.textContent = 'Verschiebe …'; btn.disabled = true;
+  const { error } = await sb.from('kontakte').update({geloescht_am: new Date().toISOString()}).eq('id', id);
   if (error) {
     zeigeMeldung('Fehler: ' + error.message, 'err');
-    btn.disabled = false; btn.textContent = 'Ja, löschen';
+    btn.disabled = false; btn.textContent = 'In Papierkorb';
     return;
   }
   dlg.close(); dlg.remove();
-  zeigeMeldung('Ansprechpartner gelöscht ✓', 'ok');
+  zeigeMeldung('Ansprechpartner in Papierkorb verschoben ✓', 'ok');
   zurueckZurListe();
 }
 
@@ -5460,17 +5585,17 @@ function kundeLoeschen(id, name) {
   const dlg = document.createElement('dialog');
   dlg.style.cssText = 'background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:24px;max-width:440px;width:95vw';
   dlg.innerHTML = `
-    <div style="font-size:16px;font-weight:700;margin-bottom:10px">🗑️ Kunde löschen?</div>
+    <div style="font-size:16px;font-weight:700;margin-bottom:10px">🗑️ In Papierkorb verschieben?</div>
     <div style="font-size:14px;font-weight:600;margin-bottom:8px">${esc(name)}</div>
     <div style="font-size:13px;color:var(--muted);margin-bottom:18px;line-height:1.5">
-      Notizen, Aufgaben und E-Mail-Protokolle werden gelöscht.<br>
-      Verknüpfte Ansprechpartner und Stellenausschreibungen bleiben erhalten, verlieren aber die Kundenzuordnung.
+      Firma wird in den Papierkorb verschoben und kann dort wiederhergestellt werden.<br>
+      Ansprechpartner, Notizen und Aufgaben bleiben erhalten.
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
       <button onclick="this.closest('dialog').close();this.closest('dialog').remove()"
               style="padding:7px 18px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line)">Abbrechen</button>
       <button onclick="_kundeWirklichLoeschen('${esc(id)}',this.closest('dialog'))"
-              style="padding:7px 22px;border-radius:5px;cursor:pointer;background:var(--hot);color:#fff;border:none;font-weight:700">Ja, löschen</button>
+              style="padding:7px 22px;border-radius:5px;cursor:pointer;background:var(--hot);color:#fff;border:none;font-weight:700">In Papierkorb</button>
     </div>`;
   document.body.appendChild(dlg);
   dlg.showModal();
@@ -5478,19 +5603,15 @@ function kundeLoeschen(id, name) {
 
 async function _kundeWirklichLoeschen(id, dlg) {
   const btn = dlg.querySelector('button:last-child');
-  btn.textContent = 'Lösche …'; btn.disabled = true;
-  for (const [tbl, col] of [['aufgaben','verknuepft_mit'],['emails','entity_id']]) {
-    const { error } = await sb.from(tbl).delete().eq(col, id);
-    if (error) console.warn('Löschen ' + tbl + ':', error.message);
-  }
-  const { error } = await sb.from('kunden').delete().eq('id', id);
+  btn.textContent = 'Verschiebe …'; btn.disabled = true;
+  const { error } = await sb.from('kunden').update({geloescht_am: new Date().toISOString()}).eq('id', id);
   if (error) {
-    zeigeMeldung('Fehler: ' + error.message + ' — ggf. noch verknüpfte Stellen vorhanden', 'err');
-    btn.disabled = false; btn.textContent = 'Ja, löschen';
+    zeigeMeldung('Fehler: ' + error.message, 'err');
+    btn.disabled = false; btn.textContent = 'In Papierkorb';
     return;
   }
   dlg.close(); dlg.remove();
-  zeigeMeldung('Kunde gelöscht ✓', 'ok');
+  zeigeMeldung('Firma in Papierkorb verschoben ✓', 'ok');
   zurueckZurListe();
 }
 
