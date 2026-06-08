@@ -1974,7 +1974,7 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails)
     <details class="acc">
       <summary><span>System</span><span class="acc-arr">▶</span></summary>
       <div class="acc-body" style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px 20px">
-        ${zeile('Kandidat-ID', esc(d.id))}
+        ${zeile('Kandidat-ID', `<span title="${esc(d.id)}">${fmtKandidatId(d.id)}</span>`)}
         ${zeile('Erstellt', d.erstellt_am?fmtDat(d.erstellt_am):'')}
         ${zeile('Geändert', d.geaendert_am?fmtDat(d.geaendert_am):'')}
         ${zeile('Letzte Aktivität', d.letzte_aktivitaet?fmtDat(d.letzte_aktivitaet):'')}
@@ -2073,6 +2073,14 @@ function initAbschnitteSortierung() {
     if (arrow) summary.insertBefore(btns, arrow);
     else summary.appendChild(btns);
   });
+}
+
+function fmtKandidatId(id) {
+  if (!id) return '';
+  // Zoho-Import: "Z-Recruit_XXXXXXXXXX" → "KAN-XXXXXXXXXX"
+  const m = String(id).match(/Z-?[Rr]ecruit_?(.+)/);
+  if (m) return 'KAN-' + m[1];
+  return id;  // andere IDs unverändert
 }
 
 function fmtDat(s){ if(!s) return ''; try{const d=new Date(s);
@@ -2517,7 +2525,7 @@ async function detailKontakt(id){
     }</div>`:''}
     ${aufgabenCardHtml(aufg_,'Kontakt',d.id)}
     <div class="card"><h3>System</h3><div class="grid2">
-      <div>${zeile('Kontakt-ID', esc(d.id))}${zeile('Quelle', esc(d.quelle))}</div>
+      <div>${zeile('Kontakt-ID', `<span title="${esc(d.id)}">${fmtKandidatId(d.id)}</span>`)}${zeile('Quelle', esc(d.quelle))}</div>
       <div>${zeile('Erstellt', d.erstellt_am?fmtDat(d.erstellt_am):'')}${zeile('Geändert', d.geaendert_am?fmtDat(d.geaendert_am):'')}</div>
     </div></div>
   `;
