@@ -6003,7 +6003,11 @@ function rmRenderFirmen(bodyEl,rows,cLat,cLng){
       +'<td style="padding:7px 10px;color:var(--muted);font-size:12px">'+esc(r.telefon||'–')+'</td>'
       +'</tr>';
   });
-  bodyEl.innerHTML=htm+'</tbody></table></div>';
+  _rmLetzteErgebnisse = {tab:'firmen', rows};
+  bodyEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+    + '<span style="font-size:12px;color:var(--muted)">' + rows.length + ' Treffer</span>'
+    + '<button onclick="rechercheCsvExport()" style="padding:5px 13px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);font-size:12px;color:var(--ink)">📥 CSV</button>'
+    + '</div>' + htm + '</tbody></table></div>';
 }
 
 // ================================================================
@@ -6055,7 +6059,11 @@ async function rechercheKontakteAusfuehren() {
       +'<td style="padding:7px 10px;color:var(--muted);font-size:12px">'+esc(r.telefon_beruflich||r.mobil||'–')+'</td>'
       +'</tr>';
   });
-  bodyEl.innerHTML=htm+'</tbody></table></div>';
+  _rmLetzteErgebnisse = {tab:'kontakte', rows:data, firmaMap};
+  bodyEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+    + '<span style="font-size:12px;color:var(--muted)">' + data.length + ' Treffer</span>'
+    + '<button onclick="rechercheCsvExport()" style="padding:5px 13px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);font-size:12px;color:var(--ink)">📥 CSV</button>'
+    + '</div>' + htm + '</tbody></table></div>';
 }
 
 // ================================================================
@@ -6063,6 +6071,7 @@ async function rechercheKontakteAusfuehren() {
 // ================================================================
 let _rmGewaehltePos = new Set();
 let _mfaAktuellerFaktorId = null;
+let _rmLetzteErgebnisse = null; // {tab, rows} für CSV-Export
 let _rmAktivesTab = 'kandidaten';
 const _rmFirmTyp = new Set();
 
@@ -6307,7 +6316,42 @@ async function rechercheMaskeAusfuehren() {
           + '</tr>';
   });
   html += '</tbody></table></div>';
-  bodyEl.innerHTML = html;
+  _rmLetzteErgebnisse = {tab:'kandidaten', rows};
+  bodyEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+    + '<span style="font-size:12px;color:var(--muted)">' + rows.length + ' Treffer</span>'
+    + '<button onclick="rechercheCsvExport()" style="padding:5px 13px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);font-size:12px;color:var(--ink)">📥 CSV</button>'
+    + '</div>' + html;
+}
+
+function rechercheCsvExport() {
+  if (!_rmLetzteErgebnisse || !_rmLetzteErgebnisse.rows || !_rmLetzteErgebnisse.rows.length) {
+    zeigeMeldung('Keine Ergebnisse zum Exportieren.','err'); return;
+  }
+  const {tab, rows, firmaMap} = _rmLetzteErgebnisse;
+  let header, getRow;
+  if (tab === 'kandidaten') {
+    header = ['Name','Position','PLZ','Ort','Bundesland','E-Mail','Mobil','Telefon','Status','Arbeitgeber','Wertung','Tags'];
+    getRow = r => [
+      r.voller_name||'', r.berufsbezeichnung||'', r.plz||'', r.stadt||'', r.bundesland||'',
+      r.email||r.email_beruflich||'', r.mobil||r.mobil_privat||'', r.telefon||r.telefon_privat||'',
+      r.status||'', r.arbeitgeber||'', r.wertung!=null?String(r.wertung):'',
+      (r.tags||'').replace(/^;|;$/g,'').replace(/;/g,', ')
+    ];
+  } else if (tab === 'firmen') {
+    header = ['Name','Typ','Branche','PLZ','Ort','Bundesland','Telefon','E-Mail','Website'];
+    getRow = r => [r.name||'', r.typ||'', r.branche||'', r.plz||'', r.stadt||'', r.bundesland||'', r.telefon||'', r.email||'', r.website||''];
+  } else {
+    header = ['Name','Funktion','Firma','E-Mail','Telefon','Mobil'];
+    getRow = r => [r.voller_name||'', r.berufsbezeichnung||'', (firmaMap&&firmaMap[r.kunde_id])||'', r.email||'', r.telefon_beruflich||'', r.mobil||''];
+  }
+  const csvEsc = v => { const s=String(v||''); return (s.includes(',')||s.includes('"')||s.includes('\n'))?'"'+s.replace(/"/g,'""')+'"':s; };
+  const lines = [header.map(csvEsc).join(','), ...rows.map(r => getRow(r).map(csvEsc).join(','))];
+  const blob = new Blob(['﻿' + lines.join('\r\n')], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'YAVIS_Recherche_' + tab + '_' + new Date().toISOString().slice(0,10) + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  zeigeMeldung('CSV exportiert (' + rows.length + ' Zeilen) ✓','ok');
 }
 
 function rechercheMaskeZuruecksetzen() {
