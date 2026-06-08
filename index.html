@@ -363,9 +363,18 @@
           <option value="faellig">Fällig (heute &amp; überfällig)</option>
           <option value="alle">Alle</option>
         </select></div>
+      <button class="tab" onclick="wvAlleAuswaehlen()" title="Alle auswählen">☑ Alle</button>
+      <button class="tab" onclick="wvAuswahlAufheben()" title="Auswahl aufheben">☐ Keine</button>
+    </div>
+    <!-- Aktionsleiste (erscheint wenn Einträge ausgewählt) -->
+    <div id="wvSelBar" style="display:none;align-items:center;gap:8px;background:var(--accent);color:#fff;padding:8px 14px;border-radius:6px;margin-bottom:8px;flex-wrap:wrap">
+      <span id="wvSelCount" style="font-weight:600"></span>
+      <button onclick="wvFaelligkeitAendern()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 12px;border-radius:4px;cursor:pointer;font-size:13px">📅 Datum ändern</button>
+      <button onclick="wvAuswahlAufheben()" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.4);padding:5px 10px;border-radius:4px;cursor:pointer;font-size:13px;margin-left:auto">✕ Aufheben</button>
     </div>
     <div class="count" id="wvCount"></div>
     <table><thead><tr>
+      <th style="width:32px;text-align:center"><input type="checkbox" id="wvSelAll" title="Alle" onchange="wvAlleToggle(this.checked)" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)"></th>
       <th>Fällig am</th><th>Betreff</th><th>Wer</th><th>Aktionen</th>
     </tr></thead><tbody id="wvBody"></tbody></table>
   </div>
@@ -1677,7 +1686,6 @@ async function zeigeStart(){
       ${kachel('📇','Ansprechpartner',ko.count,'kontakte')}
       ${kachelPlatz('📅','Termine / Kalender')}
       ${kachelPlatz('✉️','Newsletter')}
-      ${kachelPlatz('📁','Projekte')}
       ${kachelPlatz('ℹ️','Infos')}
     </div>`;
   window.scrollTo(0,0);
@@ -1973,7 +1981,87 @@ async function aufgabeErledigt(taskId, typ, id){
   else if(typ==='Kunde') detailKunde(id);
   else if(typ==='Kontakt') detailKontakt(id);
 }
-async function ladeWiedervorlagen(){
+async let _wvSelected = new Set();
+
+function wvSelUpdate() {
+  const bar = document.getElementById('wvSelBar');
+  const cnt = document.getElementById('wvSelCount');
+  const allCb = document.getElementById('wvSelAll');
+  if (bar) bar.style.display = _wvSelected.size ? 'flex' : 'none';
+  if (cnt) cnt.textContent = _wvSelected.size + ' ausgewählt';
+  // Header-Checkbox: checked wenn alle gecheckt, indeterminate wenn einige
+  const allCbs = document.querySelectorAll('.wv-cb');
+  if (allCb && allCbs.length) {
+    const checked = document.querySelectorAll('.wv-cb:checked').length;
+    allCb.checked = checked === allCbs.length;
+    allCb.indeterminate = checked > 0 && checked < allCbs.length;
+  }
+}
+function wvToggle(id, checked) {
+  if (checked) _wvSelected.add(id); else _wvSelected.delete(id);
+  wvSelUpdate();
+}
+function wvAlleToggle(checked) {
+  document.querySelectorAll('.wv-cb').forEach(cb => {
+    cb.checked = checked;
+    if (checked) _wvSelected.add(cb.dataset.id); else _wvSelected.delete(cb.dataset.id);
+  });
+  wvSelUpdate();
+}
+function wvAlleAuswaehlen() {
+  document.querySelectorAll('.wv-cb').forEach(cb => { cb.checked = true; _wvSelected.add(cb.dataset.id); });
+  const allCb = document.getElementById('wvSelAll'); if (allCb) allCb.checked = true;
+  wvSelUpdate();
+}
+function wvAuswahlAufheben() {
+  _wvSelected.clear();
+  document.querySelectorAll('.wv-cb').forEach(cb => cb.checked = false);
+  const allCb = document.getElementById('wvSelAll'); if (allCb) { allCb.checked = false; allCb.indeterminate = false; }
+  wvSelUpdate();
+}
+function wvFaelligkeitAendern() {
+  if (!_wvSelected.size) return;
+  const n = _wvSelected.size;
+  const heute = heuteISO();
+  const dlg = document.createElement('dialog');
+  dlg.style.cssText = 'background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:28px;max-width:360px;width:90%;color:var(--ink)';
+  dlg.innerHTML = `
+    <h3 style="margin:0 0 16px;font-size:16px">📅 Fälligkeitsdatum ändern</h3>
+    <p style="font-size:13px;color:var(--muted);margin:0 0 14px">${n} Wiedervorlage${n===1?'':'n'} werden aktualisiert.</p>
+    <div class="field" style="margin-bottom:18px">
+      <label>Neues Datum</label>
+      <input id="wvNeuDatum" type="date" value="${heute}"
+             style="width:100%;padding:8px 10px;font-size:14px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;box-sizing:border-box">
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="this.closest('dialog').close();this.closest('dialog').remove()"
+              style="padding:7px 16px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line)">Abbrechen</button>
+      <button onclick="wvDatumBestaetigen(this.closest('dialog'))"
+              style="padding:7px 16px;border-radius:5px;cursor:pointer;background:var(--accent);color:#fff;border:none;font-weight:700">✓ Speichern</button>
+    </div>`;
+  document.body.appendChild(dlg);
+  dlg.showModal();
+  setTimeout(() => document.getElementById('wvNeuDatum')?.focus(), 80);
+}
+async function wvDatumBestaetigen(dlg) {
+  const datum = document.getElementById('wvNeuDatum')?.value;
+  if (!datum) { zeigeMeldung('Bitte ein Datum wählen.', 'err'); return; }
+  const ids = [..._wvSelected];
+  let fehler = 0;
+  for (let i = 0; i < ids.length; i += 50) {
+    const {error} = await sb.from('aufgaben').update({faelligkeitsdatum: datum}).in('id', ids.slice(i, i+50));
+    if (error) { fehler++; }
+  }
+  dlg.close(); dlg.remove();
+  if (fehler) { zeigeMeldung('Fehler beim Aktualisieren.', 'err'); }
+  else {
+    zeigeMeldung(_wvSelected.size + ' Wiedervorlage' + (_wvSelected.size===1?'':'n') + ' auf ' + fmtDatum(datum) + ' gesetzt ✓', 'ok');
+    wvAuswahlAufheben();
+    ladeWiedervorlagen();
+  }
+}
+
+function ladeWiedervorlagen(){
   const body=document.getElementById('wvBody'); body.innerHTML='';
   const cnt=document.getElementById('wvCount'); cnt.textContent='Lade …';
   const modus=document.getElementById('wvFilter').value;
@@ -1998,12 +2086,17 @@ async function ladeWiedervorlagen(){
     (ko.data||[]).forEach(r=>map[r.id]={typ:'Kontakt',ic:'📇',name:r.voller_name,open:()=>detailKontakt(r.id)});
   }
   cnt.textContent=tasks.length+' Aufgabe'+(tasks.length===1?'':'n')+(modus==='alle'?'':modus==='faellig'?' (fällig/überfällig)':' (offen)');
-  if(!tasks.length){ body.innerHTML='<tr><td colspan="4" class="empty">Keine Aufgaben.</td></tr>'; return; }
+  if(!tasks.length){ body.innerHTML='<tr><td colspan="5" class="empty">Keine Aufgaben.</td></tr>'; return; }
   tasks.forEach(t=>{
     const ref=map[t.verknuepft_mit];
     const ueber=istOffen(t.status)&&t.faelligkeitsdatum&&t.faelligkeitsdatum<heute;
     const tr=document.createElement('tr'); tr.className='row-click';
     tr.innerHTML=`
+      <td onclick="event.stopPropagation()" style="width:32px;text-align:center">
+        <input type="checkbox" class="wv-cb" data-id="${t.id}"
+               onchange="wvToggle('${t.id}',this.checked)"
+               style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)">
+      </td>
       <td style="${ueber?'color:var(--hot);font-weight:600':''}">${t.faelligkeitsdatum?fmtDatum(t.faelligkeitsdatum):'–'}${ueber?' ⚠':''}</td>
       <td>${esc(t.betreff)||'–'}${t.beschreibung?'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+esc(t.beschreibung.slice(0,80))+(t.beschreibung.length>80?'…':'')+'</div>':''}</td>
       <td>${ref?ref.ic+' '+esc(ref.name)+' <span class="pill">'+ref.typ+'</span>':(t.kontaktname?esc(t.kontaktname):'–')}</td>
