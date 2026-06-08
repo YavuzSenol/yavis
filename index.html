@@ -1127,17 +1127,18 @@ async function selMassenAnwenden(dlg){
   ladeKandidaten();
 }
 
-// ---- Löschen ----
+// ---- Löschen (→ Papierkorb) ----
 async function selLoeschen(){
   if(!selectedKandIds.size) return;
   const n=selectedKandIds.size;
-  if(!confirm(`⚠️ ${n} Kandidat${n===1?'':'en'} wirklich dauerhaft löschen?\n\nDas kann NICHT rückgängig gemacht werden!`)) return;
+  if(!confirm(`${n} Kandidat${n===1?'':'en'} in den Papierkorb verschieben?`)) return;
   const ids=[...selectedKandIds];
+  const ts=new Date().toISOString();
   for(let i=0;i<ids.length;i+=50){
-    const {error}=await sb.from('kandidaten').delete().in('id',ids.slice(i,i+50));
+    const {error}=await sb.from('kandidaten').update({geloescht_am:ts}).in('id',ids.slice(i,i+50));
     if(error){zeigeMeldung('Fehler: '+error.message,'err'); return;}
   }
-  selAufheben(); zeigeMeldung(`${n} Kandidat${n===1?' gelöscht':'en gelöscht'}`);
+  selAufheben(); zeigeMeldung(`${n} Kandidat${n===1?' in Papierkorb verschoben':' in Papierkorb verschoben'}`,'ok');
   ladeKandidaten();
 }
 
@@ -2671,9 +2672,10 @@ async function ladeKunden(){
       const geoMap={}; (geos||[]).forEach(g=>geoMap[g.plz]={lat:g.lat,lng:g.lng});
       ohneLl.forEach(r=>{ if(geoMap[r.plz]){r.lat=geoMap[r.plz].lat;r.lng=geoMap[r.plz].lng;} });
     }
-    const rows=data.filter(r=>r.lat!=null&&r.lng!=null&&haversineKm(cLat,cLng,r.lat,r.lng)<=radius);
+    let rows=data.filter(r=>r.lat!=null&&r.lng!=null&&haversineKm(cLat,cLng,r.lat,r.lng)<=radius);
+    if(q){const ql=q.toLowerCase();rows=rows.filter(r=>(r.name||'').toLowerCase().includes(ql)||(r.branche||'').toLowerCase().includes(ql)||(r.stadt||'').toLowerCase().includes(ql));}
     rows.sort((a,b)=>haversineKm(cLat,cLng,a.lat,a.lng)-haversineKm(cLat,cLng,b.lat,b.lng));
-    document.getElementById('cCount').textContent=rows.length+' Firmen im Umkreis von '+radius+' km um '+plz+(typ?' · '+typ:'');
+    document.getElementById('cCount').textContent=rows.length+' Firmen im Umkreis von '+radius+' km um '+plz+(typ?' · '+typ:'')+(q?' · "'+q+'"':'');
     rows.forEach(r=>{
       const tr=document.createElement('tr');tr.className='row-click';
       const km=Math.round(haversineKm(cLat,cLng,r.lat,r.lng));
