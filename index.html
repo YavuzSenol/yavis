@@ -1963,6 +1963,7 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails)
     </details>
   `;
   window.scrollTo(0,0);
+  setTimeout(initAbschnitteSortierung, 0);
 }
 
 function zurueckZurListe(){
@@ -1978,6 +1979,81 @@ window.addEventListener('popstate', () => {
     zurueckZurListe();
   }
 });
+
+function initAbschnitteSortierung() {
+  const page = document.getElementById('detailPage');
+  if (!page) return;
+  const sects = Array.from(page.querySelectorAll(':scope > details.acc'));
+  if (sects.length < 2) return;
+
+  // Abschnitts-Schlüssel aus dem Summary-Titeltext ermitteln
+  sects.forEach(s => {
+    if (!s.dataset.abKey) {
+      const titleEl = s.querySelector('summary > span:first-child');
+      if (titleEl) {
+        // Nur den reinen Text (ohne acc-cnt Klammer)
+        const txt = Array.from(titleEl.childNodes)
+          .filter(n => n.nodeType === Node.TEXT_NODE)
+          .map(n => n.textContent.trim()).join('');
+        s.dataset.abKey = txt || titleEl.textContent.trim().replace(/\(\d+\)/,'').trim();
+      }
+    }
+  });
+
+  // Gespeicherte Reihenfolge wiederherstellen
+  try {
+    const saved = JSON.parse(localStorage.getItem('yavis_abschnitt_order') || '[]');
+    if (saved.length >= 2) {
+      saved.forEach(key => {
+        const el = sects.find(s => s.dataset.abKey === key);
+        if (el) page.appendChild(el);   // ans Ende verschieben = in gespeicherter Reihenfolge
+      });
+    }
+  } catch(e) {}
+
+  // Hilfsfunktion: aktuelle Reihenfolge speichern
+  const speichern = () => {
+    const order = Array.from(page.querySelectorAll(':scope > details.acc')).map(x => x.dataset.abKey || '');
+    localStorage.setItem('yavis_abschnitt_order', JSON.stringify(order));
+  };
+
+  // ↑↓ Buttons in jede summary einfügen
+  sects.forEach(s => {
+    const summary = s.querySelector('summary');
+    if (!summary || summary.querySelector('.ab-sort')) return;  // schon vorhanden
+
+    const btns = document.createElement('span');
+    btns.className = 'ab-sort';
+    btns.style.cssText = 'display:inline-flex;gap:2px;margin-right:8px;opacity:0;transition:opacity .15s';
+
+    // Hover-Sichtbarkeit
+    summary.addEventListener('mouseenter', () => btns.style.opacity = '0.75');
+    summary.addEventListener('mouseleave', () => btns.style.opacity = '0');
+
+    [['↑','Nach oben'], ['↓','Nach unten']].forEach(([txt, label], dir) => {
+      const b = document.createElement('button');
+      b.textContent = txt;
+      b.title = label;
+      b.style.cssText = 'background:rgba(255,255,255,.1);border:none;cursor:pointer;padding:1px 7px;font-size:13px;color:var(--accent2);border-radius:3px;line-height:1.5;font-weight:700';
+      b.addEventListener('mouseenter', () => b.style.background = 'var(--panel2)');
+      b.addEventListener('mouseleave', () => b.style.background = 'rgba(255,255,255,.1)');
+      b.onclick = e => {
+        e.preventDefault(); e.stopPropagation();
+        const all = Array.from(page.querySelectorAll(':scope > details.acc'));
+        const idx = all.indexOf(s);
+        if (dir === 0 && idx > 0)              all[idx-1].before(s);       // nach oben
+        else if (dir === 1 && idx < all.length-1) all[idx+1].after(s);     // nach unten
+        speichern();
+      };
+      btns.appendChild(b);
+    });
+
+    // Buttons VOR dem ▶ Pfeil einfügen
+    const arrow = summary.querySelector('.acc-arr');
+    if (arrow) summary.insertBefore(btns, arrow);
+    else summary.appendChild(btns);
+  });
+}
 
 function fmtDat(s){ if(!s) return ''; try{const d=new Date(s);
   return d.toLocaleDateString('de-DE')+' '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});}catch{return s;} }
