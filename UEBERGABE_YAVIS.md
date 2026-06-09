@@ -43,7 +43,7 @@ Tabellen: `kandidaten`, `kunden`, `kontakte`, `stellen`, `bewerbungen`, `notizen
 
 **`kandidaten`-Felder (Auszug):** id, vorname, nachname, voller_name, email, email_beruflich, email_zweit, telefon, telefon_privat, mobil, mobil_privat, fax, strasse, plz, stadt, bundesland, land, lat, lng, berufsbezeichnung, position_original, arbeitgeber, faehigkeiten, qualifikation, studiengang, erfahrung_jahre, gehalt_aktuell, gehalt_erwartet, kuendigungsfrist, wechselmotivation, umzugsbereitschaft, wunschregion, positionswunsch, profil_zusammenfassung, bemerkung, xing_profil, linkedin_profil, status, quelle, tags, ist_hot, abwerbeschutz, wertung, besitzer_id, geburtstag, erstellt_am, geaendert_am, letzte_aktivitaet, **begruessung, wertung_intern, bei_firma_seit, in_position_seit, kontaktstatus**, **geloescht_am** (Papierkorb-Spalte, timestamptz, nullable).
 
-**`kunden`-Felder (Auszug):** id, name, typ, branche, strasse, plz, stadt, bundesland, land, **lat, lng** (Geo, wird beim Speichern via plz_geo befüllt), telefon, website, notiz, erstellt_am, geaendert_am, **geloescht_am** (Papierkorb-Spalte).
+**`kunden`-Felder (echte Spaltennamen, geprüft 09.06.):** id, name, typ, branche, strasse, plz, stadt, bundesland, land, **lat, lng** (Geo, via plz_geo befüllt), telefon, fax, email, **`webseite`** (NICHT `website`!), **`info`** (NICHT `notiz`!), tags, account_manager, kundennummer, quelle, erstellt_am, geaendert_am, letzte_aktivitaet, **geloescht_am** (Papierkorb). ⚠️ In Zoho gibt es Rechnungs- UND Versandadresse, in YAVIS nur EIN Adressfeld — der korrekte Wert kommt aus der Versandadresse.
 
 **`kontakte`-Felder (Auszug):** id, vorname, nachname, voller_name, berufsbezeichnung, email, telefon_beruflich, mobil, kunde_id, notiz, erstellt_am, geaendert_am, **geloescht_am** (Papierkorb-Spalte).
 
@@ -204,15 +204,24 @@ Falls Push hängt: GCM-Fenster → **„Sign in with a code"** → Code auf gith
 
 ## 8. Offene Aufgaben (Priorität)
 
+### ✅ Erledigt am 09.06.2026 (diese Sitzung)
+- **#1 Homepage-Absturz**, **#2 Papierkorb-SQL**, **#3 Microsoft Graph E-Mail-Versand** — alle erledigt/verifiziert. Graph hat 3 echte Sende-Funktionen: `msMailDirektSenden` / `serienMailDirektSenden` / `nlDirektSenden` (→ `_graphSendMail` / `/me/sendMail`). Hinweis: Versand als `contentType:'Text'` mit Signatur aus `yavis_signatur` (nicht die HTML-Outlook-Signatur).
+- **Firmen + Ansprechpartner: Mehrfachauswahl** (Häkchen + „Alle auswählen") mit Aktionen **👤 An Kandidat senden** (Firmen-/Kontaktliste per Graph-Mail an Kandidat + Protokoll in `emails`) und **📥 CSV**.
+- **Konfigurierbare + sortierbare Spalten** (🗂-Button) für Firmen UND Ansprechpartner; **PLZ/Ort getrennt**; Speicherung in localStorage `kunden_spalten` / `kontakte_spalten`. Klick auf Spaltenkopf = auf-/absteigend sortieren.
+- **Firmen-Massenbearbeitung** (✏️ Ändern): Typ/Branche/Ort/Bundesland/Land auf die Auswahl anwenden, Option „nur leere Felder füllen".
+- **Bugfix:** Firmen-Code nutzte `website` statt des DB-Feldnamens **`webseite`** (Spalte + CSV-Export).
+- **DATEN-FIX (Supabase):** Der ursprüngliche Zoho-Import hatte die meist **leere Rechnungsadresse** statt der gefüllten **Versandadresse** übernommen. Skripte `_adressfix_dryrun.py` / `_adressfix_schreiben.py` (Match per `Kunde Id`=`kunden.id`): 95 Firmen Stadt/PLZ/Straße/Bundesland nachgetragen, 92 neue Koordinaten aus `plz_geo`. **Köln 14→39, Firmen ohne Koordinaten 115→23, mit PLZ 83→177.** (Backup-Quelle: `zoho backup/Kunden/Clients_001.csv`.)
+- **195 Firmen** Typ „Auftraggeber" → „Auftraggeber-Potenzial" umgestellt (DB: jetzt 196 Potenzial, 0 Auftraggeber).
+
 ### 🔴 Als Nächstes
 
 | # | Aufgabe | Details |
 |---|---------|---------|
-| 1 | **✅ Homepage-Absturz behoben** | War: 4 JS-Syntax-Bugs (async let, 3× await in non-async fn) → gesamtes JS blockiert. Fixes in Commits `d6f4b4f` und `ef2687f`. **Beim ersten Start im Büro: Strg+Shift+R drücken und testen ob Startseite erscheint.** |
-| 2 | **Papierkorb-SQL ausführen** | Nutzer-Aktion: SQL aus §3 in Supabase SQL Editor ausführen. Danach ist Papierkorb aktiv. |
-| 3 | **Microsoft Graph API — E-Mail senden** | `mailto:?body=` unterdrückt Outlook-Signatur. Lösung: YAVIS schickt Mail direkt über Graph API → volle HTML-Signatur erscheint automatisch. Graph-OAuth bereits vorbereitet (Client-ID `3b720301-85dc-48c7-9033-b6e0805c378c`). |
-| 4 | **~13 Duplikate** | Kandidaten die auch als Ansprechpartner existieren. Duplikate-Finder in Einstellungen → Datenverwaltung bereits vorhanden. |
-| 5 | **54 Kandidaten ohne Berufsbezeichnung** | Diese haben XING/LinkedIn-Profile aber kein PDF. Manuell via „📋 Aus Profil/Text" nachpflegen. |
+| 1 | **Telefonnummern vereinheitlichen** | Dry-Run fertig: 164 Firmen mit Tel, **146 würden** auf internationales `+49 …` normiert (führende 0→+49, `0049`→+49, „(0)"/Schrägstriche raus, Durchwahl `-` bleibt). **Freigabe zum echten Schreiben steht noch aus.** |
+| 2 | **Branche/Telefon per Web-Recherche** | 89 Firmen ohne Branche, 32 ohne Telefon — aus Zoho NICHT nachholbar (war dort schon leer). **171 haben eine Webseite** → Recherche möglich; Stichprobe (8 Firmen) erfolgreich getestet (M-TEQ=TGA Köln, SPIE=TGA, o-byte=IT, Instone=Projektentwickler …). |
+| 3 | **Suche verbessern** | Firmensuche nicht nur auf die lückenhafte „Branche" stützen (Wort „TGA" steht in 0 Branchen-Feldern!). Umkreissuche soll anzeigen „X Firmen ohne Koordinaten nicht berücksichtigt". |
+| 4 | **~13 Duplikate** | Kandidaten die auch als Ansprechpartner existieren. Duplikate-Finder in Einstellungen → Datenverwaltung vorhanden. |
+| 5 | **54 Kandidaten ohne Berufsbezeichnung** | XING/LinkedIn-Profile aber kein PDF. Manuell via „📋 Aus Profil/Text" nachpflegen. |
 
 ### 🟡 Mittelfristig
 
@@ -249,6 +258,7 @@ Falls Push hängt: GCM-Fenster → **„Sign in with a code"** → Code auf gith
 - NIEMALS Outputs erfinden oder „ich habe getestet" ohne echten Beleg.
 - Bei neuen Funktionen immer fragen: „Möchtest du das auch selbst anpassen können?"
 - Für API-Tests: `login.local` lesen → Token holen → Requests mit Bearer-Token.
+- ⚠️ **`login.local` hat ZWEI Passwörter:** `PASSWORT` (Supabase-App-Login, ~9 Zeichen) und `Passwort` (Starface, ~15 Zeichen). Beim Parsen **case-sensitiv** auf `PASSWORT` matchen — sonst Login-Fehler `400 invalid_credentials`. Auth-Flow: POST `/auth/v1/token?grant_type=password` mit Header `apikey`=publishable key.
 - Bei Schreiboperationen immer erst Dry-Run/Probelauf anbieten.
 - Git: nur HTTPS, kein SSH. Push funktioniert (GCM gespeichert).
 - `login.local` und `Management_token.txt` NIE committen.
