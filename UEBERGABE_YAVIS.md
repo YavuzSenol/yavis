@@ -31,8 +31,12 @@
 - **Tag-Picker** + **Geburtstag-Feld** im Kandidaten-Editor; **Fähigkeiten** entfernt
 - **Einstellungen gegliedert** in 5 Tabs
 
+**Rollen-Umbau Stufe 1 — ✅ erledigt** (`UEBERGABE_rollen_umbau.md`)
+- **1A:** Direktansprache-Felder (Positionswunsch, Wunschregion, Umzug, Gehalt akt./Wunsch, Kündigungsfrist, Wechselmotivation) in EINEM Block „Direktansprache" gebündelt (vorher über 2 Spalten verstreut). Reine UI.
+- **1B:** 4 neue Boolean-Spalten `sperre_email/sperre_brief/sperre_anruf/kein_newsletter` (per SQL angelegt). Block „Status & Sperren" in Anzeige + 4 Checkboxen im Editor. **Durchsetzung:** Newsletter filtert `kein_newsletter` ODER `sperre_email` ODER Abwerbeschutz (`istGeschuetzt`) **hart** raus (schließt Abwerbeschutz-Lücke); Einzel-E-Mail zeigt bei `sperre_email` Warnbanner + Rückfrage „trotzdem senden?". Abwerbeschutz blieb unverändert.
+
 **Offen / als Nächstes**
-- Rollen-Umbau **Stufe 1** (wartet auf Datei `UEBERGABE_rollen_umbau.md` — aktuell nicht auf diesem Rechner)
+- Rollen-Umbau **Stufe 2** (Personen-/Rollen-Modell) — NUR mit Backup (`backup-vor-rollen-umbau`) + Plan + Freigaben; Recherche-Maske zuletzt
 - Manuell: 74 Berufsbezeichnungen, ~19 Firmen-Telefonnummern, echte Kunden wieder als „Auftraggeber" markieren
 - Webflow-Embed (auf Zuruf)
 
@@ -77,7 +81,7 @@ ID-Format der Kandidaten: `Zrecruit_<zahl>` (z. B. `Zrecruit_16153000000376122`)
 
 Tabellen: `kandidaten`, `kunden`, `kontakte`, `stellen`, `bewerbungen`, `notizen`, `aufgaben`, `emails`, `plz_geo`, `dokumente`, `erfahrung`, `ausbildung`.
 
-**`kandidaten`-Felder (Auszug):** id, vorname, nachname, voller_name, email, email_beruflich, email_zweit, telefon, telefon_privat, mobil, mobil_privat, fax, strasse, plz, stadt, bundesland, land, lat, lng, berufsbezeichnung, position_original, arbeitgeber, faehigkeiten, qualifikation, studiengang, erfahrung_jahre, gehalt_aktuell, gehalt_erwartet, kuendigungsfrist, wechselmotivation, umzugsbereitschaft, wunschregion, positionswunsch, profil_zusammenfassung, bemerkung, xing_profil, linkedin_profil, status, quelle, tags, ist_hot, abwerbeschutz, wertung, besitzer_id, geburtstag, erstellt_am, geaendert_am, letzte_aktivitaet, **begruessung, wertung_intern, bei_firma_seit, in_position_seit, kontaktstatus**, **geloescht_am** (Papierkorb-Spalte, timestamptz, nullable).
+**`kandidaten`-Felder (Auszug):** id, vorname, nachname, voller_name, email, email_beruflich, email_zweit, telefon, telefon_privat, mobil, mobil_privat, fax, strasse, plz, stadt, bundesland, land, lat, lng, berufsbezeichnung, position_original, arbeitgeber, faehigkeiten, qualifikation, studiengang, erfahrung_jahre, gehalt_aktuell, gehalt_erwartet, kuendigungsfrist, wechselmotivation, umzugsbereitschaft, wunschregion, positionswunsch, profil_zusammenfassung, bemerkung, xing_profil, linkedin_profil, status, quelle, tags, ist_hot, abwerbeschutz, wertung, besitzer_id, geburtstag, erstellt_am, geaendert_am, letzte_aktivitaet, **begruessung, wertung_intern, bei_firma_seit, in_position_seit, kontaktstatus**, **geloescht_am** (Papierkorb-Spalte, timestamptz, nullable), **sperre_email, sperre_brief, sperre_anruf, kein_newsletter** (Rollen-Umbau Stufe 1B; boolean NOT NULL DEFAULT false — Kontaktsperren / DSGVO, unabhängig vom Abwerbeschutz).
 
 **`kunden`-Felder (echte Spaltennamen, geprüft 09.06.):** id, name, typ, branche, strasse, plz, stadt, bundesland, land, **lat, lng** (Geo, via plz_geo befüllt), telefon, fax, email, **`webseite`** (NICHT `website`!), **`info`** (NICHT `notiz`!), tags, account_manager, kundennummer, quelle, erstellt_am, geaendert_am, letzte_aktivitaet, **geloescht_am** (Papierkorb). ⚠️ In Zoho gibt es Rechnungs- UND Versandadresse, in YAVIS nur EIN Adressfeld — der korrekte Wert kommt aus der Versandadresse.
 
