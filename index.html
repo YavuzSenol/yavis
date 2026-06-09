@@ -313,7 +313,9 @@
         </select></div>
       <button class="go" onclick="ladeKunden()">Suchen</button>
       <button class="neuBtn" onclick="neuerKunde()">+ Neue Firma</button>
+      <button class="tab" onclick="toggleKSpaltenPanel()">🗂 Spalten</button>
     </div>
+    <div id="cSpaltenPanel" style="display:none;border:1px solid var(--line);background:var(--panel);border-radius:4px;padding:14px;margin-bottom:14px"></div>
     <div class="count" id="cCount"></div>
     <div id="cSelBar" style="display:none;align-items:center;gap:8px;background:var(--accent);color:#fff;padding:8px 14px;border-radius:6px;margin-bottom:8px;flex-wrap:wrap">
       <span id="cSelCount" style="font-weight:600"></span>
@@ -321,10 +323,7 @@
       <button onclick="kundenCsvExport()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">📥 CSV</button>
       <button onclick="kundeSelAufheben()" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.4);padding:5px 10px;border-radius:4px;cursor:pointer;font-size:13px;margin-left:auto">✕ Aufheben</button>
     </div>
-    <table><thead><tr>
-      <th style="width:32px;text-align:center"><input type="checkbox" id="cSelAll" title="Alle auswählen" onchange="kundeSelAll(this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></th>
-      <th>Firma</th><th>Typ</th><th>Branche</th><th>PLZ / Ort</th><th>Telefon</th>
-    </tr></thead><tbody id="cBody"></tbody></table>
+    <table><thead><tr id="cHead"></tr></thead><tbody id="cBody"></tbody></table>
   </div>
 
   <!-- Kontakte -->
@@ -3080,6 +3079,73 @@ async function _anKandidatSenden(dlg){
   }
 }
 
+// ===== Firmen-Spalten konfigurierbar + sortierbar =====
+const KUNDEN_SPALTEN_DEF=[
+  {key:'name',       label:'Firma',      get:r=>r.name||'',       render:r=>esc(r.name)||'–'},
+  {key:'typ',        label:'Typ',        get:r=>r.typ||'',        render:r=>`<span class="pill">${esc(r.typ)||'Auftraggeber'}</span>`},
+  {key:'branche',    label:'Branche',    get:r=>r.branche||'',    render:r=>esc(r.branche)||'–'},
+  {key:'strasse',    label:'Straße',     get:r=>r.strasse||'',    render:r=>esc(r.strasse)||'–'},
+  {key:'plz',        label:'PLZ',        get:r=>r.plz||'',        render:r=>esc(r.plz)||'–'},
+  {key:'stadt',      label:'Ort',        get:r=>r.stadt||'',      render:r=>esc(r.stadt)||'–'},
+  {key:'bundesland', label:'Bundesland', get:r=>r.bundesland||'', render:r=>esc(r.bundesland)||'–'},
+  {key:'land',       label:'Land',       get:r=>r.land||'',       render:r=>esc(r.land)||'–'},
+  {key:'telefon',    label:'Telefon',    get:r=>r.telefon||'',    render:r=>esc(r.telefon)||'–'},
+  {key:'website',    label:'Website',    get:r=>r.website||'',     render:r=>r.website?`<a class="calllink" href="${/^https?:/i.test(r.website)?esc(r.website):'https://'+esc(r.website)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(r.website)} ↗</a>`:'–'},
+];
+const KUNDEN_SPALTEN_MAP=Object.fromEntries(KUNDEN_SPALTEN_DEF.map(c=>[c.key,c]));
+let kSichtbareSpalten=(()=>{ try{ const s=JSON.parse(localStorage.getItem('kunden_spalten')); if(Array.isArray(s)&&s.length) return s.filter(k=>KUNDEN_SPALTEN_MAP[k]); }catch(e){} return ['name','typ','branche','plz','stadt','telefon']; })();
+let kSortKey=null, kSortDir=1, _kundenMitKm=false;
+function kSpaltenSpeichern(){ localStorage.setItem('kunden_spalten', JSON.stringify(kSichtbareSpalten)); }
+function kSpaltenListe(){ return kSichtbareSpalten.map(k=>KUNDEN_SPALTEN_MAP[k]).filter(Boolean); }
+function kSpaltenHeaderRender(mitKm){
+  const head=document.getElementById('cHead'); if(!head) return;
+  head.innerHTML = `<th style="width:32px;text-align:center" onclick="event.stopPropagation()"><input type="checkbox" id="cSelAll" title="Alle auswählen" onchange="kundeSelAll(this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></th>`
+    + kSpaltenListe().map(c=>{ const pf=kSortKey===c.key?(kSortDir===1?' ▲':' ▼'):''; return `<th style="cursor:pointer;user-select:none;white-space:nowrap" onclick="kSortBy('${c.key}')" title="Auf-/absteigend sortieren">${c.label}${pf}</th>`; }).join('')
+    + (mitKm?`<th>Entfernung</th>`:'');
+}
+function kSortBy(key){ if(kSortKey===key) kSortDir=-kSortDir; else { kSortKey=key; kSortDir=1; } renderKundenTabelle(_kundenMitKm); }
+function renderKundenTabelle(mitKm){
+  const body=document.getElementById('cBody'); if(!body) return;
+  _kundenMitKm=mitKm;
+  kSpaltenHeaderRender(mitKm);
+  let rows=[..._kundenGeladen];
+  if(kSortKey){ const c=KUNDEN_SPALTEN_MAP[kSortKey]; rows.sort((a,b)=>String(c?c.get(a):'').localeCompare(String(c?c.get(b):''),'de',{numeric:true,sensitivity:'base'})*kSortDir); }
+  else if(mitKm){ rows.sort((a,b)=>(a._km||0)-(b._km||0)); }
+  body.innerHTML='';
+  if(!rows.length){ body.innerHTML=`<tr><td colspan="${kSpaltenListe().length+(mitKm?2:1)}" class="empty">Keine Treffer.</td></tr>`; updateKundeSelBar(); return; }
+  rows.forEach(r=>{
+    const tr=document.createElement('tr'); tr.className='row-click';
+    const cb=`<td onclick="event.stopPropagation()" style="width:32px;text-align:center"><input type="checkbox" class="kunde-cb" data-id="${r.id}" ${selectedKundenIds.has(r.id)?'checked':''} onchange="kundeSelToggle('${r.id}',this)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></td>`;
+    let tds=cb+kSpaltenListe().map(c=>`<td>${c.render(r)}</td>`).join('');
+    if(mitKm) tds+=`<td class="km">${r._km} km</td>`;
+    tr.innerHTML=tds;
+    tr.onclick=()=>detailKunde(r.id);
+    body.appendChild(tr);
+  });
+  updateKundeSelBar();
+}
+function toggleKSpaltenPanel(){ const p=document.getElementById('cSpaltenPanel'); if(!p) return; if(p.style.display==='none'){ renderKSpaltenPanel(); p.style.display='block'; } else p.style.display='none'; }
+function renderKSpaltenPanel(){
+  const p=document.getElementById('cSpaltenPanel'); if(!p) return;
+  const aktiv=kSichtbareSpalten, inaktiv=KUNDEN_SPALTEN_DEF.filter(c=>!kSichtbareSpalten.includes(c.key));
+  let html=`<div style="font-size:13px;font-weight:600;margin-bottom:4px">🗂 Spalten & Reihenfolge</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Mit ↑ ↓ verschieben, mit ✕ ausblenden. Klick auf eine Spaltenüberschrift in der Tabelle sortiert auf-/absteigend.</div>`;
+  aktiv.forEach((k,i)=>{ const c=KUNDEN_SPALTEN_MAP[k]; if(!c) return; const up=i===0, dn=i===aktiv.length-1;
+    html+=`<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;margin-bottom:4px;background:var(--panel2);border:1px solid var(--line);border-radius:3px;max-width:360px">
+      <span style="flex:1;font-size:13px">${c.label}</span>
+      <button class="tab" style="padding:2px 9px${up?';opacity:.3':''}" ${up?'disabled':''} onclick="moveKSpalte('${k}',-1)">↑</button>
+      <button class="tab" style="padding:2px 9px${dn?';opacity:.3':''}" ${dn?'disabled':''} onclick="moveKSpalte('${k}',1)">↓</button>
+      <button class="tab" style="padding:2px 9px" onclick="toggleKSpalte('${k}')" title="Ausblenden">✕</button>
+    </div>`; });
+  if(inaktiv.length){
+    html+=`<div style="font-size:12px;color:var(--muted);margin:10px 0 6px">Hinzufügen:</div>`+
+      inaktiv.map(c=>`<span class="tag" style="cursor:pointer;margin:2px 5px 2px 0;display:inline-block" onclick="toggleKSpalte('${c.key}')">+ ${c.label}</span>`).join('');
+  }
+  p.innerHTML=html;
+}
+function toggleKSpalte(key){ if(kSichtbareSpalten.includes(key)){ if(kSichtbareSpalten.length<=1) return; kSichtbareSpalten=kSichtbareSpalten.filter(k=>k!==key); } else { kSichtbareSpalten=[...kSichtbareSpalten,key]; } kSpaltenSpeichern(); renderKSpaltenPanel(); renderKundenTabelle(_kundenMitKm); }
+function moveKSpalte(key,dir){ const i=kSichtbareSpalten.indexOf(key), j=i+dir; if(i<0||j<0||j>=kSichtbareSpalten.length) return; const a=[...kSichtbareSpalten]; [a[i],a[j]]=[a[j],a[i]]; kSichtbareSpalten=a; kSpaltenSpeichern(); renderKSpaltenPanel(); renderKundenTabelle(_kundenMitKm); }
+
 async function ladeKunden(){
   const q=document.getElementById('cSuche').value.trim();
   const typ=document.getElementById('cTyp').value;
@@ -3087,7 +3153,7 @@ async function ladeKunden(){
   const plz=cPlzEl?cPlzEl.value.trim():'';
   const radius=parseInt((document.getElementById('cRadius')||{}).value||'50')||50;
   const body=document.getElementById('cBody'); body.innerHTML='';
-  selectedKundenIds.clear(); _kundenGeladen=[]; updateKundeSelBar();
+  selectedKundenIds.clear(); _kundenGeladen=[]; kSortKey=null; updateKundeSelBar();
 
   // ---- Umkreissuche ----
   if(plz){
@@ -3111,18 +3177,11 @@ async function ladeKunden(){
     }
     let rows=data.filter(r=>r.lat!=null&&r.lng!=null&&haversineKm(cLat,cLng,r.lat,r.lng)<=radius);
     if(q){const ql=q.toLowerCase();rows=rows.filter(r=>(r.name||'').toLowerCase().includes(ql)||(r.branche||'').toLowerCase().includes(ql)||(r.stadt||'').toLowerCase().includes(ql));}
-    rows.sort((a,b)=>haversineKm(cLat,cLng,a.lat,a.lng)-haversineKm(cLat,cLng,b.lat,b.lng));
+    rows.forEach(r=>{ r._km=Math.round(haversineKm(cLat,cLng,r.lat,r.lng)); });
+    rows.sort((a,b)=>a._km-b._km);
     _kundenGeladen=rows;
     document.getElementById('cCount').textContent=rows.length+' Firmen im Umkreis von '+radius+' km um '+plz+(typ?' · '+typ:'')+(q?' · "'+q+'"':'');
-    rows.forEach(r=>{
-      const tr=document.createElement('tr');tr.className='row-click';
-      const km=Math.round(haversineKm(cLat,cLng,r.lat,r.lng));
-      tr.innerHTML=`<td onclick="event.stopPropagation()" style="width:32px;text-align:center"><input type="checkbox" class="kunde-cb" data-id="${r.id}" onchange="kundeSelToggle('${r.id}',this)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></td><td>${esc(r.name)||'–'}</td><td><span class="pill">${esc(r.typ)||'Auftraggeber'}</span></td><td>${esc(r.branche)||'–'}</td>
-        <td>${esc(r.plz)||''} ${esc(r.stadt)||''}<span style="color:var(--muted);font-size:12px;margin-left:5px">(${km} km)</span></td><td>${esc(r.telefon)||'–'}</td>`;
-      tr.onclick=()=>detailKunde(r.id);
-      body.appendChild(tr);
-    });
-    if(!rows.length) body.innerHTML='<tr><td colspan="6" class="empty">Keine Firmen in diesem Umkreis gefunden.</td></tr>';
+    renderKundenTabelle(true);
     return;
   }
 
@@ -3135,14 +3194,7 @@ async function ladeKunden(){
   if(error){document.getElementById('cCount').textContent='Fehler: '+error.message;return;}
   _kundenGeladen=data;
   document.getElementById('cCount').textContent=data.length+' Firmen'+(typ?' · '+typ:'');
-  data.forEach(r=>{
-    const tr=document.createElement('tr');tr.className='row-click';
-    tr.innerHTML=`<td onclick="event.stopPropagation()" style="width:32px;text-align:center"><input type="checkbox" class="kunde-cb" data-id="${r.id}" onchange="kundeSelToggle('${r.id}',this)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></td><td>${esc(r.name)||'–'}</td><td><span class="pill">${esc(r.typ)||'Auftraggeber'}</span></td><td>${esc(r.branche)||'–'}</td>
-      <td>${esc(r.plz)||''} ${esc(r.stadt)||''}</td><td>${esc(r.telefon)||'–'}</td>`;
-    tr.onclick=()=>detailKunde(r.id);
-    body.appendChild(tr);
-  });
-  if(!data.length) body.innerHTML='<tr><td colspan="6" class="empty">Keine Treffer.</td></tr>';
+  renderKundenTabelle(false);
 }
 
 async function ladeKontakte(){
