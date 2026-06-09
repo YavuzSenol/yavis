@@ -2157,18 +2157,21 @@ function _psBody(d, erf, ausb, anonym, anrede, nachname){
     : 'gerne darf ich Ihnen das Profil von '+(d.voller_name||'')+' vorstellen:';
   return `${_psGruss(anrede,nachname)}\n\n${einleitung}\n\n${_profilText(d,erf,ausb,anonym)}\n\nBei Interesse stelle ich gerne den Kontakt her.\n\nViele Grüße`+(meinName?'\n'+meinName:'');
 }
+function _blobToBase64(blob){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]||''); r.onerror=rej; r.readAsDataURL(blob); }); }
 async function profilSendenDialog(kandidatId){
-  const [kk,ke,ka]=await Promise.all([
+  const [kk,ke,ka,kdoc]=await Promise.all([
     sb.from('kandidaten').select('*').eq('id',kandidatId).single(),
     sb.from('erfahrung').select('*').eq('kandidat_id',kandidatId),
     sb.from('ausbildung').select('*').eq('kandidat_id',kandidatId),
+    sb.from('dokumente').select('*').eq('kandidat_id',kandidatId).order('hochgeladen_am',{ascending:false}),
   ]);
   const d=kk.data; if(!d){ zeigeMeldung('Kandidat nicht gefunden','err'); return; }
   const erfA=(ke.data||[]).slice().sort((a,b)=>(b.aktuell?1:0)-(a.aktuell?1:0));
   const ausbA=ka.data||[];
+  const docs=kdoc.data||[];
   const betreffDefault='Kandidatenvorschlag'+(d.berufsbezeichnung?': '+d.berufsbezeichnung:'');
   const dlg=document.createElement('dialog');
-  dlg._d=d; dlg._erf=erfA; dlg._ausb=ausbA; dlg._anrede='Herr'; dlg._nachname='';
+  dlg._d=d; dlg._erf=erfA; dlg._ausb=ausbA; dlg._anrede='Herr'; dlg._nachname=''; dlg._docs=docs;
   dlg.style.cssText='border:none;border-radius:10px;background:var(--panel);color:var(--text);padding:0;max-width:680px;width:94vw;max-height:90vh';
   dlg.innerHTML=`
     <div style="padding:18px 20px;overflow:auto;max-height:90vh">
@@ -2194,6 +2197,12 @@ async function profilSendenDialog(kandidatId){
           </select>
         </div>
       </div>
+      ${docs.length?`<div style="margin-bottom:10px">
+        <label style="font-size:13px;color:var(--muted)">Anhang — Kandidatenprofil-PDF auswählen</label>
+        <div style="border:1px solid var(--line);border-radius:5px;padding:6px 9px;max-height:120px;overflow:auto">
+          ${docs.map((doc,i)=>`<label style="display:flex;align-items:center;gap:7px;font-size:13px;padding:3px 0;cursor:pointer"><input type="checkbox" class="psDoc" data-idx="${i}" ${(/profil/i.test(doc.dateiname||'')||/profil/i.test(doc.kategorie||''))?'checked':''} style="width:14px;height:14px"> ${esc(doc.dateiname||'Dokument')}${doc.groesse?` <span style="color:var(--muted);font-size:11px">(${Math.round(doc.groesse/1024)} KB)</span>`:''}</label>`).join('')}
+        </div>
+      </div>`:`<div style="font-size:12px;color:var(--muted);margin-bottom:10px">Keine Dokumente hinterlegt — es wird nur der Profiltext gesendet.</div>`}
       <div style="margin-bottom:10px">
         <label style="font-size:13px;color:var(--muted)">Betreff</label>
         <input id="psBetreff" value="${esc(betreffDefault)}" style="width:100%;box-sizing:border-box">
@@ -2247,20 +2256,35 @@ async function _psSenden(dlg){
   const betreff=dlg.querySelector('#psBetreff').value.trim();
   const text=dlg.querySelector('#psText').value;
   const kid=dlg._d.id;
+  const checkedDocs=[...dlg.querySelectorAll('.psDoc:checked')].map(c=>(dlg._docs||[])[+c.dataset.idx]).filter(Boolean);
   const btn=dlg.querySelector('button[onclick^="_psSenden"]'); if(btn){ btn.disabled=true; btn.textContent='⏳ …'; }
   const token=await msGetToken();
   if(token){
     const signatur=localStorage.getItem('yavis_signatur')||'';
-    const result=await _graphSendMail(token,{ message:{ subject:betreff, body:{contentType:'Text',content:text+(signatur?'\n\n'+signatur:'')}, toRecipients:[{emailAddress:{address:email}}] }, saveToSentItems:true });
+    // Anhänge aus dem Storage laden und base64-kodieren
+    const attachments=[];
+    for(const doc of checkedDocs){
+      try{
+        if(doc.groesse && Number(doc.groesse)>3000000){ zeigeMeldung('„'+(doc.dateiname||'Anhang')+'" zu groß (>3 MB) — übersprungen','warn'); continue; }
+        const {data:blob,error}=await sb.storage.from('dokumente').download(doc.pfad);
+        if(error||!blob) continue;
+        const b64=await _blobToBase64(blob);
+        attachments.push({'@odata.type':'#microsoft.graph.fileAttachment', name:doc.dateiname||'Anhang.pdf', contentType:doc.typ||'application/pdf', contentBytes:b64});
+      }catch(e){}
+    }
+    const message={ subject:betreff, body:{contentType:'Text',content:text+(signatur?'\n\n'+signatur:'')}, toRecipients:[{emailAddress:{address:email}}] };
+    if(attachments.length) message.attachments=attachments;
+    const result=await _graphSendMail(token,{ message, saveToSentItems:true });
     if(!result.ok){ zeigeMeldung('Sendefehler: '+result.msg,'err'); if(btn){btn.disabled=false;btn.textContent='📨 Senden';} return; }
     try{
       const {data:user}=await sb.auth.getUser();
-      await sb.from('emails').insert({ id:'yavis_'+Date.now()+'_'+Math.random().toString(36).slice(2,8), betreff:'📤 '+(betreff||'Profil gesendet')+' → '+email, entity_id:kid, besitzer_id:user?.user?.id||null, erstellt_am:new Date().toISOString() });
+      await sb.from('emails').insert({ id:'yavis_'+Date.now()+'_'+Math.random().toString(36).slice(2,8), betreff:'📤 '+(betreff||'Profil gesendet')+(attachments.length?' 📎'+attachments.length:'')+' → '+email, entity_id:kid, besitzer_id:user?.user?.id||null, erstellt_am:new Date().toISOString() });
     }catch(e){}
     dlg.close(); dlg.remove();
-    zeigeMeldung('✅ Profil an '+email+' gesendet + protokolliert','ok');
+    zeigeMeldung('✅ Profil an '+email+' gesendet'+(attachments.length?' (+'+attachments.length+' Anhang)':'')+' + protokolliert','ok');
     setTimeout(()=>detailKandidat(kid),400);
   } else {
+    if(checkedDocs.length) zeigeMeldung('Ohne Outlook-Verbindung können Anhänge nicht automatisch mit — nur Text-Entwurf','warn');
     window.location.href='mailto:'+encodeURIComponent(email)+'?subject='+encodeURIComponent(betreff)+'&body='+encodeURIComponent(text);
     dlg.close(); dlg.remove();
     zeigeMeldung('Outlook-Entwurf geöffnet (keine Graph-Verbindung aktiv)','ok');
