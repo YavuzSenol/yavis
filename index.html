@@ -294,19 +294,21 @@
   <!-- Kunden -->
   <div id="view-kunden" style="display:none">
     <div class="bar">
-      <div class="field"><label>Suche (Name, Branche, Ort)</label>
+      <div class="field" data-filter="suche"><label>Suche (Name, Branche, Ort)</label>
         <input id="cSuche" placeholder="z.B. Ingenieurbüro" style="min-width:260px"></div>
-      <div class="field"><label>Typ</label>
+      <div class="field" data-filter="typ"><label>Typ</label>
         <select id="cTyp" onchange="ladeKunden()">
           <option value="">alle</option>
           <option>Auftraggeber</option><option>Auftraggeber-Potenzial</option>
           <option>Lieferant</option><option>Sonstige</option>
         </select></div>
-      <div class="field"><label>Branche</label>
+      <div class="field" data-filter="branche"><label>Branche</label>
         <select id="cBranche" onchange="ladeKunden()"><option value="">alle</option></select></div>
-      <div class="field"><label>PLZ (Umkreis)</label>
-        <input id="cPlz" placeholder="z.B. 50667" style="width:90px" maxlength="5"></div>
-      <div class="field"><label>Radius km</label>
+      <div class="field" data-filter="stadt"><label>Stadt</label>
+        <input id="cStadt" placeholder="z.B. Köln" style="width:130px" onkeydown="if(event.key==='Enter')ladeKunden()"></div>
+      <div class="field" data-filter="plz"><label>PLZ (Umkreis)</label>
+        <input id="cPlz" placeholder="z.B. 50667" style="width:90px" maxlength="5" onkeydown="if(event.key==='Enter')ladeKunden()"></div>
+      <div class="field" data-filter="radius"><label>Radius km</label>
         <select id="cRadius">
           <option value="25">25 km</option>
           <option value="50" selected>50 km</option>
@@ -317,7 +319,9 @@
       <button class="go" onclick="ladeKunden()">Suchen</button>
       <button class="neuBtn" onclick="neuerKunde()">+ Neue Firma</button>
       <button class="tab" onclick="toggleKSpaltenPanel()">🗂 Spalten</button>
+      <button class="tab" onclick="toggleKFilterPanel()">🔧 Filter</button>
     </div>
+    <div id="cFilterPanel" style="display:none;border:1px solid var(--line);background:var(--panel);border-radius:4px;padding:14px;margin-bottom:14px"></div>
     <div id="cSpaltenPanel" style="display:none;border:1px solid var(--line);background:var(--panel);border-radius:4px;padding:14px;margin-bottom:14px"></div>
     <div class="count" id="cCount"></div>
     <div id="cSelBar" style="display:none;align-items:center;gap:8px;background:var(--accent);color:#fff;padding:8px 14px;border-radius:6px;margin-bottom:8px;flex-wrap:wrap">
@@ -1198,7 +1202,7 @@ document.querySelectorAll('.tab[data-view]').forEach(t=>t.onclick=()=>{
   ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte','recherche'].forEach(v=>
     document.getElementById('view-'+v).style.display = v===t.dataset.view?'block':'none');
   if(t.dataset.view==='start') zeigeStart();
-  if(t.dataset.view==='kunden'){ fuelleBrancheFilter(); ladeKunden(); }
+  if(t.dataset.view==='kunden'){ fuelleBrancheFilter(); applyKFilter(); ladeKunden(); }
   if(t.dataset.view==='projekte') zeigeProjekteListe();
   if(t.dataset.view==='kandidaten') ladeKandidaten();
   if(t.dataset.view==='kontakte') ladeKontakte();
@@ -3452,10 +3456,46 @@ function fuelleBrancheFilter(){
   const cur=sel.value;
   sel.innerHTML='<option value="">alle</option>'+branchenListe().map(b=>`<option${b===cur?' selected':''}>${esc(b)}</option>`).join('');
 }
+// ===== Firmen-Filterfelder ein-/ausblendbar =====
+const KUNDEN_FILTER_DEF=[
+  {key:'suche',label:'Suche',el:'cSuche'},
+  {key:'typ',label:'Typ',el:'cTyp'},
+  {key:'branche',label:'Branche',el:'cBranche'},
+  {key:'stadt',label:'Stadt',el:'cStadt'},
+  {key:'plz',label:'PLZ (Umkreis)',el:'cPlz'},
+  {key:'radius',label:'Radius',el:'cRadius'},
+];
+let kFilterSichtbar=(()=>{ try{ const s=JSON.parse(localStorage.getItem('kunden_filter')); if(Array.isArray(s)&&s.length) return s.filter(k=>KUNDEN_FILTER_DEF.some(f=>f.key===k)); }catch(e){} return KUNDEN_FILTER_DEF.map(f=>f.key); })();
+function applyKFilter(){
+  document.querySelectorAll('#view-kunden .bar .field[data-filter]').forEach(el=>{
+    el.style.display = kFilterSichtbar.includes(el.dataset.filter) ? '' : 'none';
+  });
+}
+function toggleKFilterPanel(){ const p=document.getElementById('cFilterPanel'); if(!p) return; if(p.style.display==='none'){ renderKFilterPanel(); p.style.display='block'; } else p.style.display='none'; }
+function renderKFilterPanel(){
+  const p=document.getElementById('cFilterPanel'); if(!p) return;
+  p.innerHTML=`<div style="font-size:13px;font-weight:600;margin-bottom:4px">🔧 Suchfelder ein-/ausblenden</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Bestimmt, welche Filterfelder in der Leiste angezeigt werden.</div>`
+    + KUNDEN_FILTER_DEF.map(f=>`<label style="display:inline-flex;align-items:center;gap:6px;margin:2px 16px 6px 0;font-size:13px;cursor:pointer"><input type="checkbox" ${kFilterSichtbar.includes(f.key)?'checked':''} onchange="toggleKFilter('${f.key}')" style="width:14px;height:14px">${f.label}</label>`).join('');
+}
+function toggleKFilter(key){
+  if(kFilterSichtbar.includes(key)){
+    if(kFilterSichtbar.length<=1) return;
+    kFilterSichtbar=kFilterSichtbar.filter(k=>k!==key);
+    const def=KUNDEN_FILTER_DEF.find(f=>f.key===key); const el=def&&document.getElementById(def.el);
+    if(el){ if(el.tagName==='SELECT') el.value=(key==='radius'?'50':''); else el.value=''; }
+  } else {
+    kFilterSichtbar=KUNDEN_FILTER_DEF.filter(f=>kFilterSichtbar.includes(f.key)||f.key===key).map(f=>f.key);
+  }
+  localStorage.setItem('kunden_filter',JSON.stringify(kFilterSichtbar));
+  applyKFilter(); renderKFilterPanel(); ladeKunden();
+}
+
 async function ladeKunden(){
   const q=document.getElementById('cSuche').value.trim();
   const typ=document.getElementById('cTyp').value;
   const branche=(document.getElementById('cBranche')||{}).value||'';
+  const stadtEl=document.getElementById('cStadt'); const stadt=stadtEl?stadtEl.value.trim():'';
   const cPlzEl=document.getElementById('cPlz');
   const plz=cPlzEl?cPlzEl.value.trim():'';
   const radius=parseInt((document.getElementById('cRadius')||{}).value||'50')||50;
@@ -3484,13 +3524,14 @@ async function ladeKunden(){
     }
     let pool=data;
     if(branche) pool=pool.filter(r=>(r.branche||'')===branche);
+    if(stadt){const sl=stadt.toLowerCase();pool=pool.filter(r=>(r.stadt||'').toLowerCase().includes(sl));}
     if(q){const ql=q.toLowerCase();pool=pool.filter(r=>(r.name||'').toLowerCase().includes(ql)||(r.branche||'').toLowerCase().includes(ql)||(r.stadt||'').toLowerCase().includes(ql));}
     const ohneKoord=pool.filter(r=>r.lat==null||r.lng==null).length;
     let rows=pool.filter(r=>r.lat!=null&&r.lng!=null&&haversineKm(cLat,cLng,r.lat,r.lng)<=radius);
     rows.forEach(r=>{ r._km=Math.round(haversineKm(cLat,cLng,r.lat,r.lng)); });
     rows.sort((a,b)=>a._km-b._km);
     _kundenGeladen=rows;
-    let txt=rows.length+' Firmen im Umkreis von '+radius+' km um '+plz+(typ?' · '+typ:'')+(branche?' · '+branche:'')+(q?' · "'+q+'"':'');
+    let txt=rows.length+' Firmen im Umkreis von '+radius+' km um '+plz+(typ?' · '+typ:'')+(branche?' · '+branche:'')+(stadt?' · '+stadt:'')+(q?' · "'+q+'"':'');
     if(ohneKoord) txt+=' · ⚠️ '+ohneKoord+' ohne Koordinaten nicht berücksichtigt';
     document.getElementById('cCount').textContent=txt;
     renderKundenTabelle(true);
@@ -3503,10 +3544,11 @@ async function ladeKunden(){
   if(q) query=query.or(`name.ilike.%${q}%,branche.ilike.%${q}%,stadt.ilike.%${q}%`);
   if(typ) query=query.eq('typ',typ);
   if(branche) query=query.eq('branche',branche);
+  if(stadt) query=query.ilike('stadt',`%${stadt}%`);
   const {data,error}=await query;
   if(error){document.getElementById('cCount').textContent='Fehler: '+error.message;return;}
   _kundenGeladen=data;
-  document.getElementById('cCount').textContent=data.length+' Firmen'+(typ?' · '+typ:'')+(branche?' · '+branche:'');
+  document.getElementById('cCount').textContent=data.length+' Firmen'+(typ?' · '+typ:'')+(branche?' · '+branche:'')+(stadt?' · '+stadt:'');
   renderKundenTabelle(false);
 }
 
