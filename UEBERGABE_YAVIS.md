@@ -158,7 +158,7 @@ Supabase → SQL Editor → New Query → ausführen. Danach aktiviert sich der 
 - Pro Zeile: ♻️ Wiederherstellen (setzt `geloescht_am = null`) oder 🗑️ Endgültig löschen
 - **⚠️ SQL muss einmalig ausgeführt werden** (→ §3)
 
-localStorage-Keys gesamt: `sb_url`, `sb_key`, `yavis_mein_name`, `yavis_meine_plz`, `yavis_radius`, `yavis_bcc`, `yavis_signatur`, `yavis_vorlagen`, `yavis_theme`, `yavis_kompakt`, `yavis_eins_zoom`, `yavis_app_zoom`, `yavis_status_liste`, `ms_access_token`, `ms_refresh_token`, `yavis_abschnitt_order`
+localStorage-Keys gesamt: `sb_url`, `sb_key`, `yavis_mein_name`, `yavis_meine_plz`, `yavis_radius`, `yavis_bcc`, `yavis_signatur`, `yavis_vorlagen`, `yavis_theme`, `yavis_kompakt`, `yavis_eins_zoom`, `yavis_app_zoom`, `yavis_status_liste`, `yavis_branchen` (feste Firmen-Branchen), `kunden_spalten`, `kontakte_spalten` (Spaltenkonfiguration Firmen/Ansprechpartner), `ms_access_token`, `ms_refresh_token`, `yavis_abschnitt_order`
 
 ---
 
@@ -212,16 +212,18 @@ Falls Push hängt: GCM-Fenster → **„Sign in with a code"** → Code auf gith
 - **Bugfix:** Firmen-Code nutzte `website` statt des DB-Feldnamens **`webseite`** (Spalte + CSV-Export).
 - **DATEN-FIX (Supabase):** Der ursprüngliche Zoho-Import hatte die meist **leere Rechnungsadresse** statt der gefüllten **Versandadresse** übernommen. Skripte `_adressfix_dryrun.py` / `_adressfix_schreiben.py` (Match per `Kunde Id`=`kunden.id`): 95 Firmen Stadt/PLZ/Straße/Bundesland nachgetragen, 92 neue Koordinaten aus `plz_geo`. **Köln 14→39, Firmen ohne Koordinaten 115→23, mit PLZ 83→177.** (Backup-Quelle: `zoho backup/Kunden/Clients_001.csv`.)
 - **195 Firmen** Typ „Auftraggeber" → „Auftraggeber-Potenzial" umgestellt (DB: jetzt 196 Potenzial, 0 Auftraggeber).
+- **Telefonnummern vereinheitlicht:** alle 164 vorhandenen auf internationales `+49`-Format normiert; 6 fehlende per Web-Recherche nachgetragen (Telefon leer jetzt 26).
+- **Branche angereichert + feste Struktur:** 88 Firmen per Web-Recherche eine Branche gegeben, dann **feste 6er-Liste** eingeführt und ALLE 196 Firmen darauf umgeordnet. Die 6 Werte: **Ingenieurbüro · Ausführer / Anlagenbau · Bauunternehmen / GU · Immobilien / Projektentwickler · Hersteller / Industrie · Sonstige**. (1 Firma noch ohne Branche: Natalie Söll.)
+- **Branche = feste Dropdown-Struktur:** im Firmen-Bearbeiten-Formular UND in der Massenbearbeitung Dropdown; verwaltbar unter **Einstellungen → 🏭 Firmen-Branchen**; localStorage `yavis_branchen`, Default `BRANCHEN_STANDARD`, Getter `branchenListe()` (gebaut analog zu `statusListe()`). Hilfsskripte: `_branche_final.csv`, `_telefon_todo.json`.
 
 ### 🔴 Als Nächstes
 
 | # | Aufgabe | Details |
 |---|---------|---------|
-| 1 | **Telefonnummern vereinheitlichen** | Dry-Run fertig: 164 Firmen mit Tel, **146 würden** auf internationales `+49 …` normiert (führende 0→+49, `0049`→+49, „(0)"/Schrägstriche raus, Durchwahl `-` bleibt). **Freigabe zum echten Schreiben steht noch aus.** |
-| 2 | **Branche/Telefon per Web-Recherche** | 89 Firmen ohne Branche, 32 ohne Telefon — aus Zoho NICHT nachholbar (war dort schon leer). **171 haben eine Webseite** → Recherche möglich; Stichprobe (8 Firmen) erfolgreich getestet (M-TEQ=TGA Köln, SPIE=TGA, o-byte=IT, Instone=Projektentwickler …). |
-| 3 | **Suche verbessern** | Firmensuche nicht nur auf die lückenhafte „Branche" stützen (Wort „TGA" steht in 0 Branchen-Feldern!). Umkreissuche soll anzeigen „X Firmen ohne Koordinaten nicht berücksichtigt". |
-| 4 | **~13 Duplikate** | Kandidaten die auch als Ansprechpartner existieren. Duplikate-Finder in Einstellungen → Datenverwaltung vorhanden. |
-| 5 | **54 Kandidaten ohne Berufsbezeichnung** | XING/LinkedIn-Profile aber kein PDF. Manuell via „📋 Aus Profil/Text" nachpflegen. |
+| 1 | **Suche verbessern (in Arbeit)** | Branche als **Filter-Dropdown** im Firmen-Tab (statt Freitext, nutzt `branchenListe()`); Umkreissuche soll anzeigen „X Firmen ohne Koordinaten nicht berücksichtigt". |
+| 2 | **Rest-Datenlücken (manuell)** | 26 Firmen ohne Telefon (19 ohne Webseite), 1 Firma ohne Branche (Natalie Söll — hinterlegte Webseite falsch). |
+| 3 | **~13 Duplikate** | Kandidaten die auch als Ansprechpartner existieren. Duplikate-Finder in Einstellungen → Datenverwaltung vorhanden. |
+| 4 | **54 Kandidaten ohne Berufsbezeichnung** | XING/LinkedIn-Profile aber kein PDF. Manuell via „📋 Aus Profil/Text" nachpflegen. |
 
 ### 🟡 Mittelfristig
 
