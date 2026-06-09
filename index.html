@@ -957,6 +957,22 @@
       </div>
     </div>
 
+    <!-- Firmen-Branchen -->
+    <div style="margin-bottom:20px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">🏭 Firmen-Branchen</div>
+      <div style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;overflow:hidden">
+        <div id="branchenVerwaltungCont"></div>
+        <div style="padding:11px 16px;display:flex;gap:8px;align-items:center;border-top:1px solid var(--line)">
+          <input id="brancheNeuInp" placeholder="Neue Branche …" onkeydown="if(event.key==='Enter')brancheHinzufuegen()"
+                 style="flex:1;padding:6px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
+          <button onclick="brancheHinzufuegen()"
+                  style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--accent2);color:#fff;border:none;font-size:13px;font-weight:600">+ Hinzufügen</button>
+          <button onclick="brancheAufStandardReset()" title="Auf Standard-Werte zurücksetzen"
+                  style="padding:6px 12px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);font-size:13px;color:var(--muted)">↺</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Datenverwaltung -->
     <div style="margin-bottom:20px">
       <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">📋 Datenverwaltung</div>
@@ -2502,6 +2518,11 @@ const FIRMEN_TYP_BG={
   'Lieferant':'#0078d4',
   'Sonstige':'var(--muted)'
 };
+const BRANCHEN_STANDARD=['Ingenieurbüro','Ausführer / Anlagenbau','Bauunternehmen / GU','Immobilien / Projektentwickler','Hersteller / Industrie','Sonstige'];
+function branchenListe(){
+  try{ const s=localStorage.getItem('yavis_branchen'); if(s){ const a=JSON.parse(s); if(a&&a.length) return a; } }catch(e){}
+  return [...BRANCHEN_STANDARD];
+}
 
 function ef(label,id,val,type='text'){
   return `<div class="edit-field"><label>${label}</label><input id="ef_${id}" type="${type}" value="${val?String(val).replace(/"/g,'&quot;'):''}"></div>`;
@@ -2757,7 +2778,7 @@ function zeigeKundeFormular(d){
     <div class="card"><h3>Firmendaten</h3><div class="edit-grid">
       ${ef('Firmenname','name',d.name)}
       ${esel('Typ','typ',d.typ||'Auftraggeber',FIRMEN_TYPEN)}
-      ${ef('Branche','branche',d.branche)}
+      ${esel('Branche','branche',d.branche,branchenListe())}
       ${ef('Telefon','telefon',d.telefon)}
       ${ef('Fax','fax',d.fax)}
       ${ef('E-Mail','email',d.email,'email')}
@@ -2974,6 +2995,7 @@ function kundenMassFeldWechseln(sel){
   const feld=sel.value; if(!feld){ box.innerHTML=''; return; }
   const st='width:100%;padding:8px;font-size:14px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;margin-top:6px;box-sizing:border-box';
   if(feld==='typ') box.innerHTML=`<label style="font-size:13px;color:var(--muted)">Neuer Typ</label><select id="kMassWert" style="${st}">${['Auftraggeber','Auftraggeber-Potenzial','Lieferant','Sonstige'].map(t=>`<option>${t}</option>`).join('')}</select>`;
+  else if(feld==='branche') box.innerHTML=`<label style="font-size:13px;color:var(--muted)">Neue Branche</label><select id="kMassWert" style="${st}">${branchenListe().map(t=>`<option>${esc(t)}</option>`).join('')}</select>`;
   else box.innerHTML=`<label style="font-size:13px;color:var(--muted)">Neuer Wert</label><input id="kMassWert" style="${st}" placeholder="Wert eingeben…">`;
 }
 async function kundenMassAnwenden(dlg){
@@ -3939,7 +3961,7 @@ function oeffneEinstellungen(){
   // Kompakt-Button-Label
   const kb=document.getElementById('kompaktBtn');
   if(kb) kb.textContent=document.body.classList.contains('kompakt')?'✅ An':'⬜ Aus';
-  document.getElementById('einstellungenDlg').showModal(); renderStatusVerwaltung(); einsZoomAnwenden();
+  document.getElementById('einstellungenDlg').showModal(); renderStatusVerwaltung(); renderBranchenVerwaltung(); einsZoomAnwenden();
   msEinstellungenUI();
 }
 
@@ -6724,6 +6746,46 @@ function statusLoeschen(idx) {
     });
   }
   zeigeMeldung('"' + entfernt + '" entfernt', 'ok');
+}
+
+// ---- Firmen-Branchen-Verwaltung ----
+function renderBranchenVerwaltung() {
+  const cont = document.getElementById('branchenVerwaltungCont');
+  if (!cont) return;
+  const liste = branchenListe();
+  cont.innerHTML = liste.map((v, i) =>
+    '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 16px;' +
+    (i < liste.length - 1 ? 'border-bottom:1px solid var(--line)' : '') + '">' +
+    '<span style="font-size:13px">' + esc(v) + '</span>' +
+    '<button onclick="brancheLoeschen(' + i + ')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;line-height:1;padding:0 2px" title="Entfernen">×</button>' +
+    '</div>'
+  ).join('');
+}
+function brancheHinzufuegen() {
+  const inp = document.getElementById('brancheNeuInp');
+  const val = (inp.value || '').trim();
+  if (!val) return;
+  const liste = branchenListe();
+  if (liste.some(s => s.toLowerCase() === val.toLowerCase())) { zeigeMeldung('Wert existiert bereits', 'err'); return; }
+  liste.push(val);
+  localStorage.setItem('yavis_branchen', JSON.stringify(liste));
+  inp.value = '';
+  renderBranchenVerwaltung();
+  zeigeMeldung('"' + val + '" hinzugefügt ✓', 'ok');
+}
+function brancheLoeschen(idx) {
+  const liste = branchenListe();
+  if (liste.length <= 1) { zeigeMeldung('Mindestens ein Wert muss vorhanden sein', 'err'); return; }
+  const entfernt = liste.splice(idx, 1)[0];
+  localStorage.setItem('yavis_branchen', JSON.stringify(liste));
+  renderBranchenVerwaltung();
+  zeigeMeldung('"' + entfernt + '" entfernt', 'ok');
+}
+function brancheAufStandardReset() {
+  if (!confirm('Branchen-Liste auf die Standard-Werte zurücksetzen?\n\n' + BRANCHEN_STANDARD.join(', '))) return;
+  localStorage.removeItem('yavis_branchen');
+  renderBranchenVerwaltung();
+  zeigeMeldung('Standard-Werte wiederhergestellt ✓', 'ok');
 }
 
 function statusAufStandardReset() {
