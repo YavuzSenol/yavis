@@ -227,16 +227,18 @@ Falls Push hängt: GCM-Fenster → **„Sign in with a code"** → Code auf gith
 | 2 | **19 Firmen ohne Telefon (manuell)** | Konzern-Zentralen (Fraport/Heraeus/UPS) und NL-Standorte ohne öffentlich auffindbare Direktnummer. |
 | 3 | **~~Duplikate~~ — erledigt/geklärt** | Die 12 „Duplikate" sind gewollte Doppelrollen (Kunde **und** Kandidat). KEIN Handlungsbedarf. |
 
-### 🟡 Mittelfristig
+### ✅ Erledigt am 09.06.2026 (Feature-Block)
+- **Kandidatenprofil zusenden** — Button „📤 Profil senden" am Kandidaten (`profilSendenDialog`): Empfänger per Ansprechpartner-Suche oder E-Mail, **anonymisierbar** (Standard an: verbirgt Name/Arbeitgeber/Kontakt), formatiertes Profil im Text, Versand via Graph + Protokoll. (Kein PDF — Profil als Text im Body.)
+- **Hot-Flag** — Filter „🔥 nur Hot" im Kandidaten-Tab (`kNurHot`) + Umschalt-Button „🔥" am Kandidaten (`hotToggle`). Anzeige (HOT-Pille/🔥) war schon da.
+- **Abwerbeschutz-Automatik FIX** — `ladeAuftraggeberNamen()` fragte nie matchendes `'Auftraggeber Potenzial'` (Leerzeichen) ab → korrigiert auf `typ='Auftraggeber'`. ⚠️ Greift erst, wenn echte Kunden wieder als Typ **„Auftraggeber"** markiert sind (aktuell sind alle „Auftraggeber-Potenzial" → niemand auto-geschützt).
+- **Tag-Picker** — Kandidaten-Editor hat jetzt ein Tags-Feld (Chips mit ×, Eingabe mit `<datalist>`-Vorschlägen aus `ladeAlleTags()`). Speicherformat `;tag;tag;`.
+- **Geburtstag-Feld** — im Kandidaten-Editor ergänzt (`type=date`, ISO `YYYY-MM-DD`).
+
+### 🟡 Mittelfristig (offen)
 
 | # | Aufgabe |
 |---|---------|
-| 5 | **Webflow-Embed** — `webflow_jobs_embed.html` liegt fertig in `C:\Claude`. In Webflow als HTML-Embed-Block einbauen. |
-| 6 | **Abwerbeschutz** — Auto-Markierung wenn `arbeitgeber` = Auftraggeber |
-| 7 | **Tag-Picker** — Vorschlagsliste beim Tag-Bearbeiten am Kandidaten |
-| 8 | **Geburtstag-Feld** im Bearbeiten-Formular |
-| 9 | **Hot-Flag** — `ist_hot` nutzbar machen (Filter + Markierung in Liste) |
-| 10 | **Kandidatenprofil zusenden** — Profil-PDF per Mail an Firma/Kontakt schicken (braucht Graph API → #2) |
+| 5 | **Webflow-Embed** — `webflow_jobs_embed.html` liegt fertig in `C:\Claude`. In Webflow als HTML-Embed-Block einbauen. *(Nutzer meldet sich später dazu.)* |
 
 ### 💤 Langfristig / Optional
 
