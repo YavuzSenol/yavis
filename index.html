@@ -2146,12 +2146,16 @@ function _profilText(d, erf, ausb, anonym){
   }
   return L.join('\n');
 }
-function _psBody(d, erf, ausb, anonym){
+function _psGruss(anrede, nachname){
+  if(nachname && (anrede==='Herr'||anrede==='Frau')) return 'Guten Tag '+anrede+' '+nachname+',';
+  return 'Guten Tag,';
+}
+function _psBody(d, erf, ausb, anonym, anrede, nachname){
   const meinName=localStorage.getItem('yavis_mein_name')||'';
   const einleitung = anonym
-    ? 'gerne stelle ich Ihnen anbei ein anonymisiertes Kandidatenprofil vor:'
-    : 'gerne stelle ich Ihnen das Profil von '+(d.voller_name||'')+' vor:';
-  return `Sehr geehrte Damen und Herren,\n\n${einleitung}\n\n${_profilText(d,erf,ausb,anonym)}\n\nBei Interesse stelle ich gerne den Kontakt her.\n\nViele Grüße`+(meinName?'\n'+meinName:'');
+    ? 'gerne darf ich Ihnen anbei ein anonymisiertes Kandidatenprofil vorstellen:'
+    : 'gerne darf ich Ihnen das Profil von '+(d.voller_name||'')+' vorstellen:';
+  return `${_psGruss(anrede,nachname)}\n\n${einleitung}\n\n${_profilText(d,erf,ausb,anonym)}\n\nBei Interesse stelle ich gerne den Kontakt her.\n\nViele Grüße`+(meinName?'\n'+meinName:'');
 }
 async function profilSendenDialog(kandidatId){
   const [kk,ke,ka]=await Promise.all([
@@ -2164,7 +2168,7 @@ async function profilSendenDialog(kandidatId){
   const ausbA=ka.data||[];
   const betreffDefault='Kandidatenvorschlag'+(d.berufsbezeichnung?': '+d.berufsbezeichnung:'');
   const dlg=document.createElement('dialog');
-  dlg._d=d; dlg._erf=erfA; dlg._ausb=ausbA;
+  dlg._d=d; dlg._erf=erfA; dlg._ausb=ausbA; dlg._anrede='Herr'; dlg._nachname='';
   dlg.style.cssText='border:none;border-radius:10px;background:var(--panel);color:var(--text);padding:0;max-width:680px;width:94vw;max-height:90vh';
   dlg.innerHTML=`
     <div style="padding:18px 20px;overflow:auto;max-height:90vh">
@@ -2175,16 +2179,28 @@ async function profilSendenDialog(kandidatId){
         <div id="psTreffer" style="max-height:160px;overflow:auto;margin-top:4px;border:1px solid var(--line);border-radius:5px;display:none"></div>
         <input id="psEmail" placeholder="empfaenger@firma.de" style="width:100%;box-sizing:border-box;margin-top:6px">
       </div>
-      <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted);margin-bottom:10px;cursor:pointer">
-        <input type="checkbox" id="psAnonym" checked onchange="_psToggleAnonym(this)" style="width:15px;height:15px"> Anonymisiert (Name, Arbeitgeber &amp; Kontakt verbergen)
-      </label>
+      <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:180px">
+          <label style="font-size:13px;color:var(--muted)">Vorlage</label>
+          <select id="psVorlage" onchange="_psRegen(this.closest('dialog'))" style="width:100%;box-sizing:border-box">
+            <option value="mitName">Profil mit Namen (Standard)</option>
+            <option value="anonym">Profil anonymisiert</option>
+          </select>
+        </div>
+        <div style="width:140px">
+          <label style="font-size:13px;color:var(--muted)">Anrede</label>
+          <select id="psAnrede" onchange="_psAnredeChange(this)" style="width:100%;box-sizing:border-box">
+            <option>Herr</option><option>Frau</option><option value="">— neutral</option>
+          </select>
+        </div>
+      </div>
       <div style="margin-bottom:10px">
         <label style="font-size:13px;color:var(--muted)">Betreff</label>
         <input id="psBetreff" value="${esc(betreffDefault)}" style="width:100%;box-sizing:border-box">
       </div>
       <div style="margin-bottom:14px">
         <label style="font-size:13px;color:var(--muted)">Nachricht</label>
-        <textarea id="psText" rows="16" style="width:100%;box-sizing:border-box;font-family:inherit">${esc(_psBody(d,erfA,ausbA,true))}</textarea>
+        <textarea id="psText" rows="16" style="width:100%;box-sizing:border-box;font-family:inherit">${esc(_psBody(d,erfA,ausbA,false,'Herr',''))}</textarea>
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end">
         <button onclick="this.closest('dialog').close();this.closest('dialog').remove()" style="padding:7px 16px;border-radius:5px;border:1px solid var(--line);background:transparent;color:var(--text);cursor:pointer">Abbrechen</button>
@@ -2193,17 +2209,18 @@ async function profilSendenDialog(kandidatId){
     </div>`;
   document.body.appendChild(dlg); dlg.showModal();
 }
-function _psToggleAnonym(cb){
-  const dlg=cb.closest('dialog');
-  dlg.querySelector('#psText').value=_psBody(dlg._d,dlg._erf,dlg._ausb,cb.checked);
+function _psRegen(dlg){
+  const anonym = dlg.querySelector('#psVorlage').value==='anonym';
+  dlg.querySelector('#psText').value=_psBody(dlg._d,dlg._erf,dlg._ausb,anonym,dlg._anrede,dlg._nachname);
 }
+function _psAnredeChange(sel){ const dlg=sel.closest('dialog'); dlg._anrede=sel.value; _psRegen(dlg); }
 let _psTimer=null;
 function _psSuche(inp){
   clearTimeout(_psTimer);
   const q=inp.value.trim(); const dlg=inp.closest('dialog'); const box=dlg.querySelector('#psTreffer');
   if(q.length<2){ box.style.display='none'; box.innerHTML=''; return; }
   _psTimer=setTimeout(async()=>{
-    let qy=sb.from('kontakte').select('id,voller_name,email').or(`voller_name.ilike.%${q}%`).limit(12);
+    let qy=sb.from('kontakte').select('id,voller_name,nachname,email').or(`voller_name.ilike.%${q}%`).limit(12);
     if(softDeleteAktiv) qy=qy.is('geloescht_am',null);
     const {data}=await qy;
     dlg._psTreffer=data||[];
@@ -2220,6 +2237,8 @@ function _psWaehle(el){
   const dlg=el.closest('dialog'); const k=(dlg._psTreffer||[])[+el.dataset.idx]; if(!k) return;
   dlg.querySelector('#psEmail').value=k.email||'';
   dlg.querySelector('#psSuche').value=k.voller_name||'';
+  dlg._nachname=k.nachname||(k.voller_name||'').split(' ').slice(-1)[0]||'';
+  _psRegen(dlg);
   const box=dlg.querySelector('#psTreffer'); box.style.display='none'; box.innerHTML='';
 }
 async function _psSenden(dlg){
