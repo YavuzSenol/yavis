@@ -941,6 +941,10 @@
           <div><b>E-Mail-Vorlagen</b><div style="font-size:12px;color:var(--muted)">Texte und Betreffzeilen fuer Serien-E-Mails</div></div>
           <button onclick="document.getElementById('einstellungenDlg').close();oeffneVorlagen()" style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:13px">Verwalten</button>
         </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--line)">
+          <div><b>Profil-Vorlagen</b><div style="font-size:12px;color:var(--muted)">Vorlagen für „📤 Profil senden" (mit Namen / anonym)</div></div>
+          <button onclick="document.getElementById('einstellungenDlg').close();oeffneProfilVorlagen()" style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:13px">Verwalten</button>
+        </div>
         <div style="padding:11px 16px">
           <div style="margin-bottom:6px"><b>E-Mail-Signatur</b> <span style="font-size:12px;color:var(--muted)">— HTML erlaubt · wird an alle Outlook-Entwürfe angehängt</span></div>
           <textarea id="einsSignatur" rows="6" placeholder="HTML-Signatur hier einfügen (z.B. aus Outlook-Signaturdatei kopiert)&#10;&#10;Oder einfach Klartext:&#10;Mit freundlichen Grüßen&#10;Yavuz Senol · Senol Consulting · Köln" style="width:100%;padding:8px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;resize:vertical;font-family:inherit;box-sizing:border-box"></textarea>
@@ -2154,13 +2158,72 @@ function _psGruss(anrede, nachname){
   if(nachname && (anrede==='Herr'||anrede==='Frau')) return 'Guten Tag '+anrede+' '+nachname+',';
   return 'Guten Tag,';
 }
-function _psBody(d, erf, ausb, anonym, anrede, nachname){
+const PROFIL_VORLAGEN_STANDARD=[
+  {id:1,name:'Profil mit Namen (Standard)',anonym:false,text:'{Gruss}\n\ngerne darf ich Ihnen das Profil von {Name} vorstellen:\n\n{Profil}\n\nBei Interesse stelle ich gerne den Kontakt her.\n\nViele Grüße\n{MeinName}'},
+  {id:2,name:'Profil anonymisiert',anonym:true,text:'{Gruss}\n\ngerne darf ich Ihnen anbei ein anonymisiertes Kandidatenprofil vorstellen:\n\n{Profil}\n\nBei Interesse stelle ich gerne den Kontakt her.\n\nViele Grüße\n{MeinName}'},
+];
+function profilVorlagen(){ try{ const s=JSON.parse(localStorage.getItem('yavis_profil_vorlagen')); if(Array.isArray(s)&&s.length) return s; }catch(e){} return PROFIL_VORLAGEN_STANDARD.map(v=>({...v})); }
+function profilVorlagenSpeichern(arr){ localStorage.setItem('yavis_profil_vorlagen',JSON.stringify(arr)); }
+function _psFill(tpl, d, erf, ausb, anrede, nachname){
   const meinName=localStorage.getItem('yavis_mein_name')||'';
-  const einleitung = anonym
-    ? 'gerne darf ich Ihnen anbei ein anonymisiertes Kandidatenprofil vorstellen:'
-    : 'gerne darf ich Ihnen das Profil von '+(d.voller_name||'')+' vorstellen:';
-  return `${_psGruss(anrede,nachname)}\n\n${einleitung}\n\n${_profilText(d,erf,ausb,anonym)}\n\nBei Interesse stelle ich gerne den Kontakt her.\n\nViele Grüße`+(meinName?'\n'+meinName:'');
+  return String((tpl&&tpl.text)||'')
+    .replace(/\{Gruss\}/g,_psGruss(anrede,nachname))
+    .replace(/\{Name\}/g,(tpl&&tpl.anonym)?'':(d.voller_name||''))
+    .replace(/\{Profil\}/g,_profilText(d,erf,ausb,!!(tpl&&tpl.anonym)))
+    .replace(/\{MeinName\}/g,meinName);
 }
+// ---- Profil-Vorlagen-Verwaltung ----
+function oeffneProfilVorlagen(){
+  const dlg=document.createElement('dialog');
+  dlg.style.cssText='width:min(720px,96vw);max-height:92vh;overflow-y:auto;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;padding:0';
+  dlg.innerHTML=`
+    <div style="padding:22px 26px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid var(--line);padding-bottom:12px">
+        <h2 style="margin:0;font-size:18px;font-weight:700">📤 Profil-Vorlagen</h2>
+        <button onclick="this.closest('dialog').close();this.closest('dialog').remove()" style="background:none;border:none;cursor:pointer;font-size:22px;color:var(--muted)">×</button>
+      </div>
+      <div style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:14px;margin-bottom:16px">
+        <div id="pvFormTitel" style="font-weight:700;margin-bottom:10px">➕ Neue Vorlage</div>
+        <input type="hidden" id="pvId">
+        <label style="font-size:12px;color:var(--muted)">Name</label>
+        <input id="pvName" placeholder="z.B. Profil mit Namen" style="width:100%;box-sizing:border-box;margin:4px 0 10px">
+        <label style="display:flex;align-items:center;gap:7px;font-size:13px;margin-bottom:10px;cursor:pointer"><input type="checkbox" id="pvAnonym" style="width:15px;height:15px"> Anonymisiert (im {Profil} Name/Arbeitgeber verbergen)</label>
+        <label style="font-size:12px;color:var(--muted)">Text — Platzhalter: <code>{Gruss}</code> <code>{Name}</code> <code>{Profil}</code> <code>{MeinName}</code></label>
+        <textarea id="pvText" rows="11" style="width:100%;box-sizing:border-box;margin-top:4px;font-family:inherit"></textarea>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
+          <button onclick="_pvReset(this.closest('dialog'))" style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink)">Neu</button>
+          <button onclick="_pvSpeichern(this.closest('dialog'))" style="padding:6px 16px;border-radius:5px;cursor:pointer;background:var(--accent);color:#fff;border:none;font-weight:600">Speichern</button>
+        </div>
+      </div>
+      <div id="pvListe"></div>
+    </div>`;
+  document.body.appendChild(dlg); _pvRender(dlg); dlg.showModal();
+}
+function _pvRender(dlg){
+  const list=profilVorlagen(); const div=dlg.querySelector('#pvListe');
+  div.innerHTML=list.length?list.map(v=>`
+    <div style="background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:12px 14px;margin-bottom:5px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;font-size:14px">${esc(v.name)}${v.anonym?' <span style="font-size:10px;color:var(--muted);font-weight:600">· anonym</span>':''}</div>
+        <div style="font-size:12px;color:var(--muted);white-space:pre-wrap;max-height:46px;overflow:hidden">${esc((v.text||'').substring(0,120))}${(v.text||'').length>120?'…':''}</div>
+      </div>
+      <div style="display:flex;gap:5px;flex-shrink:0">
+        <button onclick="_pvBearbeiten(this.closest('dialog'),'${v.id}')" title="Bearbeiten" style="padding:4px 10px;border-radius:4px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink)">✏️</button>
+        <button onclick="_pvLoeschen(this.closest('dialog'),'${v.id}')" title="Löschen" style="padding:4px 10px;border-radius:4px;cursor:pointer;background:rgba(168,162,158,.15);border:1px solid rgba(168,162,158,.30);color:var(--hot)">🗑️</button>
+      </div>
+    </div>`).join(''):'<div style="font-size:13px;color:var(--muted);text-align:center;padding:16px">Keine Vorlagen.</div>';
+}
+function _pvReset(dlg){ dlg.querySelector('#pvId').value=''; dlg.querySelector('#pvName').value=''; dlg.querySelector('#pvAnonym').checked=false; dlg.querySelector('#pvText').value=''; dlg.querySelector('#pvFormTitel').textContent='➕ Neue Vorlage'; }
+function _pvBearbeiten(dlg,id){ const v=profilVorlagen().find(x=>String(x.id)===String(id)); if(!v) return; dlg.querySelector('#pvId').value=v.id; dlg.querySelector('#pvName').value=v.name||''; dlg.querySelector('#pvAnonym').checked=!!v.anonym; dlg.querySelector('#pvText').value=v.text||''; dlg.querySelector('#pvFormTitel').textContent='✏️ Vorlage bearbeiten'; }
+function _pvSpeichern(dlg){
+  const name=dlg.querySelector('#pvName').value.trim(); if(!name){ zeigeMeldung('Bitte einen Namen eingeben','warn'); return; }
+  const anonym=dlg.querySelector('#pvAnonym').checked; const text=dlg.querySelector('#pvText').value;
+  const id=dlg.querySelector('#pvId').value; const list=profilVorlagen();
+  if(id){ const i=list.findIndex(x=>String(x.id)===String(id)); if(i>=0) list[i]={...list[i],name,anonym,text}; }
+  else { list.push({id:Date.now(),name,anonym,text}); }
+  profilVorlagenSpeichern(list); _pvReset(dlg); _pvRender(dlg); zeigeMeldung('Profil-Vorlage gespeichert ✓','ok');
+}
+function _pvLoeschen(dlg,id){ if(!confirm('Vorlage wirklich löschen?')) return; profilVorlagenSpeichern(profilVorlagen().filter(x=>String(x.id)!==String(id))); _pvRender(dlg); }
 function _blobToBase64(blob){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]||''); r.onerror=rej; r.readAsDataURL(blob); }); }
 async function profilSendenDialog(kandidatId){
   const [kk,ke,ka,kdoc]=await Promise.all([
@@ -2188,10 +2251,9 @@ async function profilSendenDialog(kandidatId){
       </div>
       <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
         <div style="flex:1;min-width:180px">
-          <label style="font-size:13px;color:var(--muted)">Vorlage</label>
+          <label style="font-size:13px;color:var(--muted)">Vorlage <a href="#" onclick="event.preventDefault();oeffneProfilVorlagen()" style="color:var(--accent2);font-size:11px;margin-left:6px">⚙️ verwalten</a></label>
           <select id="psVorlage" onchange="_psRegen(this.closest('dialog'))" style="width:100%;box-sizing:border-box">
-            <option value="mitName">Profil mit Namen (Standard)</option>
-            <option value="anonym">Profil anonymisiert</option>
+            ${profilVorlagen().map(v=>`<option value="${v.id}">${esc(v.name)}</option>`).join('')}
           </select>
         </div>
         <div style="width:140px">
@@ -2213,7 +2275,7 @@ async function profilSendenDialog(kandidatId){
       </div>
       <div style="margin-bottom:14px">
         <label style="font-size:13px;color:var(--muted)">Nachricht</label>
-        <textarea id="psText" rows="16" style="width:100%;box-sizing:border-box;font-family:inherit">${esc(_psBody(d,erfA,ausbA,false,'Herr',''))}</textarea>
+        <textarea id="psText" rows="16" style="width:100%;box-sizing:border-box;font-family:inherit">${esc(_psFill(profilVorlagen()[0],d,erfA,ausbA,'Herr',''))}</textarea>
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end">
         <button onclick="this.closest('dialog').close();this.closest('dialog').remove()" style="padding:7px 16px;border-radius:5px;border:1px solid var(--line);background:transparent;color:var(--text);cursor:pointer">Abbrechen</button>
@@ -2223,8 +2285,9 @@ async function profilSendenDialog(kandidatId){
   document.body.appendChild(dlg); dlg.showModal();
 }
 function _psRegen(dlg){
-  const anonym = dlg.querySelector('#psVorlage').value==='anonym';
-  dlg.querySelector('#psText').value=_psBody(dlg._d,dlg._erf,dlg._ausb,anonym,dlg._anrede,dlg._nachname);
+  const id=dlg.querySelector('#psVorlage').value; const list=profilVorlagen();
+  const tpl=list.find(v=>String(v.id)===String(id))||list[0];
+  dlg.querySelector('#psText').value=_psFill(tpl,dlg._d,dlg._erf,dlg._ausb,dlg._anrede,dlg._nachname);
 }
 function _psAnredeChange(sel){ const dlg=sel.closest('dialog'); dlg._anrede=sel.value; _psRegen(dlg); }
 let _psTimer=null;
