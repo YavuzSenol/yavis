@@ -215,15 +215,17 @@ Falls Push hängt: GCM-Fenster → **„Sign in with a code"** → Code auf gith
 - **Telefonnummern vereinheitlicht:** alle 164 vorhandenen auf internationales `+49`-Format normiert; 6 fehlende per Web-Recherche nachgetragen (Telefon leer jetzt 26).
 - **Branche angereichert + feste Struktur:** 88 Firmen per Web-Recherche eine Branche gegeben, dann **feste 6er-Liste** eingeführt und ALLE 196 Firmen darauf umgeordnet. Die 6 Werte: **Ingenieurbüro · Ausführer / Anlagenbau · Bauunternehmen / GU · Immobilien / Projektentwickler · Hersteller / Industrie · Sonstige**. (1 Firma noch ohne Branche: Natalie Söll.)
 - **Branche = feste Dropdown-Struktur:** im Firmen-Bearbeiten-Formular UND in der Massenbearbeitung Dropdown; verwaltbar unter **Einstellungen → 🏭 Firmen-Branchen**; localStorage `yavis_branchen`, Default `BRANCHEN_STANDARD`, Getter `branchenListe()` (gebaut analog zu `statusListe()`). Hilfsskripte: `_branche_final.csv`, `_telefon_todo.json`.
+- **Firmen-Suche verbessert:** Branche-Filter-Dropdown im Firmen-Tab (`fuelleBrancheFilter()`, nutzt `branchenListe()`); Umkreissuche zeigt „⚠️ X ohne Koordinaten nicht berücksichtigt".
+- **E-Mail-Bereich bei Firmen + Ansprechpartnern** ergänzt (Anzeige `mailHistorieHtml` per `entity_id` + „📧 protokollieren"). **Outlook-Sync** (`msSyncOutlook`) matcht jetzt Kandidaten + **Firmen** + **Ansprechpartner** (vorher nur Kandidaten). IDs lesbar: `fmtId(id,'FIR')` / `fmtId(id,'ANS')`.
+- **Backlog-Bereinigung:** #1 Firmen-Lücken: 7 Telefonnummern recherchiert, Branche-Lücke geschlossen (Natalie Söll = IT/Sonstige) → **0 ohne Branche, 19 ohne Telefon** (Rest = Konzern-Zentralen/NL, manuell). #2 „~13 Duplikate" sind **KEINE Duplikate**, sondern gewollte **Doppelrollen** (Person ist Firmenkontakt UND Kandidat, weil sie selbst sucht) — alle behalten, nicht löschen. #3 Berufsbezeichnung: Web-Recherche untauglich (XING/LinkedIn login-geschützt) → bleibt manuell; Arbeitsliste `_berufsbezeichnung_todo.csv`.
 
 ### 🔴 Als Nächstes
 
 | # | Aufgabe | Details |
 |---|---------|---------|
-| 1 | **Suche verbessern (in Arbeit)** | Branche als **Filter-Dropdown** im Firmen-Tab (statt Freitext, nutzt `branchenListe()`); Umkreissuche soll anzeigen „X Firmen ohne Koordinaten nicht berücksichtigt". |
-| 2 | **Rest-Datenlücken (manuell)** | 26 Firmen ohne Telefon (19 ohne Webseite), 1 Firma ohne Branche (Natalie Söll — hinterlegte Webseite falsch). |
-| 3 | **~13 Duplikate** | Kandidaten die auch als Ansprechpartner existieren. Duplikate-Finder in Einstellungen → Datenverwaltung vorhanden. |
-| 4 | **54 Kandidaten ohne Berufsbezeichnung** | XING/LinkedIn-Profile aber kein PDF. Manuell via „📋 Aus Profil/Text" nachpflegen. |
+| 1 | **74 Kandidaten ohne Berufsbezeichnung (manuell)** | Titel liegen nur auf login-geschützten XING/LinkedIn-Profilen (Web-Recherche untauglich). Abarbeiten via App **„📋 Aus Profil/Text"**. Arbeitsliste mit Profil-Links: `_berufsbezeichnung_todo.csv` (63 mit Link). |
+| 2 | **19 Firmen ohne Telefon (manuell)** | Konzern-Zentralen (Fraport/Heraeus/UPS) und NL-Standorte ohne öffentlich auffindbare Direktnummer. |
+| 3 | **~~Duplikate~~ — erledigt/geklärt** | Die 12 „Duplikate" sind gewollte Doppelrollen (Kunde **und** Kandidat). KEIN Handlungsbedarf. |
 
 ### 🟡 Mittelfristig
 
