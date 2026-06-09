@@ -2423,6 +2423,11 @@ function fmtKandidatId(id) {
   if (m) return 'KAN-' + m[1].slice(-5);
   return id;  // andere IDs unverändert
 }
+function fmtId(id, prefix){
+  if(!id) return '';
+  const m=String(id).match(/(\d+)$/);
+  return m ? prefix+'-'+m[1].slice(-5) : id;
+}
 
 function fmtDat(s){ if(!s) return ''; try{const d=new Date(s);
   return d.toLocaleDateString('de-DE')+' '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});}catch{return s;} }
@@ -2704,19 +2709,20 @@ async function speichereKandidat(id){
 // ============ KUNDEN ============
 async function detailKunde(id){
   history.pushState({yavis:'detail'}, '', '');
-  const [k, kont, stel, notiz, aufg] = await Promise.all([
+  const [k, kont, stel, notiz, aufg, mails] = await Promise.all([
     sb.from('kunden').select('*').eq('id',id).single(),
     sb.from('kontakte').select('*').eq('kunde_id',id),
     sb.from('stellen').select('*').eq('kunde_id',id),
     sb.from('notizen').select('*').eq('kunde_id',id).order('erstellt_am',{ascending:false}),
     sb.from('aufgaben').select('*').eq('verknuepft_mit',id).order('faelligkeitsdatum',{ascending:true,nullsFirst:false}),
+    sb.from('emails').select('*').eq('entity_id',id).order('erstellt_am',{ascending:false}).limit(100),
   ]);
   const d=k.data; if(!d) return;
   kontextDatensatz={typ:'Kunde',id:d.id,name:d.name};
   ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
   const adresse=[d.strasse,[d.plz,d.stadt].filter(Boolean).join(' '),d.bundesland,d.land].filter(Boolean).join(', ');
-  const kont_=kont.data||[], stel_=stel.data||[], notiz_=notiz.data||[], aufg_=aufg.data||[];
+  const kont_=kont.data||[], stel_=stel.data||[], notiz_=notiz.data||[], aufg_=aufg.data||[], mails_=mails.data||[];
   page.innerHTML=`
     <div class="detail-head">
       <button class="back" onclick="zurueckZurListe()">← Zurück</button>
@@ -2757,8 +2763,12 @@ async function detailKunde(id){
       notiz_.slice(0,30).map(n=>`<div class="note">${esc(n.inhalt)||'–'}<div class="meta">${n.erstellt_am?fmtDat(n.erstellt_am):''}</div></div>`).join('')
     }</div>`:''}
     ${aufgabenCardHtml(aufg_,'Kunde',d.id)}
+    <div class="card"><h3>E-Mails (${mails_.length})</h3>
+      <div id="mailHistorie">${mailHistorieHtml(mails_)}</div>
+      <div style="margin-top:10px"><button class="neuBtn" onclick="mailProtokollieren('${d.id}','${esc(d.name)}')">📧 E-Mail protokollieren</button></div>
+    </div>
     <div class="card"><h3>System</h3><div class="grid2">
-      <div>${zeile('Kunde-ID', esc(d.id))}${zeile('Quelle', esc(d.quelle))}</div>
+      <div>${zeile('Kunde-ID', `<span title="${esc(d.id)}">${fmtId(d.id,'FIR')}</span>`)}${zeile('Quelle', esc(d.quelle))}</div>
       <div>${zeile('Erstellt', d.erstellt_am?fmtDat(d.erstellt_am):'')}${zeile('Geändert', d.geaendert_am?fmtDat(d.geaendert_am):'')}</div>
     </div></div>
   `;
@@ -2835,6 +2845,8 @@ async function detailKontakt(id){
   const notizT_=notizTab||[];
   const {data:aufgTab}=await sb.from('aufgaben').select('*').eq('verknuepft_mit',id).order('faelligkeitsdatum',{ascending:true,nullsFirst:false});
   const aufg_=aufgTab||[];
+  const {data:mailsTab}=await sb.from('emails').select('*').eq('entity_id',id).order('erstellt_am',{ascending:false}).limit(100);
+  const mailsT_=mailsTab||[];
   kontextDatensatz={typ:'Kontakt',id:d.id,name:d.voller_name};
   ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
@@ -2870,8 +2882,12 @@ async function detailKontakt(id){
       notizT_.slice(0,30).map(n=>`<div class="note">${esc(n.inhalt)||'–'}<div class="meta">${n.typ?esc(n.typ)+' · ':''}${n.erstellt_am?fmtDat(n.erstellt_am):''}</div></div>`).join('')
     }</div>`:''}
     ${aufgabenCardHtml(aufg_,'Kontakt',d.id)}
+    <div class="card"><h3>E-Mails (${mailsT_.length})</h3>
+      <div id="mailHistorie">${mailHistorieHtml(mailsT_)}</div>
+      <div style="margin-top:10px"><button class="neuBtn" onclick="mailProtokollieren('${d.id}','${esc(d.voller_name)}')">📧 E-Mail protokollieren</button></div>
+    </div>
     <div class="card"><h3>System</h3><div class="grid2">
-      <div>${zeile('Kontakt-ID', `<span title="${esc(d.id)}">${fmtKandidatId(d.id)}</span>`)}${zeile('Quelle', esc(d.quelle))}</div>
+      <div>${zeile('Kontakt-ID', `<span title="${esc(d.id)}">${fmtId(d.id,'ANS')}</span>`)}${zeile('Quelle', esc(d.quelle))}</div>
       <div>${zeile('Erstellt', d.erstellt_am?fmtDat(d.erstellt_am):'')}${zeile('Geändert', d.geaendert_am?fmtDat(d.geaendert_am):'')}</div>
     </div></div>
   `;
@@ -5134,30 +5150,28 @@ async function msSyncOutlook(){
       }
     }
 
-    // Kandidaten mit passenden E-Mails suchen
-    const emailListe=[...emailMap.keys()];
-    const {data:kands1}=await sb.from('kandidaten').select('id,voller_name,email,email_beruflich')
-      .in('email',emailListe.slice(0,100));
-    const {data:kands2}=await sb.from('kandidaten').select('id,voller_name,email,email_beruflich')
-      .in('email_beruflich',emailListe.slice(0,100));
+    // Passende Einträge in Kandidaten, Firmen UND Ansprechpartnern suchen
+    const emailListe=[...emailMap.keys()].slice(0,100);
+    const [k1,k2,ku,ko]=await Promise.all([
+      sb.from('kandidaten').select('id,voller_name,email,email_beruflich').in('email',emailListe),
+      sb.from('kandidaten').select('id,voller_name,email,email_beruflich').in('email_beruflich',emailListe),
+      sb.from('kunden').select('id,name,email').in('email',emailListe),
+      sb.from('kontakte').select('id,voller_name,email').in('email',emailListe),
+    ]);
+    const treffer=[]; const seen=new Set();
+    function addTreffer(eid,name,typ,...emails){
+      const key=typ+':'+eid; if(seen.has(key)) return; seen.add(key);
+      let mi={}; for(const e of emails){ const m=emailMap.get((e||'').toLowerCase()); if(m){mi=m;break;} }
+      treffer.push({id:eid,name:name||'(ohne Name)',typ,mailSubject:mi.subject||'',mailSentAt:mi.sentAt||''});
+    }
+    [...(k1.data||[]),...(k2.data||[])].forEach(k=>addTreffer(k.id,k.voller_name,'Kandidat',k.email,k.email_beruflich));
+    (ku.data||[]).forEach(k=>addTreffer(k.id,k.name,'Firma',k.email));
+    (ko.data||[]).forEach(k=>addTreffer(k.id,k.voller_name,'Ansprechpartner',k.email));
 
-    const alleKands=[...((kands1||[])), ...((kands2||[]))];
-    // Duplikate entfernen
-    const seen=new Set();
-    const kands=alleKands.filter(k=>{if(seen.has(k.id))return false;seen.add(k.id);return true;});
-
-    if(!kands.length){
-      zeigeMeldung(`${messages.length} E-Mails geprüft — keine passenden Kandidaten gefunden`,'warn');
+    if(!treffer.length){
+      zeigeMeldung(`${messages.length} E-Mails geprüft — keine passenden Einträge gefunden`,'warn');
       return;
     }
-
-    // Treffer mit Mail-Daten anreichern
-    const treffer=kands.map(k=>{
-      const email=(k.email||k.email_beruflich||'').toLowerCase();
-      const mailInfo=emailMap.get(email)||emailMap.get((k.email_beruflich||'').toLowerCase())||{};
-      return{...k,mailSubject:mailInfo.subject||'',mailSentAt:mailInfo.sentAt||''};
-    });
-
     msSyncDialog(treffer,messages.length);
   }catch(e){zeigeMeldung('Fehler: '+e.message,'err');}
 }
@@ -5169,7 +5183,7 @@ function msSyncDialog(treffer,totalMessages){
     <div style="padding:18px 22px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
       <div>
         <div style="font-size:16px;font-weight:700">🔄 Outlook-Sync</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:2px">${totalMessages} gesendete E-Mails geprüft — ${treffer.length} passende Kandidaten gefunden</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">${totalMessages} gesendete E-Mails geprüft — ${treffer.length} passende Einträge gefunden</div>
       </div>
       <button onclick="this.closest('dialog').close();this.closest('dialog').remove()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--muted)">×</button>
     </div>
@@ -5177,7 +5191,7 @@ function msSyncDialog(treffer,totalMessages){
       ${treffer.map(k=>`
         <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 22px;border-bottom:1px solid var(--line)">
           <div style="flex:1;min-width:0">
-            <div style="font-weight:600;font-size:13px">${esc(k.voller_name)}</div>
+            <div style="font-weight:600;font-size:13px">${esc(k.name)} <span style="font-size:10px;color:var(--muted);font-weight:600">· ${k.typ}</span></div>
             <div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(k.mailSubject||'(kein Betreff)')}</div>
             <div style="font-size:11px;color:var(--muted)">${k.mailSentAt?new Date(k.mailSentAt).toLocaleDateString('de-DE'):''}</div>
           </div>
