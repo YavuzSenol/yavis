@@ -333,7 +333,9 @@
         <input id="ktSuche" placeholder="z.B. Michael Müller" style="min-width:260px"></div>
       <button class="go" onclick="ladeKontakte()">Suchen</button>
       <button class="neuBtn" onclick="neuerKontakt()">+ Neuer Ansprechpartner</button>
+      <button class="tab" onclick="toggleKtSpaltenPanel()">🗂 Spalten</button>
     </div>
+    <div id="ktSpaltenPanel" style="display:none;border:1px solid var(--line);background:var(--panel);border-radius:4px;padding:14px;margin-bottom:14px"></div>
     <div class="count" id="ktCount"></div>
     <div id="ktSelBar" style="display:none;align-items:center;gap:8px;background:var(--accent);color:#fff;padding:8px 14px;border-radius:6px;margin-bottom:8px;flex-wrap:wrap">
       <span id="ktSelCount" style="font-weight:600"></span>
@@ -341,10 +343,7 @@
       <button onclick="kontakteCsvExport()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">📥 CSV</button>
       <button onclick="kontaktSelAufheben()" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.4);padding:5px 10px;border-radius:4px;cursor:pointer;font-size:13px;margin-left:auto">✕ Aufheben</button>
     </div>
-    <table><thead><tr>
-      <th style="width:32px;text-align:center"><input type="checkbox" id="ktSelAll" title="Alle auswählen" onchange="kontaktSelAll(this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></th>
-      <th>Name</th><th>Firma</th><th>Funktion</th><th>E-Mail</th><th>Telefon</th>
-    </tr></thead><tbody id="ktBody"></tbody></table>
+    <table><thead><tr id="ktHead"></tr></thead><tbody id="ktBody"></tbody></table>
   </div>
 
   <!-- Wiedervorlagen -->
@@ -3197,10 +3196,68 @@ async function ladeKunden(){
   renderKundenTabelle(false);
 }
 
+// ===== Ansprechpartner-Spalten konfigurierbar + sortierbar (wie Firmen) =====
+const KONTAKTE_SPALTEN_DEF=[
+  {key:'voller_name',      label:'Name',     get:r=>r.voller_name||'',      render:r=>esc(r.voller_name)||'–'},
+  {key:'_firma',           label:'Firma',    get:r=>r._firma||'',           render:r=>r._firma?esc(r._firma):'<span style="color:var(--muted)">ohne Firma</span>'},
+  {key:'berufsbezeichnung',label:'Funktion', get:r=>r.berufsbezeichnung||'', render:r=>esc(r.berufsbezeichnung)||'–'},
+  {key:'email',            label:'E-Mail',   get:r=>r.email||'',            render:r=>r.email?`<a class="calllink" href="mailto:${esc(r.email)}" onclick="event.stopPropagation()">${esc(r.email)}</a>`:'–'},
+  {key:'telefon_beruflich',label:'Telefon',  get:r=>r.telefon_beruflich||r.mobil||'', render:r=>esc(r.telefon_beruflich)||esc(r.mobil)||'–'},
+  {key:'mobil',            label:'Mobil',    get:r=>r.mobil||'',            render:r=>esc(r.mobil)||'–'},
+];
+const KONTAKTE_SPALTEN_MAP=Object.fromEntries(KONTAKTE_SPALTEN_DEF.map(c=>[c.key,c]));
+let ktSichtbareSpalten=(()=>{ try{ const s=JSON.parse(localStorage.getItem('kontakte_spalten')); if(Array.isArray(s)&&s.length) return s.filter(k=>KONTAKTE_SPALTEN_MAP[k]); }catch(e){} return ['voller_name','_firma','berufsbezeichnung','email','telefon_beruflich']; })();
+let ktSortKey=null, ktSortDir=1;
+function ktSpaltenSpeichern(){ localStorage.setItem('kontakte_spalten', JSON.stringify(ktSichtbareSpalten)); }
+function ktSpaltenListe(){ return ktSichtbareSpalten.map(k=>KONTAKTE_SPALTEN_MAP[k]).filter(Boolean); }
+function ktSpaltenHeaderRender(){
+  const head=document.getElementById('ktHead'); if(!head) return;
+  head.innerHTML = `<th style="width:32px;text-align:center" onclick="event.stopPropagation()"><input type="checkbox" id="ktSelAll" title="Alle auswählen" onchange="kontaktSelAll(this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></th>`
+    + ktSpaltenListe().map(c=>{ const pf=ktSortKey===c.key?(ktSortDir===1?' ▲':' ▼'):''; return `<th style="cursor:pointer;user-select:none;white-space:nowrap" onclick="ktSortBy('${c.key}')" title="Auf-/absteigend sortieren">${c.label}${pf}</th>`; }).join('');
+}
+function ktSortBy(key){ if(ktSortKey===key) ktSortDir=-ktSortDir; else { ktSortKey=key; ktSortDir=1; } renderKontakteTabelle(); }
+function renderKontakteTabelle(){
+  const body=document.getElementById('ktBody'); if(!body) return;
+  ktSpaltenHeaderRender();
+  let rows=[..._kontakteGeladen];
+  if(ktSortKey){ const c=KONTAKTE_SPALTEN_MAP[ktSortKey]; rows.sort((a,b)=>String(c?c.get(a):'').localeCompare(String(c?c.get(b):''),'de',{numeric:true,sensitivity:'base'})*ktSortDir); }
+  body.innerHTML='';
+  if(!rows.length){ body.innerHTML=`<tr><td colspan="${ktSpaltenListe().length+1}" class="empty">Keine Treffer.</td></tr>`; updateKontaktSelBar(); return; }
+  rows.forEach(r=>{
+    const tr=document.createElement('tr'); tr.className='row-click';
+    const cb=`<td onclick="event.stopPropagation()" style="width:32px;text-align:center"><input type="checkbox" class="kontakt-cb" data-id="${r.id}" ${selectedKontaktIds.has(r.id)?'checked':''} onchange="kontaktSelToggle('${r.id}',this)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></td>`;
+    tr.innerHTML=cb+ktSpaltenListe().map(c=>`<td>${c.render(r)}</td>`).join('');
+    tr.onclick=()=>detailKontakt(r.id);
+    body.appendChild(tr);
+  });
+  updateKontaktSelBar();
+}
+function toggleKtSpaltenPanel(){ const p=document.getElementById('ktSpaltenPanel'); if(!p) return; if(p.style.display==='none'){ renderKtSpaltenPanel(); p.style.display='block'; } else p.style.display='none'; }
+function renderKtSpaltenPanel(){
+  const p=document.getElementById('ktSpaltenPanel'); if(!p) return;
+  const aktiv=ktSichtbareSpalten, inaktiv=KONTAKTE_SPALTEN_DEF.filter(c=>!ktSichtbareSpalten.includes(c.key));
+  let html=`<div style="font-size:13px;font-weight:600;margin-bottom:4px">🗂 Spalten & Reihenfolge</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Mit ↑ ↓ verschieben, mit ✕ ausblenden. Klick auf eine Spaltenüberschrift in der Tabelle sortiert auf-/absteigend.</div>`;
+  aktiv.forEach((k,i)=>{ const c=KONTAKTE_SPALTEN_MAP[k]; if(!c) return; const up=i===0, dn=i===aktiv.length-1;
+    html+=`<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;margin-bottom:4px;background:var(--panel2);border:1px solid var(--line);border-radius:3px;max-width:360px">
+      <span style="flex:1;font-size:13px">${c.label}</span>
+      <button class="tab" style="padding:2px 9px${up?';opacity:.3':''}" ${up?'disabled':''} onclick="moveKtSpalte('${k}',-1)">↑</button>
+      <button class="tab" style="padding:2px 9px${dn?';opacity:.3':''}" ${dn?'disabled':''} onclick="moveKtSpalte('${k}',1)">↓</button>
+      <button class="tab" style="padding:2px 9px" onclick="toggleKtSpalte('${k}')" title="Ausblenden">✕</button>
+    </div>`; });
+  if(inaktiv.length){
+    html+=`<div style="font-size:12px;color:var(--muted);margin:10px 0 6px">Hinzufügen:</div>`+
+      inaktiv.map(c=>`<span class="tag" style="cursor:pointer;margin:2px 5px 2px 0;display:inline-block" onclick="toggleKtSpalte('${c.key}')">+ ${c.label}</span>`).join('');
+  }
+  p.innerHTML=html;
+}
+function toggleKtSpalte(key){ if(ktSichtbareSpalten.includes(key)){ if(ktSichtbareSpalten.length<=1) return; ktSichtbareSpalten=ktSichtbareSpalten.filter(k=>k!==key); } else { ktSichtbareSpalten=[...ktSichtbareSpalten,key]; } ktSpaltenSpeichern(); renderKtSpaltenPanel(); renderKontakteTabelle(); }
+function moveKtSpalte(key,dir){ const i=ktSichtbareSpalten.indexOf(key), j=i+dir; if(i<0||j<0||j>=ktSichtbareSpalten.length) return; const a=[...ktSichtbareSpalten]; [a[i],a[j]]=[a[j],a[i]]; ktSichtbareSpalten=a; ktSpaltenSpeichern(); renderKtSpaltenPanel(); renderKontakteTabelle(); }
+
 async function ladeKontakte(){
   const q=document.getElementById('ktSuche').value.trim();
   const body=document.getElementById('ktBody'); body.innerHTML='';
-  selectedKontaktIds.clear(); _kontakteGeladen=[]; updateKontaktSelBar();
+  selectedKontaktIds.clear(); _kontakteGeladen=[]; ktSortKey=null; updateKontaktSelBar();
   let query=sb.from('kontakte').select('*').limit(200).order('nachname');
   if(softDeleteAktiv) query=query.is('geloescht_am',null);
   if(q) query=query.or(`voller_name.ilike.%${q}%,berufsbezeichnung.ilike.%${q}%`);
@@ -3212,19 +3269,9 @@ async function ladeKontakte(){
   if(firmaIds.length){ const {data:fd}=await sb.from('kunden').select('id,name').in('id',firmaIds);
     (fd||[]).forEach(f=>firmaMap[f.id]=f.name); }
   _kontakteGeladen=data;
+  data.forEach(r=>{ r._firma=(r.kunde_id?firmaMap[r.kunde_id]:'')||''; });
   document.getElementById('ktCount').textContent=data.length+' Ansprechpartner';
-  data.forEach(r=>{
-    const tr=document.createElement('tr');tr.className='row-click';
-    const firma=r.kunde_id?firmaMap[r.kunde_id]:'';
-    r._firma=firma||'';
-    tr.innerHTML=`<td onclick="event.stopPropagation()" style="width:32px;text-align:center"><input type="checkbox" class="kontakt-cb" data-id="${r.id}" onchange="kontaktSelToggle('${r.id}',this)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></td><td>${esc(r.voller_name)||'–'}</td><td>${firma?esc(firma):'<span style="color:var(--muted)">ohne Firma</span>'}</td>
-      <td>${esc(r.berufsbezeichnung)||'–'}</td>
-      <td>${r.email?`<a class="calllink" href="mailto:${esc(r.email)}" onclick="event.stopPropagation()">${esc(r.email)}</a>`:'–'}</td>
-      <td>${esc(r.telefon_beruflich)||esc(r.mobil)||'–'}</td>`;
-    tr.onclick=()=>detailKontakt(r.id);
-    body.appendChild(tr);
-  });
-  if(!data.length) body.innerHTML='<tr><td colspan="6" class="empty">Keine Treffer.</td></tr>';
+  renderKontakteTabelle();
 }
 
 function zeigeDetail(title,obj){
