@@ -3017,7 +3017,7 @@ function kundenCsvExport(){
   const rows=_kundenGeladen.filter(r=>selectedKundenIds.has(r.id));
   if(!rows.length){ zeigeMeldung('Keine Firmen ausgewählt','warn'); return; }
   _csvDownload('zielfirmen.csv',['Firma','Typ','Branche','PLZ','Ort','Telefon','Website'],
-    rows.map(r=>[r.name,r.typ,r.branche,r.plz,r.stadt,r.telefon,r.website]));
+    rows.map(r=>[r.name,r.typ,r.branche,r.plz,r.stadt,r.telefon,r.webseite]));
 }
 function kontakteCsvExport(){
   const rows=_kontakteGeladen.filter(r=>selectedKontaktIds.has(r.id));
@@ -3039,7 +3039,7 @@ function kontakteAnKandidat(){
 
 function _ankZeilen(typ,rows){
   if(typ==='firmen'){
-    return rows.map((r,i)=>`${i+1}. ${r.name||'–'}${r.branche?' – '+r.branche:''}${(r.plz||r.stadt)?', '+[r.plz,r.stadt].filter(Boolean).join(' '):''}${r.telefon?', Tel: '+r.telefon:''}${r.website?', '+r.website:''}`).join('\n');
+    return rows.map((r,i)=>`${i+1}. ${r.name||'–'}${r.branche?' – '+r.branche:''}${(r.plz||r.stadt)?', '+[r.plz,r.stadt].filter(Boolean).join(' '):''}${r.telefon?', Tel: '+r.telefon:''}${r.webseite?', '+r.webseite:''}`).join('\n');
   }
   return rows.map((r,i)=>`${i+1}. ${r.voller_name||'–'}${r._firma?' ('+r._firma+')':''}${r.berufsbezeichnung?' – '+r.berufsbezeichnung:''}${r.email?', '+r.email:''}${(r.telefon_beruflich||r.mobil)?', Tel: '+(r.telefon_beruflich||r.mobil):''}`).join('\n');
 }
@@ -3142,7 +3142,7 @@ const KUNDEN_SPALTEN_DEF=[
   {key:'bundesland', label:'Bundesland', get:r=>r.bundesland||'', render:r=>esc(r.bundesland)||'–'},
   {key:'land',       label:'Land',       get:r=>r.land||'',       render:r=>esc(r.land)||'–'},
   {key:'telefon',    label:'Telefon',    get:r=>r.telefon||'',    render:r=>esc(r.telefon)||'–'},
-  {key:'website',    label:'Website',    get:r=>r.website||'',     render:r=>r.website?`<a class="calllink" href="${/^https?:/i.test(r.website)?esc(r.website):'https://'+esc(r.website)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(r.website)} ↗</a>`:'–'},
+  {key:'webseite',   label:'Website',    get:r=>r.webseite||'',    render:r=>r.webseite?`<a class="calllink" href="${/^https?:/i.test(r.webseite)?esc(r.webseite):'https://'+esc(r.webseite)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(r.webseite)} ↗</a>`:'–'},
 ];
 const KUNDEN_SPALTEN_MAP=Object.fromEntries(KUNDEN_SPALTEN_DEF.map(c=>[c.key,c]));
 let kSichtbareSpalten=(()=>{ try{ const s=JSON.parse(localStorage.getItem('kunden_spalten')); if(Array.isArray(s)&&s.length) return s.filter(k=>KUNDEN_SPALTEN_MAP[k]); }catch(e){} return ['name','typ','branche','plz','stadt','telefon']; })();
@@ -6624,7 +6624,7 @@ function rechercheCsvExport() {
     ];
   } else if (tab === 'firmen') {
     header = ['Name','Typ','Branche','PLZ','Ort','Bundesland','Telefon','E-Mail','Website'];
-    getRow = r => [r.name||'', r.typ||'', r.branche||'', r.plz||'', r.stadt||'', r.bundesland||'', r.telefon||'', r.email||'', r.website||''];
+    getRow = r => [r.name||'', r.typ||'', r.branche||'', r.plz||'', r.stadt||'', r.bundesland||'', r.telefon||'', r.email||'', r.webseite||''];
   } else {
     header = ['Name','Funktion','Firma','E-Mail','Telefon','Mobil'];
     getRow = r => [r.voller_name||'', r.berufsbezeichnung||'', (firmaMap&&firmaMap[r.kunde_id])||'', r.email||'', r.telefon_beruflich||'', r.mobil||''];
