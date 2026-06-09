@@ -315,7 +315,14 @@
       <button class="neuBtn" onclick="neuerKunde()">+ Neue Firma</button>
     </div>
     <div class="count" id="cCount"></div>
+    <div id="cSelBar" style="display:none;align-items:center;gap:8px;background:var(--accent);color:#fff;padding:8px 14px;border-radius:6px;margin-bottom:8px;flex-wrap:wrap">
+      <span id="cSelCount" style="font-weight:600"></span>
+      <button onclick="kundenAnKandidat()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">👤 An Kandidat senden</button>
+      <button onclick="kundenCsvExport()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">📥 CSV</button>
+      <button onclick="kundeSelAufheben()" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.4);padding:5px 10px;border-radius:4px;cursor:pointer;font-size:13px;margin-left:auto">✕ Aufheben</button>
+    </div>
     <table><thead><tr>
+      <th style="width:32px;text-align:center"><input type="checkbox" id="cSelAll" title="Alle auswählen" onchange="kundeSelAll(this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></th>
       <th>Firma</th><th>Typ</th><th>Branche</th><th>PLZ / Ort</th><th>Telefon</th>
     </tr></thead><tbody id="cBody"></tbody></table>
   </div>
@@ -329,7 +336,14 @@
       <button class="neuBtn" onclick="neuerKontakt()">+ Neuer Ansprechpartner</button>
     </div>
     <div class="count" id="ktCount"></div>
+    <div id="ktSelBar" style="display:none;align-items:center;gap:8px;background:var(--accent);color:#fff;padding:8px 14px;border-radius:6px;margin-bottom:8px;flex-wrap:wrap">
+      <span id="ktSelCount" style="font-weight:600"></span>
+      <button onclick="kontakteAnKandidat()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">👤 An Kandidat senden</button>
+      <button onclick="kontakteCsvExport()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">📥 CSV</button>
+      <button onclick="kontaktSelAufheben()" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.4);padding:5px 10px;border-radius:4px;cursor:pointer;font-size:13px;margin-left:auto">✕ Aufheben</button>
+    </div>
     <table><thead><tr>
+      <th style="width:32px;text-align:center"><input type="checkbox" id="ktSelAll" title="Alle auswählen" onchange="kontaktSelAll(this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></th>
       <th>Name</th><th>Firma</th><th>Funktion</th><th>E-Mail</th><th>Telefon</th>
     </tr></thead><tbody id="ktBody"></tbody></table>
   </div>
@@ -2915,6 +2929,157 @@ function haversineKm(lat1,lon1,lat2,lon2){
   return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
 
+// ===== Mehrfachauswahl Firmen + Ansprechpartner (Zielfirmenliste an Kandidat) =====
+let _kundenGeladen=[]; let selectedKundenIds=new Set();
+let _kontakteGeladen=[]; let selectedKontaktIds=new Set();
+
+function updateKundeSelBar(){
+  const bar=document.getElementById('cSelBar'); if(!bar) return;
+  const n=selectedKundenIds.size;
+  bar.style.display=n?'flex':'none';
+  const c=document.getElementById('cSelCount'); if(c) c.textContent=n+(n===1?' Firma':' Firmen')+' ausgewählt';
+  const all=document.getElementById('cSelAll');
+  if(all){ const total=document.querySelectorAll('.kunde-cb').length; all.checked=n>0&&n===total; all.indeterminate=n>0&&n<total; }
+}
+function kundeSelToggle(id,cb){ if(cb.checked) selectedKundenIds.add(id); else selectedKundenIds.delete(id); updateKundeSelBar(); }
+function kundeSelAll(checked){ document.querySelectorAll('.kunde-cb').forEach(cb=>{ cb.checked=checked; if(checked) selectedKundenIds.add(cb.dataset.id); else selectedKundenIds.delete(cb.dataset.id); }); updateKundeSelBar(); }
+function kundeSelAufheben(){ selectedKundenIds.clear(); document.querySelectorAll('.kunde-cb').forEach(cb=>cb.checked=false); const all=document.getElementById('cSelAll'); if(all){all.checked=false;all.indeterminate=false;} updateKundeSelBar(); }
+
+function updateKontaktSelBar(){
+  const bar=document.getElementById('ktSelBar'); if(!bar) return;
+  const n=selectedKontaktIds.size;
+  bar.style.display=n?'flex':'none';
+  const c=document.getElementById('ktSelCount'); if(c) c.textContent=n+(n===1?' Ansprechpartner':' Ansprechpartner')+' ausgewählt';
+  const all=document.getElementById('ktSelAll');
+  if(all){ const total=document.querySelectorAll('.kontakt-cb').length; all.checked=n>0&&n===total; all.indeterminate=n>0&&n<total; }
+}
+function kontaktSelToggle(id,cb){ if(cb.checked) selectedKontaktIds.add(id); else selectedKontaktIds.delete(id); updateKontaktSelBar(); }
+function kontaktSelAll(checked){ document.querySelectorAll('.kontakt-cb').forEach(cb=>{ cb.checked=checked; if(checked) selectedKontaktIds.add(cb.dataset.id); else selectedKontaktIds.delete(cb.dataset.id); }); updateKontaktSelBar(); }
+function kontaktSelAufheben(){ selectedKontaktIds.clear(); document.querySelectorAll('.kontakt-cb').forEach(cb=>cb.checked=false); const all=document.getElementById('ktSelAll'); if(all){all.checked=false;all.indeterminate=false;} updateKontaktSelBar(); }
+
+function _csvDownload(name,head,zeilen){
+  const csv=[head.join(';')].concat(zeilen.map(z=>z.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(';'))).join('\r\n');
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click();
+}
+function kundenCsvExport(){
+  const rows=_kundenGeladen.filter(r=>selectedKundenIds.has(r.id));
+  if(!rows.length){ zeigeMeldung('Keine Firmen ausgewählt','warn'); return; }
+  _csvDownload('zielfirmen.csv',['Firma','Typ','Branche','PLZ','Ort','Telefon','Website'],
+    rows.map(r=>[r.name,r.typ,r.branche,r.plz,r.stadt,r.telefon,r.website]));
+}
+function kontakteCsvExport(){
+  const rows=_kontakteGeladen.filter(r=>selectedKontaktIds.has(r.id));
+  if(!rows.length){ zeigeMeldung('Keine Ansprechpartner ausgewählt','warn'); return; }
+  _csvDownload('ansprechpartner.csv',['Name','Firma','Funktion','E-Mail','Telefon'],
+    rows.map(r=>[r.voller_name,r._firma,r.berufsbezeichnung,r.email,r.telefon_beruflich||r.mobil]));
+}
+
+function kundenAnKandidat(){
+  const rows=_kundenGeladen.filter(r=>selectedKundenIds.has(r.id));
+  if(!rows.length){ zeigeMeldung('Keine Firmen ausgewählt','warn'); return; }
+  oeffneAnKandidatDialog('firmen',rows);
+}
+function kontakteAnKandidat(){
+  const rows=_kontakteGeladen.filter(r=>selectedKontaktIds.has(r.id));
+  if(!rows.length){ zeigeMeldung('Keine Ansprechpartner ausgewählt','warn'); return; }
+  oeffneAnKandidatDialog('kontakte',rows);
+}
+
+function _ankZeilen(typ,rows){
+  if(typ==='firmen'){
+    return rows.map((r,i)=>`${i+1}. ${r.name||'–'}${r.branche?' – '+r.branche:''}${(r.plz||r.stadt)?', '+[r.plz,r.stadt].filter(Boolean).join(' '):''}${r.telefon?', Tel: '+r.telefon:''}${r.website?', '+r.website:''}`).join('\n');
+  }
+  return rows.map((r,i)=>`${i+1}. ${r.voller_name||'–'}${r._firma?' ('+r._firma+')':''}${r.berufsbezeichnung?' – '+r.berufsbezeichnung:''}${r.email?', '+r.email:''}${(r.telefon_beruflich||r.mobil)?', Tel: '+(r.telefon_beruflich||r.mobil):''}`).join('\n');
+}
+function oeffneAnKandidatDialog(typ,rows){
+  const liste=_ankZeilen(typ,rows);
+  const titel=typ==='firmen'?'Zielfirmen':'Ansprechpartner';
+  const meinName=localStorage.getItem('yavis_mein_name')||'';
+  const betreffDefault=titel+' für Sie';
+  const textDefault=`Hallo,\n\nanbei eine Auswahl an ${titel} für Sie:\n\n${liste}\n\nViele Grüße`+(meinName?'\n'+meinName:'');
+  const dlg=document.createElement('dialog');
+  dlg.style.cssText='border:none;border-radius:10px;background:var(--panel);color:var(--text);padding:0;max-width:660px;width:92vw';
+  dlg.innerHTML=`
+    <div style="padding:18px 20px">
+      <h3 style="margin:0 0 14px">👤 ${rows.length} ${titel} an Kandidat senden</h3>
+      <div style="margin-bottom:10px">
+        <label style="font-size:13px;color:var(--muted)">Kandidat suchen</label>
+        <input id="akSuche" placeholder="Name eingeben…" oninput="_ankSucheKandidat(this)" autocomplete="off" style="width:100%;box-sizing:border-box">
+        <div id="akTreffer" style="max-height:170px;overflow:auto;margin-top:4px;border:1px solid var(--line);border-radius:5px;display:none"></div>
+        <div id="akGewaehlt" style="margin-top:6px;font-size:13px;color:var(--accent);min-height:18px"></div>
+      </div>
+      <div style="margin-bottom:10px">
+        <label style="font-size:13px;color:var(--muted)">Betreff</label>
+        <input id="akBetreff" value="${esc(betreffDefault)}" style="width:100%;box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="font-size:13px;color:var(--muted)">Nachricht</label>
+        <textarea id="akText" rows="12" style="width:100%;box-sizing:border-box;font-family:inherit">${esc(textDefault)}</textarea>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button onclick="this.closest('dialog').close();this.closest('dialog').remove()" style="padding:7px 16px;border-radius:5px;border:1px solid var(--line);background:transparent;color:var(--text);cursor:pointer">Abbrechen</button>
+        <button onclick="_anKandidatSenden(this.closest('dialog'))" style="padding:7px 18px;border-radius:5px;border:none;background:var(--accent);color:#fff;font-weight:600;cursor:pointer">📨 Senden</button>
+      </div>
+    </div>`;
+  document.body.appendChild(dlg); dlg.showModal();
+}
+let _ankSucheTimer=null;
+function _ankSucheKandidat(inp){
+  clearTimeout(_ankSucheTimer);
+  const q=inp.value.trim();
+  const dlg=inp.closest('dialog');
+  const box=dlg.querySelector('#akTreffer');
+  if(q.length<2){ box.style.display='none'; box.innerHTML=''; return; }
+  _ankSucheTimer=setTimeout(async()=>{
+    let query=sb.from('kandidaten').select('id,voller_name,email,email_beruflich,email_zweit').or(`voller_name.ilike.%${q}%`).limit(15);
+    if(softDeleteAktiv) query=query.is('geloescht_am',null);
+    const {data}=await query;
+    dlg._treffer=data||[];
+    if(!data||!data.length){ box.style.display='block'; box.innerHTML='<div style="padding:7px 9px;color:var(--muted);font-size:13px">Keine Treffer</div>'; return; }
+    box.style.display='block';
+    box.innerHTML=data.map((k,i)=>{
+      const mail=k.email||k.email_beruflich||k.email_zweit||'';
+      const ms=mail?'<span style="color:var(--muted)">· '+esc(mail)+'</span>':'<span style="color:var(--hot)">· keine E-Mail</span>';
+      return `<div data-idx="${i}" onclick="_ankWaehle(this)" style="padding:7px 9px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--line)">${esc(k.voller_name)||'(ohne Name)'} ${ms}</div>`;
+    }).join('');
+  },250);
+}
+function _ankWaehle(el){
+  const dlg=el.closest('dialog');
+  const k=(dlg._treffer||[])[+el.dataset.idx]; if(!k) return;
+  const mail=k.email||k.email_beruflich||k.email_zweit||'';
+  dlg._kandId=k.id; dlg._kandEmail=mail; dlg._kandName=k.voller_name||'';
+  dlg.querySelector('#akSuche').value=k.voller_name||'';
+  dlg.querySelector('#akGewaehlt').innerHTML='✓ '+(esc(k.voller_name)||'(ohne Name)')+(mail?' · '+esc(mail):' · <span style="color:var(--hot)">keine E-Mail hinterlegt!</span>');
+  const box=dlg.querySelector('#akTreffer'); box.style.display='none'; box.innerHTML='';
+}
+async function _anKandidatSenden(dlg){
+  const kid=dlg._kandId, kemail=dlg._kandEmail, kname=dlg._kandName||'';
+  if(!kid){ zeigeMeldung('Bitte zuerst einen Kandidaten auswählen','warn'); return; }
+  if(!kemail){ zeigeMeldung('Dieser Kandidat hat keine E-Mail-Adresse','err'); return; }
+  const betreff=dlg.querySelector('#akBetreff').value.trim();
+  const text=dlg.querySelector('#akText').value;
+  const sendBtn=dlg.querySelector('button[onclick^="_anKandidatSenden"]');
+  if(sendBtn){ sendBtn.disabled=true; sendBtn.textContent='⏳ …'; }
+  const token=await msGetToken();
+  if(token){
+    const signatur=localStorage.getItem('yavis_signatur')||'';
+    const result=await _graphSendMail(token,{ message:{ subject:betreff, body:{contentType:'Text',content:text+(signatur?'\n\n'+signatur:'')}, toRecipients:[{emailAddress:{address:kemail}}] }, saveToSentItems:true });
+    if(!result.ok){ zeigeMeldung('Sendefehler: '+result.msg,'err'); if(sendBtn){sendBtn.disabled=false;sendBtn.textContent='📨 Senden';} return; }
+    try{
+      const {data:user}=await sb.auth.getUser();
+      await sb.from('emails').insert({ id:'yavis_'+Date.now()+'_'+Math.random().toString(36).slice(2,8), betreff:'📤 '+(betreff||'Liste gesendet'), entity_id:kid, besitzer_id:user?.user?.id||null, erstellt_am:new Date().toISOString() });
+    }catch(e){}
+    dlg.close(); dlg.remove();
+    zeigeMeldung('✅ Liste an '+kname+' gesendet + protokolliert','ok');
+  } else {
+    window.location.href='mailto:'+encodeURIComponent(kemail)+'?subject='+encodeURIComponent(betreff)+'&body='+encodeURIComponent(text);
+    dlg.close(); dlg.remove();
+    zeigeMeldung('Outlook-Entwurf geöffnet (keine Graph-Verbindung aktiv)','ok');
+  }
+}
+
 async function ladeKunden(){
   const q=document.getElementById('cSuche').value.trim();
   const typ=document.getElementById('cTyp').value;
@@ -2922,6 +3087,7 @@ async function ladeKunden(){
   const plz=cPlzEl?cPlzEl.value.trim():'';
   const radius=parseInt((document.getElementById('cRadius')||{}).value||'50')||50;
   const body=document.getElementById('cBody'); body.innerHTML='';
+  selectedKundenIds.clear(); _kundenGeladen=[]; updateKundeSelBar();
 
   // ---- Umkreissuche ----
   if(plz){
@@ -2946,16 +3112,17 @@ async function ladeKunden(){
     let rows=data.filter(r=>r.lat!=null&&r.lng!=null&&haversineKm(cLat,cLng,r.lat,r.lng)<=radius);
     if(q){const ql=q.toLowerCase();rows=rows.filter(r=>(r.name||'').toLowerCase().includes(ql)||(r.branche||'').toLowerCase().includes(ql)||(r.stadt||'').toLowerCase().includes(ql));}
     rows.sort((a,b)=>haversineKm(cLat,cLng,a.lat,a.lng)-haversineKm(cLat,cLng,b.lat,b.lng));
+    _kundenGeladen=rows;
     document.getElementById('cCount').textContent=rows.length+' Firmen im Umkreis von '+radius+' km um '+plz+(typ?' · '+typ:'')+(q?' · "'+q+'"':'');
     rows.forEach(r=>{
       const tr=document.createElement('tr');tr.className='row-click';
       const km=Math.round(haversineKm(cLat,cLng,r.lat,r.lng));
-      tr.innerHTML=`<td>${esc(r.name)||'–'}</td><td><span class="pill">${esc(r.typ)||'Auftraggeber'}</span></td><td>${esc(r.branche)||'–'}</td>
+      tr.innerHTML=`<td onclick="event.stopPropagation()" style="width:32px;text-align:center"><input type="checkbox" class="kunde-cb" data-id="${r.id}" onchange="kundeSelToggle('${r.id}',this)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></td><td>${esc(r.name)||'–'}</td><td><span class="pill">${esc(r.typ)||'Auftraggeber'}</span></td><td>${esc(r.branche)||'–'}</td>
         <td>${esc(r.plz)||''} ${esc(r.stadt)||''}<span style="color:var(--muted);font-size:12px;margin-left:5px">(${km} km)</span></td><td>${esc(r.telefon)||'–'}</td>`;
       tr.onclick=()=>detailKunde(r.id);
       body.appendChild(tr);
     });
-    if(!rows.length) body.innerHTML='<tr><td colspan="5" class="empty">Keine Firmen in diesem Umkreis gefunden.</td></tr>';
+    if(!rows.length) body.innerHTML='<tr><td colspan="6" class="empty">Keine Firmen in diesem Umkreis gefunden.</td></tr>';
     return;
   }
 
@@ -2966,20 +3133,22 @@ async function ladeKunden(){
   if(typ) query=query.eq('typ',typ);
   const {data,error}=await query;
   if(error){document.getElementById('cCount').textContent='Fehler: '+error.message;return;}
+  _kundenGeladen=data;
   document.getElementById('cCount').textContent=data.length+' Firmen'+(typ?' · '+typ:'');
   data.forEach(r=>{
     const tr=document.createElement('tr');tr.className='row-click';
-    tr.innerHTML=`<td>${esc(r.name)||'–'}</td><td><span class="pill">${esc(r.typ)||'Auftraggeber'}</span></td><td>${esc(r.branche)||'–'}</td>
+    tr.innerHTML=`<td onclick="event.stopPropagation()" style="width:32px;text-align:center"><input type="checkbox" class="kunde-cb" data-id="${r.id}" onchange="kundeSelToggle('${r.id}',this)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></td><td>${esc(r.name)||'–'}</td><td><span class="pill">${esc(r.typ)||'Auftraggeber'}</span></td><td>${esc(r.branche)||'–'}</td>
       <td>${esc(r.plz)||''} ${esc(r.stadt)||''}</td><td>${esc(r.telefon)||'–'}</td>`;
     tr.onclick=()=>detailKunde(r.id);
     body.appendChild(tr);
   });
-  if(!data.length) body.innerHTML='<tr><td colspan="5" class="empty">Keine Treffer.</td></tr>';
+  if(!data.length) body.innerHTML='<tr><td colspan="6" class="empty">Keine Treffer.</td></tr>';
 }
 
 async function ladeKontakte(){
   const q=document.getElementById('ktSuche').value.trim();
   const body=document.getElementById('ktBody'); body.innerHTML='';
+  selectedKontaktIds.clear(); _kontakteGeladen=[]; updateKontaktSelBar();
   let query=sb.from('kontakte').select('*').limit(200).order('nachname');
   if(softDeleteAktiv) query=query.is('geloescht_am',null);
   if(q) query=query.or(`voller_name.ilike.%${q}%,berufsbezeichnung.ilike.%${q}%`);
@@ -2990,18 +3159,20 @@ async function ladeKontakte(){
   const firmaMap={};
   if(firmaIds.length){ const {data:fd}=await sb.from('kunden').select('id,name').in('id',firmaIds);
     (fd||[]).forEach(f=>firmaMap[f.id]=f.name); }
+  _kontakteGeladen=data;
   document.getElementById('ktCount').textContent=data.length+' Ansprechpartner';
   data.forEach(r=>{
     const tr=document.createElement('tr');tr.className='row-click';
     const firma=r.kunde_id?firmaMap[r.kunde_id]:'';
-    tr.innerHTML=`<td>${esc(r.voller_name)||'–'}</td><td>${firma?esc(firma):'<span style="color:var(--muted)">ohne Firma</span>'}</td>
+    r._firma=firma||'';
+    tr.innerHTML=`<td onclick="event.stopPropagation()" style="width:32px;text-align:center"><input type="checkbox" class="kontakt-cb" data-id="${r.id}" onchange="kontaktSelToggle('${r.id}',this)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></td><td>${esc(r.voller_name)||'–'}</td><td>${firma?esc(firma):'<span style="color:var(--muted)">ohne Firma</span>'}</td>
       <td>${esc(r.berufsbezeichnung)||'–'}</td>
       <td>${r.email?`<a class="calllink" href="mailto:${esc(r.email)}" onclick="event.stopPropagation()">${esc(r.email)}</a>`:'–'}</td>
       <td>${esc(r.telefon_beruflich)||esc(r.mobil)||'–'}</td>`;
     tr.onclick=()=>detailKontakt(r.id);
     body.appendChild(tr);
   });
-  if(!data.length) body.innerHTML='<tr><td colspan="5" class="empty">Keine Treffer.</td></tr>';
+  if(!data.length) body.innerHTML='<tr><td colspan="6" class="empty">Keine Treffer.</td></tr>';
 }
 
 function zeigeDetail(title,obj){
