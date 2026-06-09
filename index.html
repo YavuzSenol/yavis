@@ -1420,7 +1420,7 @@ function normFirma(s){
 }
 async function ladeAuftraggeberNamen(){
   if(auftraggeberNamen!==null) return;
-  const {data}=await sb.from('kunden').select('name').in('typ',['Auftraggeber','Auftraggeber Potenzial']);
+  const {data}=await sb.from('kunden').select('name').eq('typ','Auftraggeber');
   auftraggeberNamen=(data||[]).map(k=>normFirma(k.name||'')).filter(Boolean);
 }
 function istGeschuetzt(r){
