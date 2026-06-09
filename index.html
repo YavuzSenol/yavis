@@ -2103,6 +2103,142 @@ async function abwerbeschutzToggle(id, aktuell){
   detailKandidat(id); // Seite neu laden
 }
 
+// ===== Kandidatenprofil an Firma/Kontakt senden =====
+function _profilText(d, erf, ausb, anonym){
+  const L=[];
+  if(!anonym && d.voller_name) L.push('Name: '+d.voller_name);
+  if(d.berufsbezeichnung) L.push('Position: '+d.berufsbezeichnung);
+  if(d.erfahrung_jahre) L.push('Berufserfahrung: '+d.erfahrung_jahre+' Jahre');
+  if(!anonym && d.arbeitgeber) L.push('Aktueller Arbeitgeber: '+d.arbeitgeber);
+  const ort = anonym ? (d.bundesland||d.stadt||'') : [d.plz,d.stadt].filter(Boolean).join(' ');
+  if(ort) L.push('Region: '+ort);
+  if(d.qualifikation) L.push('Qualifikation: '+d.qualifikation);
+  if(d.studiengang) L.push('Studiengang: '+d.studiengang);
+  if(d.faehigkeiten) L.push('Fähigkeiten: '+d.faehigkeiten);
+  if(d.gehalt_erwartet) L.push('Gehaltsvorstellung: '+d.gehalt_erwartet);
+  if(d.kuendigungsfrist) L.push('Verfügbarkeit / Kündigungsfrist: '+d.kuendigungsfrist);
+  if(d.umzugsbereitschaft) L.push('Umzugsbereitschaft: '+d.umzugsbereitschaft);
+  if(d.wunschregion) L.push('Wunschregion: '+d.wunschregion);
+  if(d.profil_zusammenfassung) L.push('\nKurzprofil:\n'+d.profil_zusammenfassung);
+  if(erf && erf.length){
+    L.push('\nBeruflicher Werdegang:');
+    erf.forEach(e=>{
+      const zeit=[e.von, e.aktuell?'heute':e.bis].filter(Boolean).join(' – ');
+      const firma=anonym?'':(e.unternehmen?', '+e.unternehmen:'');
+      L.push('• '+(e.titel||'Position')+firma+(zeit?' ('+zeit+')':''));
+    });
+  }
+  if(ausb && ausb.length){
+    L.push('\nAusbildung:');
+    ausb.forEach(a=>{
+      const zeit=[a.von,a.bis].filter(Boolean).join(' – ');
+      L.push('• '+[a.grad,a.hauptfach,a.institut].filter(Boolean).join(', ')+(zeit?' ('+zeit+')':''));
+    });
+  }
+  return L.join('\n');
+}
+function _psBody(d, erf, ausb, anonym){
+  const meinName=localStorage.getItem('yavis_mein_name')||'';
+  const einleitung = anonym
+    ? 'gerne stelle ich Ihnen anbei ein anonymisiertes Kandidatenprofil vor:'
+    : 'gerne stelle ich Ihnen das Profil von '+(d.voller_name||'')+' vor:';
+  return `Sehr geehrte Damen und Herren,\n\n${einleitung}\n\n${_profilText(d,erf,ausb,anonym)}\n\nBei Interesse stelle ich gerne den Kontakt her.\n\nViele Grüße`+(meinName?'\n'+meinName:'');
+}
+async function profilSendenDialog(kandidatId){
+  const [kk,ke,ka]=await Promise.all([
+    sb.from('kandidaten').select('*').eq('id',kandidatId).single(),
+    sb.from('erfahrung').select('*').eq('kandidat_id',kandidatId),
+    sb.from('ausbildung').select('*').eq('kandidat_id',kandidatId),
+  ]);
+  const d=kk.data; if(!d){ zeigeMeldung('Kandidat nicht gefunden','err'); return; }
+  const erfA=(ke.data||[]).slice().sort((a,b)=>(b.aktuell?1:0)-(a.aktuell?1:0));
+  const ausbA=ka.data||[];
+  const betreffDefault='Kandidatenvorschlag'+(d.berufsbezeichnung?': '+d.berufsbezeichnung:'');
+  const dlg=document.createElement('dialog');
+  dlg._d=d; dlg._erf=erfA; dlg._ausb=ausbA;
+  dlg.style.cssText='border:none;border-radius:10px;background:var(--panel);color:var(--text);padding:0;max-width:680px;width:94vw;max-height:90vh';
+  dlg.innerHTML=`
+    <div style="padding:18px 20px;overflow:auto;max-height:90vh">
+      <h3 style="margin:0 0 14px">📤 Kandidatenprofil senden</h3>
+      <div style="margin-bottom:10px">
+        <label style="font-size:13px;color:var(--muted)">Empfänger (Ansprechpartner suchen oder E-Mail eintippen)</label>
+        <input id="psSuche" placeholder="Name des Ansprechpartners…" oninput="_psSuche(this)" autocomplete="off" style="width:100%;box-sizing:border-box">
+        <div id="psTreffer" style="max-height:160px;overflow:auto;margin-top:4px;border:1px solid var(--line);border-radius:5px;display:none"></div>
+        <input id="psEmail" placeholder="empfaenger@firma.de" style="width:100%;box-sizing:border-box;margin-top:6px">
+      </div>
+      <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted);margin-bottom:10px;cursor:pointer">
+        <input type="checkbox" id="psAnonym" checked onchange="_psToggleAnonym(this)" style="width:15px;height:15px"> Anonymisiert (Name, Arbeitgeber &amp; Kontakt verbergen)
+      </label>
+      <div style="margin-bottom:10px">
+        <label style="font-size:13px;color:var(--muted)">Betreff</label>
+        <input id="psBetreff" value="${esc(betreffDefault)}" style="width:100%;box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="font-size:13px;color:var(--muted)">Nachricht</label>
+        <textarea id="psText" rows="16" style="width:100%;box-sizing:border-box;font-family:inherit">${esc(_psBody(d,erfA,ausbA,true))}</textarea>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button onclick="this.closest('dialog').close();this.closest('dialog').remove()" style="padding:7px 16px;border-radius:5px;border:1px solid var(--line);background:transparent;color:var(--text);cursor:pointer">Abbrechen</button>
+        <button onclick="_psSenden(this.closest('dialog'))" style="padding:7px 18px;border-radius:5px;border:none;background:var(--accent);color:#fff;font-weight:600;cursor:pointer">📨 Senden</button>
+      </div>
+    </div>`;
+  document.body.appendChild(dlg); dlg.showModal();
+}
+function _psToggleAnonym(cb){
+  const dlg=cb.closest('dialog');
+  dlg.querySelector('#psText').value=_psBody(dlg._d,dlg._erf,dlg._ausb,cb.checked);
+}
+let _psTimer=null;
+function _psSuche(inp){
+  clearTimeout(_psTimer);
+  const q=inp.value.trim(); const dlg=inp.closest('dialog'); const box=dlg.querySelector('#psTreffer');
+  if(q.length<2){ box.style.display='none'; box.innerHTML=''; return; }
+  _psTimer=setTimeout(async()=>{
+    let qy=sb.from('kontakte').select('id,voller_name,email').or(`voller_name.ilike.%${q}%`).limit(12);
+    if(softDeleteAktiv) qy=qy.is('geloescht_am',null);
+    const {data}=await qy;
+    dlg._psTreffer=data||[];
+    if(!data||!data.length){ box.style.display='block'; box.innerHTML='<div style="padding:7px 9px;color:var(--muted);font-size:13px">Keine Ansprechpartner gefunden</div>'; return; }
+    box.style.display='block';
+    box.innerHTML=data.map((k,i)=>{
+      const mail=k.email||'';
+      const ms=mail?'<span style="color:var(--muted)">· '+esc(mail)+'</span>':'<span style="color:var(--hot)">· keine E-Mail</span>';
+      return `<div data-idx="${i}" onclick="_psWaehle(this)" style="padding:7px 9px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--line)">${esc(k.voller_name)||'(ohne Name)'} ${ms}</div>`;
+    }).join('');
+  },250);
+}
+function _psWaehle(el){
+  const dlg=el.closest('dialog'); const k=(dlg._psTreffer||[])[+el.dataset.idx]; if(!k) return;
+  dlg.querySelector('#psEmail').value=k.email||'';
+  dlg.querySelector('#psSuche').value=k.voller_name||'';
+  const box=dlg.querySelector('#psTreffer'); box.style.display='none'; box.innerHTML='';
+}
+async function _psSenden(dlg){
+  const email=(dlg.querySelector('#psEmail').value||'').trim();
+  if(!email){ zeigeMeldung('Bitte Empfänger-E-Mail angeben','warn'); return; }
+  const betreff=dlg.querySelector('#psBetreff').value.trim();
+  const text=dlg.querySelector('#psText').value;
+  const kid=dlg._d.id;
+  const btn=dlg.querySelector('button[onclick^="_psSenden"]'); if(btn){ btn.disabled=true; btn.textContent='⏳ …'; }
+  const token=await msGetToken();
+  if(token){
+    const signatur=localStorage.getItem('yavis_signatur')||'';
+    const result=await _graphSendMail(token,{ message:{ subject:betreff, body:{contentType:'Text',content:text+(signatur?'\n\n'+signatur:'')}, toRecipients:[{emailAddress:{address:email}}] }, saveToSentItems:true });
+    if(!result.ok){ zeigeMeldung('Sendefehler: '+result.msg,'err'); if(btn){btn.disabled=false;btn.textContent='📨 Senden';} return; }
+    try{
+      const {data:user}=await sb.auth.getUser();
+      await sb.from('emails').insert({ id:'yavis_'+Date.now()+'_'+Math.random().toString(36).slice(2,8), betreff:'📤 '+(betreff||'Profil gesendet')+' → '+email, entity_id:kid, besitzer_id:user?.user?.id||null, erstellt_am:new Date().toISOString() });
+    }catch(e){}
+    dlg.close(); dlg.remove();
+    zeigeMeldung('✅ Profil an '+email+' gesendet + protokolliert','ok');
+    setTimeout(()=>detailKandidat(kid),400);
+  } else {
+    window.location.href='mailto:'+encodeURIComponent(email)+'?subject='+encodeURIComponent(betreff)+'&body='+encodeURIComponent(text);
+    dlg.close(); dlg.remove();
+    zeigeMeldung('Outlook-Entwurf geöffnet (keine Graph-Verbindung aktiv)','ok');
+  }
+}
+
 async function detailKandidat(id){
   history.pushState({yavis:'detail'}, '', '');
   await ladeAuftraggeberNamen();
@@ -2180,6 +2316,7 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails)
         <button class="editbtn" style="margin-left:0" onclick="bearbeiteKandidat('${d.id}')">✎ Bearbeiten</button>
         <button class="editbtn" style="margin-left:0;color:var(--muted)" onclick="kandidatLoeschen('${d.id}','${esc(d.voller_name)}')">🗑️ Löschen</button>
         <button class="editbtn" style="margin-left:0" onclick="mailSendenDialog('${esc(d.email||d.email_beruflich||'')}','${d.id}','${esc(d.voller_name)}','${esc(d.anrede||'')}','${esc(d.nachname||'')}')">📧 E-Mail senden</button>
+        <button class="editbtn" style="margin-left:0" onclick="profilSendenDialog('${d.id}')">📤 Profil senden</button>
       </div>
     </div>
 
