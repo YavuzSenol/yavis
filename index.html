@@ -2445,7 +2445,7 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails)
         <button class="editbtn" style="margin-left:0;font-weight:${d.ist_hot?'700':'500'}" title="${d.ist_hot?'Hot-Markierung entfernen':'Als Hot markieren'}" onclick="hotToggle('${d.id}',${d.ist_hot?'true':'false'})">${d.ist_hot?'🔥 Hot':'🔥 markieren'}</button>
         <button class="editbtn" style="margin-left:0" onclick="bearbeiteKandidat('${d.id}')">✎ Bearbeiten</button>
         <button class="editbtn" style="margin-left:0;color:var(--muted)" onclick="kandidatLoeschen('${d.id}','${esc(d.voller_name)}')">🗑️ Löschen</button>
-        <button class="editbtn" style="margin-left:0" onclick="mailSendenDialog('${esc(d.email||d.email_beruflich||'')}','${d.id}','${esc(d.voller_name)}','${esc(d.anrede||'')}','${esc(d.nachname||'')}')">📧 E-Mail senden</button>
+        <button class="editbtn" style="margin-left:0" onclick="mailSendenDialog('${esc(d.email||d.email_beruflich||'')}','${d.id}','${esc(d.voller_name)}','${esc(d.anrede||'')}','${esc(d.nachname||'')}',${d.sperre_email?'true':'false'})">📧 E-Mail senden</button>
         <button class="editbtn" style="margin-left:0" onclick="profilSendenDialog('${d.id}')">📤 Profil senden</button>
       </div>
     </div>
@@ -2469,10 +2469,18 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails)
           ${zeile('Status', d.status?`<span class="pill">${esc(d.status)}</span>`:'')}
           ${zeile('Kontaktstatus', esc(d.kontaktstatus))}
           ${zeile('Int. Wertung', esc(d.wertung_intern))}
-          ${zeile('Positionswunsch', esc(d.positionswunsch))}
-          ${zeile('Umzug', esc(d.umzugsbereitschaft))}
-          ${zeile('Wunschregion', esc(d.wunschregion))}
           ${zeile('Quelle', esc(d.quelle))}
+        </div>
+        <div class="dpanel-sub">
+          <span class="dcol-h">Status & Sperren</span>
+          ${(d.sperre_email||d.sperre_brief||d.sperre_anruf||d.kein_newsletter)
+            ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">
+                ${d.sperre_email?'<span class="tag" style="color:var(--hot);border-color:var(--hot)">🚫 E-Mail</span>':''}
+                ${d.sperre_brief?'<span class="tag" style="color:var(--hot);border-color:var(--hot)">🚫 Brief</span>':''}
+                ${d.sperre_anruf?'<span class="tag" style="color:var(--hot);border-color:var(--hot)">🚫 Anruf</span>':''}
+                ${d.kein_newsletter?'<span class="tag" style="color:var(--hot);border-color:var(--hot)">🚫 Newsletter</span>':''}
+              </div>`
+            : '<div style="font-size:12px;color:var(--muted);margin-top:3px">Keine Kontaktsperren</div>'}
         </div>
       </div>
 
@@ -2515,7 +2523,10 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails)
         ${zeile('Qualifikation', esc(d.qualifikation))}
         ${zeile('Studiengang', esc(d.studiengang))}
         <div class="dpanel-sub">
-          <span class="dcol-h">Konditionen</span>
+          <span class="dcol-h">Direktansprache</span>
+          ${zeile('Positionswunsch', esc(d.positionswunsch))}
+          ${zeile('Wunschregion', esc(d.wunschregion))}
+          ${zeile('Umzug', esc(d.umzugsbereitschaft))}
           ${zeile('Gehalt aktuell', esc(d.gehalt_aktuell))}
           ${zeile('Gehalt Wunsch', esc(d.gehalt_erwartet))}
           ${zeile('Kündigungsfrist', esc(d.kuendigungsfrist))}
@@ -2895,6 +2906,15 @@ function zeigeFormular(d){
       ${eta('Profil','profil_zusammenfassung',d.profil_zusammenfassung)}
       ${eta('Bemerkung','bemerkung',d.bemerkung)}
     </div></div>
+    <div class="card"><h3>Status &amp; Sperren</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:18px;font-size:14px">
+        <label style="display:flex;align-items:center;gap:7px;cursor:pointer"><input type="checkbox" id="ef_sperre_email" ${d.sperre_email?'checked':''} style="width:16px;height:16px"> Sperre E-Mail</label>
+        <label style="display:flex;align-items:center;gap:7px;cursor:pointer"><input type="checkbox" id="ef_sperre_brief" ${d.sperre_brief?'checked':''} style="width:16px;height:16px"> Sperre Brief</label>
+        <label style="display:flex;align-items:center;gap:7px;cursor:pointer"><input type="checkbox" id="ef_sperre_anruf" ${d.sperre_anruf?'checked':''} style="width:16px;height:16px"> Sperre Anruf</label>
+        <label style="display:flex;align-items:center;gap:7px;cursor:pointer"><input type="checkbox" id="ef_kein_newsletter" ${d.kein_newsletter?'checked':''} style="width:16px;height:16px"> Kein Newsletter</label>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:10px">Kontaktsperren = Wille der Person / DSGVO (Werbewiderspruch). Unabhängig vom Abwerbeschutz.</div>
+    </div>
     <div class="card"><h3>🏷️ Tags</h3>
       <div id="tagChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">${parseTags(d.tags).length?parseTags(d.tags).map(tagChipForm).join(''):'<span style="color:var(--muted);font-size:13px">Keine Tags</span>'}</div>
       <div style="display:flex;gap:8px;align-items:center;max-width:460px">
@@ -2973,6 +2993,10 @@ async function speichereKandidat(id){
     wechselmotivation:gv('wechselmotivation'),
     profil_zusammenfassung:gv('profil_zusammenfassung'), bemerkung:gv('bemerkung'),
     geburtstag:gv('geburtstag')||null, tags:gv('tags')||null,
+    sperre_email: !!(document.getElementById('ef_sperre_email')||{}).checked,
+    sperre_brief: !!(document.getElementById('ef_sperre_brief')||{}).checked,
+    sperre_anruf: !!(document.getElementById('ef_sperre_anruf')||{}).checked,
+    kein_newsletter: !!(document.getElementById('ef_kein_newsletter')||{}).checked,
     geaendert_am:new Date().toISOString(),
     letzte_aktivitaet:new Date().toISOString(),
   };
@@ -6263,7 +6287,7 @@ async function erstelleOutlookEntwurf({to='', bcc=[], betreff='', bodyText=''}={
 }
 
 // ---- E-Mail senden Dialog ----
-function mailSendenDialog(email, kandidatId, name, anrede='', nachname='') {
+function mailSendenDialog(email, kandidatId, name, anrede='', nachname='', gesperrt=false) {
   const vorlagen = vorlagenLaden();
   const dlg = document.createElement('dialog');
   dlg.style.cssText = 'background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:0;max-width:560px;width:95vw;max-height:90vh;display:flex;flex-direction:column';
@@ -6276,6 +6300,7 @@ function mailSendenDialog(email, kandidatId, name, anrede='', nachname='') {
       <div style="font-size:13px;margin-bottom:14px;padding:10px 14px;background:var(--panel2);border-radius:6px;border:1px solid var(--line)">
         An: <b>${esc(email || '(keine E-Mail-Adresse hinterlegt)')}</b>
         ${!email ? '<br><span style="color:var(--hot);font-size:12px;margin-top:4px;display:block">⚠️ Bitte zuerst eine E-Mail-Adresse im Profil hinterlegen.</span>' : ''}
+        ${gesperrt ? '<br><span style="color:var(--hot);font-size:12px;margin-top:4px;display:block;font-weight:600">🚫 Für diese Person ist E-Mail gesperrt — Versand erfordert Bestätigung.</span>' : ''}
       </div>
       ${vorlagen.length ? `
       <div style="margin-bottom:12px">
@@ -6313,6 +6338,7 @@ function mailSendenDialog(email, kandidatId, name, anrede='', nachname='') {
       </div>
     </div>`;
   document.body.appendChild(dlg);
+  if(gesperrt) dlg.dataset.gesperrt='1';
   dlg.showModal();
   setTimeout(() => dlg.querySelector('#msBetreff')?.focus(), 80);
 }
@@ -6348,6 +6374,7 @@ function msVorlageBerechnen(sel, name, anrede, nachname) {
 }
 
 async function msMailOeffnen(email, kandidatId, name, dlg) {
+  if(dlg && dlg.dataset && dlg.dataset.gesperrt==='1' && !confirm('Achtung: Für diese Person ist E-Mail gesperrt (Werbewiderspruch). Trotzdem senden?')) return;
   const betreff = dlg.querySelector('#msBetreff')?.value?.trim() || '';
   const text    = dlg.querySelector('#msText')?.value?.trim() || '';
   // Versuche: Outlook-Web-Entwurf via Graph API
@@ -7247,6 +7274,9 @@ async function nlSucheAusfuehren() {
   if (plz && _nlGewaehltePos.size) rows = rows.filter(r => _nlGewaehltePos.has(r.berufsbezeichnung));
   // Nur Kandidaten mit E-Mail
   rows = rows.filter(r => r.email || r.email_beruflich || r.email_zweit);
+  // Kontaktsperren + Abwerbeschutz HART filtern (Wille der Person / DSGVO)
+  await ladeAuftraggeberNamen();
+  rows = rows.filter(r => !r.kein_newsletter && !r.sperre_email && !istGeschuetzt(r));
   // Ausschluesse (wertung_intern)
   if (ausschluss.length) {
     rows = rows.filter(r => {
