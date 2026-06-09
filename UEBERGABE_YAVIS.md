@@ -4,6 +4,42 @@
 
 ---
 
+## 📌 Session 09.06.2026 — Überblick (an einem Tag umgesetzt)
+
+**Dateien**
+- `index.html` — alle App-Änderungen (~20 Commits, gepusht), Live: `yavuzsenol.github.io/yavis`
+- `UEBERGABE_YAVIS.md` — laufend mitgepflegt
+- Git wiederhergestellt (`.git` fehlte) + Identität gesetzt; Backup-Tag **`backup-vor-rollen-umbau`** (auf `96db3f5`)
+- Hilfs-CSVs/JSONs lokal (`_branche_final.csv`, `_berufsbezeichnung_todo.csv`, `_dups.json` …) sowie `_adressfix_*.py`
+
+**Datenbank-Änderungen (Supabase)**
+- **Adress-Import-Fix:** 95 Firmen Stadt/PLZ/Straße aus der **Versandadresse** nachgetragen, 92 mit Koordinaten → **Köln 14 → 39**, ohne Koordinaten 115 → 23, mit PLZ 83 → 177
+- **195 Firmen** Typ „Auftraggeber" → „Auftraggeber-Potenzial" (jetzt 0 Auftraggeber, 196 Potenzial)
+- **Telefonnummern** alle auf **`+49`-Format** vereinheitlicht (146×) + ~13 fehlende per Web recherchiert (19 bleiben manuell)
+- **Branche:** 88 Firmen per Web-Recherche befüllt, dann **alle 196 auf die 6 festen Werte** gemappt (97 geändert) → 0 ohne Branche (1 Ausnahme: Natalie Söll → korrigiert)
+- **Fähigkeiten geleert** bei **413 Kandidaten** (Zoho/LinkMatch-Müll, recoverbar aus Backup)
+
+**Neue Funktionen (App)**
+- Firmen + Ansprechpartner: **Mehrfachauswahl** (Häkchen + „Alle"), **👤 An Kandidat senden** (Zielfirmenliste), 📥 CSV
+- **Firmen-Massenbearbeitung** (✏️ Ändern: Typ/Branche/Ort/Bundesland/Land)
+- **Konfigurierbare + sortierbare Spalten** (Firmen & Ansprechpartner), **PLZ/Ort getrennt**
+- **Feste Branchen-Liste** (6 Werte) als Dropdown, in Einstellungen verwaltbar
+- **Suche:** Branche-Filter, **Stadt-Feld**, ein-/ausblendbare Suchfelder (🔧), „X ohne Koordinaten"-Hinweis
+- **E-Mail-Bereich** bei Firmen + Ansprechpartnern; **Outlook-Sync** matcht jetzt auch Firmen/Kontakte; lesbare IDs (**FIR-/ANS-**)
+- **📤 Profil senden** (Kandidat): persönliche Anrede, **Vorlagen** (zentral verwaltbar), anonym/mit Namen, **PDF-Anhang** aus Dokumenten
+- **🔥 Hot-Flag** (Filter + Markierung), **Abwerbeschutz-Automatik** repariert
+- **Tag-Picker** + **Geburtstag-Feld** im Kandidaten-Editor; **Fähigkeiten** entfernt
+- **Einstellungen gegliedert** in 5 Tabs
+
+**Offen / als Nächstes**
+- Rollen-Umbau **Stufe 1** (wartet auf Datei `UEBERGABE_rollen_umbau.md` — aktuell nicht auf diesem Rechner)
+- Manuell: 74 Berufsbezeichnungen, ~19 Firmen-Telefonnummern, echte Kunden wieder als „Auftraggeber" markieren
+- Webflow-Embed (auf Zuruf)
+
+*Details der Code-Änderungen siehe §8 „Erledigt".*
+
+---
+
 ## 1. Was ist YAVIS?
 
 Ein selbstgebautes Recruiting-CRM als Ersatz für Zoho Recruit (Abo lief 7.6.2026 aus). Nutzer ist technisch affin, aber **kein Programmierer** — alle Anleitungen müssen Schritt-für-Schritt und auf Deutsch sein. Er arbeitet auf Windows, ausschließlich in OneDrive.
