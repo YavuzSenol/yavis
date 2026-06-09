@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>YAVIS — Mockup Rollen-Modell (Vorschau, keine Live-Daten)</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Calibri,'Segoe UI',sans-serif;background:#1a1d21;color:#e7e7e7;font-size:15px}
+  .muted{color:#9aa0a6}
+  .accent{color:#f0855a}
+  a{color:#f0855a;text-decoration:none}
+  /* Banner */
+  .demo{background:#3a2a1f;border-bottom:1px solid #5a3a23;color:#f0a878;padding:6px 18px;font-size:13px;text-align:center}
+  /* Topbar */
+  .top{display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid #34393f;background:#16181c}
+  .logo{font-weight:800;letter-spacing:.04em}
+  .logo .ysc{background:#111;color:#f0855a;padding:2px 6px;border-radius:4px;margin-right:8px}
+  .layout{display:flex;min-height:80vh}
+  /* Sidebar */
+  .side{width:210px;border-right:1px solid #34393f;padding:14px 10px;background:#16181c;flex-shrink:0}
+  .nav{display:block;padding:9px 12px;border-radius:7px;color:#cfd3d7;margin-bottom:3px;cursor:pointer;font-size:14px}
+  .nav.active{color:#f0855a;font-weight:700;background:#22262b}
+  .nav.new{position:relative}
+  .badge-new{position:absolute;right:8px;top:9px;font-size:9px;background:#f0855a;color:#16181c;border-radius:6px;padding:1px 5px;font-weight:700}
+  .strike{text-decoration:line-through;opacity:.5}
+  /* Main */
+  .main{flex:1;padding:20px 26px;min-width:0}
+  h1{font-size:20px;margin:0 0 4px}
+  .bar{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin:14px 0}
+  .field label{display:block;font-size:11px;color:#9aa0a6;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+  .field input,.field select{background:#1f2328;color:#e7e7e7;border:1px solid #34393f;border-radius:6px;padding:8px 10px;font-size:14px}
+  .go{background:#c85a28;color:#fff;border:none;border-radius:6px;padding:9px 18px;font-weight:700;cursor:pointer}
+  /* Rollen-Chips Filter */
+  .rfilter{display:flex;gap:7px;flex-wrap:wrap;margin:4px 0 14px}
+  .rchip{padding:6px 12px;border-radius:16px;border:1px solid #34393f;background:#1f2328;color:#cfd3d7;cursor:pointer;font-size:13px}
+  .rchip.on{background:#f0855a;color:#16181c;border-color:#f0855a;font-weight:700}
+  /* Tabelle */
+  table{width:100%;border-collapse:collapse;background:#22262b;border:1px solid #34393f;border-radius:10px;overflow:hidden}
+  th{ text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#9aa0a6;padding:10px 14px;border-bottom:1px solid #34393f;background:#1f2328}
+  td{padding:11px 14px;border-bottom:1px solid #2a2f35;font-size:14px}
+  tr:last-child td{border-bottom:none}
+  tr.click{cursor:pointer}
+  tr.click:hover td{background:#262b31}
+  /* Rollen-Badges */
+  .role{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:11px;margin:1px 3px 1px 0}
+  .role.kand{background:#1e3a2e;color:#6ee7a8;border:1px solid #2e6b4a}
+  .role.ansp{background:#2a2150;color:#b9a8f0;border:1px solid #4a3a8c}
+  .role.auftr{background:#3a1f23;color:#f0a0a8;border:1px solid #8c4a52}
+  .pill{display:inline-block;font-size:12px;padding:2px 9px;border-radius:11px;background:#2a2f35;border:1px solid #34393f}
+  /* Detail */
+  .detailwrap{margin-top:26px;border-top:2px dashed #34393f;padding-top:18px}
+  .dhead{display:flex;align-items:center;gap:14px;margin-bottom:12px}
+  .avatar{width:54px;height:54px;border-radius:50%;background:#2a2f35;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
+  .dbtns{margin-left:auto;display:flex;gap:7px}
+  .ebtn{background:#1f2328;border:1px solid #34393f;color:#e7e7e7;border-radius:6px;padding:7px 12px;font-size:13px;cursor:pointer}
+  .panels{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;border:1px solid #34393f;border-radius:10px;overflow:hidden;background:#22262b}
+  .panel{padding:13px 15px;border-right:1px solid #34393f}
+  .panel:last-child{border-right:none}
+  .ph{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:#f0855a;font-weight:700;display:block;margin-bottom:7px}
+  .sub{margin-top:11px;padding-top:9px;border-top:1px solid #34393f}
+  .row{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:2px 0}
+  .row .k{color:#9aa0a6}
+  .lock{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;background:#3a1f23;color:#f0a0a8;border:1px solid #8c4a52;margin:2px 3px 0 0}
+  @media(max-width:880px){.panels{grid-template-columns:1fr 1fr}}
+  @media(max-width:560px){.panels{grid-template-columns:1fr}}
+</style></head>
+<body>
+<div class="demo">🔎 VORSCHAU / MOCKUP — so <b>könnte</b> das Rollen-Modell (Stufe 2) aussehen. Keine echten Daten, nichts wird gespeichert. Die echte App ist unverändert.</div>
+
+<div class="top">
+  <span class="logo"><span class="ysc">YSC</span> Y.A.V.I.S. <span class="muted" style="font-weight:400">Recruiting CRM</span></span>
+</div>
+
+<div class="layout">
+  <div class="side">
+    <div class="nav">🏠 Start</div>
+    <div class="nav active new">👥 Personen <span class="badge-new">NEU</span></div>
+    <div class="nav muted" style="font-size:12px;padding:2px 12px 8px">↳ ersetzt <span class="strike">Kandidaten</span> + <span class="strike">Ansprechpartner</span></div>
+    <div class="nav">🏢 Firmen</div>
+    <div class="nav">📋 Wiedervorlagen</div>
+    <div class="nav">📁 Projekte</div>
+    <div class="nav">🔍 Recherche</div>
+    <div class="nav">✉️ Newsletter</div>
+  </div>
+
+  <div class="main">
+    <h1>👥 Personen</h1>
+    <div class="muted" style="font-size:13px">Eine Person, eine oder mehrere Rollen. Wer Kunde <i>und</i> Kandidat ist, steht nur noch <b>einmal</b> drin.</div>
+
+    <div class="bar">
+      <div class="field"><label>Suche (Name, Position, Firma)</label><input style="width:240px" placeholder="z.B. Samman"></div>
+      <div class="field"><label>Position</label><select><option>alle</option><option>Abteilungsleitung</option><option>Projektleitung</option></select></div>
+      <div class="field"><label>PLZ (Umkreis)</label><input style="width:90px" placeholder="50667"></div>
+      <button class="go">Suchen</button>
+    </div>
+
+    <div class="rfilter">
+      <span class="muted" style="align-self:center;font-size:12px;margin-right:4px">Rolle:</span>
+      <span class="rchip on">Alle</span>
+      <span class="rchip">Kandidat</span>
+      <span class="rchip">Ansprechpartner</span>
+      <span class="rchip">Auftraggeber</span>
+      <span class="rchip">Lieferant</span>
+      <span class="rchip">Doppelrolle</span>
+    </div>
+
+    <table>
+      <thead><tr><th>Name</th><th>Rolle(n)</th><th>Position</th><th>Firma</th><th>Ort</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr class="click" style="outline:1px solid #f0855a55">
+          <td><b>Ramy Samman</b></td>
+          <td><span class="role kand">Kandidat</span><span class="role ansp">Ansprechpartner</span></td>
+          <td>Abteilungsleitung</td>
+          <td>Caverion Deutschland – Köln</td>
+          <td>Köln</td>
+          <td><span class="pill">Aktiv</span></td>
+        </tr>
+        <tr class="click">
+          <td><b>Max Mustermann</b></td>
+          <td><span class="role kand">Kandidat</span></td>
+          <td>Projektleitung TGA</td>
+          <td>Ingenieurbüro Schmidt</td>
+          <td>Köln</td>
+          <td><span class="pill">New</span></td>
+        </tr>
+        <tr class="click">
+          <td><b>Lars Schumacher</b></td>
+          <td><span class="role kand">Kandidat</span><span class="role ansp">Ansprechpartner</span></td>
+          <td>Bereichsleiter TGA</td>
+          <td>Sweco</td>
+          <td>Düsseldorf</td>
+          <td><span class="pill">Aktiv</span></td>
+        </tr>
+        <tr class="click">
+          <td><b>Sabine Berg</b></td>
+          <td><span class="role ansp">Ansprechpartner</span><span class="role auftr">Auftraggeber</span></td>
+          <td>Geschäftsführerin</td>
+          <td>M-TEQ GmbH</td>
+          <td>Köln</td>
+          <td>—</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="muted" style="font-size:12px;margin-top:8px">4 Personen · z. B. „Doppelrolle"-Filter zeigt nur Leute, die Kandidat UND Firmenkontakt sind (die 12 von neulich).</div>
+
+    <!-- DETAIL -->
+    <div class="detailwrap">
+      <div class="dhead">
+        <div class="avatar">👤</div>
+        <div>
+          <div style="font-size:19px;font-weight:700">Ramy Samman
+            <span class="role kand">Kandidat</span><span class="role ansp">Ansprechpartner</span>
+          </div>
+          <div class="muted" style="font-size:13px">Abteilungsleitung · Caverion Deutschland GmbH – Köln · <span class="pill">Aktiv</span></div>
+        </div>
+        <div class="dbtns">
+          <button class="ebtn">📄 CV einlesen</button>
+          <button class="ebtn">✎ Bearbeiten</button>
+          <button class="ebtn">📧 E-Mail senden</button>
+          <button class="ebtn">📤 Profil senden</button>
+        </div>
+      </div>
+
+      <div class="panels">
+        <!-- Spalte 1 -->
+        <div class="panel">
+          <span class="ph">Ident</span>
+          <div class="row"><span class="k">Anrede</span><span>Herr</span></div>
+          <div class="row"><span class="k">Person-ID</span><span>PER-12045</span></div>
+          <div class="sub">
+            <span class="ph">Als Kandidat</span>
+            <div class="row"><span class="k">Position</span><span>Abteilungsleitung</span></div>
+            <div class="row"><span class="k">Status</span><span>Aktiv</span></div>
+            <div class="row"><span class="k">Int. Wertung</span><span>A</span></div>
+          </div>
+          <div class="sub">
+            <span class="ph">Als Ansprechpartner</span>
+            <div class="row"><span class="k">Firma</span><span class="accent">Caverion – Köln</span></div>
+            <div class="row"><span class="k">Funktion</span><span>Abteilungsleitung</span></div>
+            <div class="row"><span class="k">Rolle Firma</span><span>Auftraggeber</span></div>
+          </div>
+        </div>
+
+        <!-- Spalte 2 -->
+        <div class="panel">
+          <span class="ph">Erreichbarkeit</span>
+          <div class="row"><span class="k">E-Mail (priv.)</span><span class="accent">r.samman@gmx.de</span></div>
+          <div class="row"><span class="k">E-Mail (Firma)</span><span class="accent">ramy.samman@caverion.com</span></div>
+          <div class="row"><span class="k">Mobil</span><span>+49 170 …</span></div>
+          <div class="sub">
+            <span class="ph">Standort</span>
+            <div class="row"><span class="k">Privat</span><span>50667 Köln</span></div>
+            <div class="row"><span class="k">XING / LinkedIn</span><span class="accent">öffnen ↗</span></div>
+          </div>
+          <div class="sub">
+            <span class="ph">Status &amp; Sperren</span>
+            <span class="lock">🚫 Newsletter</span><span class="lock">🚫 Anruf</span>
+            <div class="muted" style="font-size:11px;margin-top:6px">getrennt vom Abwerbeschutz</div>
+          </div>
+        </div>
+
+        <!-- Spalte 3 -->
+        <div class="panel">
+          <span class="ph">Direktansprache</span>
+          <div class="row"><span class="k">Positionswunsch</span><span>Niederlassungsleitung</span></div>
+          <div class="row"><span class="k">Wunschregion</span><span>NRW</span></div>
+          <div class="row"><span class="k">Umzug</span><span>nein</span></div>
+          <div class="row"><span class="k">Gehalt akt.</span><span>110.000</span></div>
+          <div class="row"><span class="k">Gehalt Wunsch</span><span>125.000</span></div>
+          <div class="row"><span class="k">Kündigungsfrist</span><span>6 Monate</span></div>
+          <div class="row"><span class="k">Wechselmotiv.</span><span>mehr Verantwortung</span></div>
+        </div>
+      </div>
+
+      <div class="muted" style="font-size:12px;margin-top:10px">Darunter wie gehabt aufklappbar: Wiedervorlagen · Werdegang · Bewerbungen · Notizen · Dokumente · E-Mails · <b>Verknüpfungen</b> (Firmen/Projekte, an denen die Person hängt).</div>
+    </div>
+  </div>
+</div>
+</body></html>
