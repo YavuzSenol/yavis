@@ -301,6 +301,8 @@
           <option>Auftraggeber</option><option>Auftraggeber-Potenzial</option>
           <option>Lieferant</option><option>Sonstige</option>
         </select></div>
+      <div class="field"><label>Branche</label>
+        <select id="cBranche" onchange="ladeKunden()"><option value="">alle</option></select></div>
       <div class="field"><label>PLZ (Umkreis)</label>
         <input id="cPlz" placeholder="z.B. 50667" style="width:90px" maxlength="5"></div>
       <div class="field"><label>Radius km</label>
@@ -1195,7 +1197,7 @@ document.querySelectorAll('.tab[data-view]').forEach(t=>t.onclick=()=>{
   ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte','recherche'].forEach(v=>
     document.getElementById('view-'+v).style.display = v===t.dataset.view?'block':'none');
   if(t.dataset.view==='start') zeigeStart();
-  if(t.dataset.view==='kunden') ladeKunden();
+  if(t.dataset.view==='kunden'){ fuelleBrancheFilter(); ladeKunden(); }
   if(t.dataset.view==='projekte') zeigeProjekteListe();
   if(t.dataset.view==='kandidaten') ladeKandidaten();
   if(t.dataset.view==='kontakte') ladeKontakte();
@@ -3220,9 +3222,15 @@ function renderKSpaltenPanel(){
 function toggleKSpalte(key){ if(kSichtbareSpalten.includes(key)){ if(kSichtbareSpalten.length<=1) return; kSichtbareSpalten=kSichtbareSpalten.filter(k=>k!==key); } else { kSichtbareSpalten=[...kSichtbareSpalten,key]; } kSpaltenSpeichern(); renderKSpaltenPanel(); renderKundenTabelle(_kundenMitKm); }
 function moveKSpalte(key,dir){ const i=kSichtbareSpalten.indexOf(key), j=i+dir; if(i<0||j<0||j>=kSichtbareSpalten.length) return; const a=[...kSichtbareSpalten]; [a[i],a[j]]=[a[j],a[i]]; kSichtbareSpalten=a; kSpaltenSpeichern(); renderKSpaltenPanel(); renderKundenTabelle(_kundenMitKm); }
 
+function fuelleBrancheFilter(){
+  const sel=document.getElementById('cBranche'); if(!sel) return;
+  const cur=sel.value;
+  sel.innerHTML='<option value="">alle</option>'+branchenListe().map(b=>`<option${b===cur?' selected':''}>${esc(b)}</option>`).join('');
+}
 async function ladeKunden(){
   const q=document.getElementById('cSuche').value.trim();
   const typ=document.getElementById('cTyp').value;
+  const branche=(document.getElementById('cBranche')||{}).value||'';
   const cPlzEl=document.getElementById('cPlz');
   const plz=cPlzEl?cPlzEl.value.trim():'';
   const radius=parseInt((document.getElementById('cRadius')||{}).value||'50')||50;
@@ -3249,12 +3257,17 @@ async function ladeKunden(){
       const geoMap={}; (geos||[]).forEach(g=>geoMap[g.plz]={lat:g.lat,lng:g.lng});
       ohneLl.forEach(r=>{ if(geoMap[r.plz]){r.lat=geoMap[r.plz].lat;r.lng=geoMap[r.plz].lng;} });
     }
-    let rows=data.filter(r=>r.lat!=null&&r.lng!=null&&haversineKm(cLat,cLng,r.lat,r.lng)<=radius);
-    if(q){const ql=q.toLowerCase();rows=rows.filter(r=>(r.name||'').toLowerCase().includes(ql)||(r.branche||'').toLowerCase().includes(ql)||(r.stadt||'').toLowerCase().includes(ql));}
+    let pool=data;
+    if(branche) pool=pool.filter(r=>(r.branche||'')===branche);
+    if(q){const ql=q.toLowerCase();pool=pool.filter(r=>(r.name||'').toLowerCase().includes(ql)||(r.branche||'').toLowerCase().includes(ql)||(r.stadt||'').toLowerCase().includes(ql));}
+    const ohneKoord=pool.filter(r=>r.lat==null||r.lng==null).length;
+    let rows=pool.filter(r=>r.lat!=null&&r.lng!=null&&haversineKm(cLat,cLng,r.lat,r.lng)<=radius);
     rows.forEach(r=>{ r._km=Math.round(haversineKm(cLat,cLng,r.lat,r.lng)); });
     rows.sort((a,b)=>a._km-b._km);
     _kundenGeladen=rows;
-    document.getElementById('cCount').textContent=rows.length+' Firmen im Umkreis von '+radius+' km um '+plz+(typ?' · '+typ:'')+(q?' · "'+q+'"':'');
+    let txt=rows.length+' Firmen im Umkreis von '+radius+' km um '+plz+(typ?' · '+typ:'')+(branche?' · '+branche:'')+(q?' · "'+q+'"':'');
+    if(ohneKoord) txt+=' · ⚠️ '+ohneKoord+' ohne Koordinaten nicht berücksichtigt';
+    document.getElementById('cCount').textContent=txt;
     renderKundenTabelle(true);
     return;
   }
@@ -3264,10 +3277,11 @@ async function ladeKunden(){
   if(softDeleteAktiv) query=query.is('geloescht_am',null);
   if(q) query=query.or(`name.ilike.%${q}%,branche.ilike.%${q}%,stadt.ilike.%${q}%`);
   if(typ) query=query.eq('typ',typ);
+  if(branche) query=query.eq('branche',branche);
   const {data,error}=await query;
   if(error){document.getElementById('cCount').textContent='Fehler: '+error.message;return;}
   _kundenGeladen=data;
-  document.getElementById('cCount').textContent=data.length+' Firmen'+(typ?' · '+typ:'');
+  document.getElementById('cCount').textContent=data.length+' Firmen'+(typ?' · '+typ:'')+(branche?' · '+branche:'');
   renderKundenTabelle(false);
 }
 
