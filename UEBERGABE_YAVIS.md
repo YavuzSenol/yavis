@@ -233,6 +233,7 @@ Falls Push hängt: GCM-Fenster → **„Sign in with a code"** → Code auf gith
 - **Abwerbeschutz-Automatik FIX** — `ladeAuftraggeberNamen()` fragte nie matchendes `'Auftraggeber Potenzial'` (Leerzeichen) ab → korrigiert auf `typ='Auftraggeber'`. ⚠️ Greift erst, wenn echte Kunden wieder als Typ **„Auftraggeber"** markiert sind (aktuell sind alle „Auftraggeber-Potenzial" → niemand auto-geschützt).
 - **Tag-Picker** — Kandidaten-Editor hat jetzt ein Tags-Feld (Chips mit ×, Eingabe mit `<datalist>`-Vorschlägen aus `ladeAlleTags()`). Speicherformat `;tag;tag;`.
 - **Geburtstag-Feld** — im Kandidaten-Editor ergänzt (`type=date`, ISO `YYYY-MM-DD`).
+- **Fähigkeiten entfernt** — Feld `faehigkeiten` war Zoho/LinkMatch-Müll. Aus Anzeige, Editor & Profilversand entfernt und in der DB für ALLE Kandidaten geleert (413 → 0). Spalte bleibt in der Tabelle (Suche referenziert sie noch, schadet nicht). Wiederherstellbar aus `zoho backup`. `.tag`-Chips sind übrigens schon grau (`panel2`/`line`).
 
 ### 🟡 Mittelfristig (offen)
 
