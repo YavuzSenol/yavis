@@ -2709,6 +2709,15 @@ function neuerKandidat(){
   zeigeFormular({id:null});
 }
 
+// ---- Tag-Editor (Kandidaten-Formular) ----
+function _tagStore(arr){ return arr.length ? ';'+arr.join(';')+';' : ''; }
+function tagChipForm(t){ return `<span class="tag" style="display:inline-flex;align-items:center;gap:5px">${esc(t)}<span onclick="tagFormRemove('${esc(t)}')" style="cursor:pointer;color:var(--muted);font-weight:700" title="Entfernen">×</span></span>`; }
+function _tagFormArr(){ const el=document.getElementById('ef_tags'); return el?parseTags(el.value):[]; }
+function _tagFormRender(arr){ const h=document.getElementById('ef_tags'); if(h) h.value=_tagStore(arr); const c=document.getElementById('tagChips'); if(c) c.innerHTML=arr.length?arr.map(tagChipForm).join(''):'<span style="color:var(--muted);font-size:13px">Keine Tags</span>'; }
+function tagFormAdd(){ const inp=document.getElementById('tagAddInput'); if(!inp) return; const t=normTag(inp.value); inp.value=''; if(!t) return; const arr=_tagFormArr(); if(!arr.includes(t)){ arr.push(t); _tagFormRender(arr); } }
+function tagFormRemove(t){ _tagFormRender(_tagFormArr().filter(x=>x!==t)); }
+async function _tagFormVorschlaege(){ const dl=document.getElementById('tagFormDL'); if(!dl) return; const alle=await ladeAlleTags(); dl.innerHTML=(alle||[]).map(t=>'<option value="'+esc(t)+'">').join(''); }
+
 function zeigeFormular(d){
   ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
@@ -2722,6 +2731,7 @@ function zeigeFormular(d){
       ${anredeSelect(d.begruessung)}
       ${ef('Vorname','vorname',d.vorname)}
       ${ef('Nachname','nachname',d.nachname)}
+      ${ef('Geburtstag','geburtstag',d.geburtstag,'date')}
       ${ef('E-Mail','email',d.email,'email')}
       ${ef('E-Mail beruflich','email_beruflich',d.email_beruflich,'email')}
       ${ef('Telefon','telefon',d.telefon)}
@@ -2768,6 +2778,15 @@ function zeigeFormular(d){
       ${eta('Profil','profil_zusammenfassung',d.profil_zusammenfassung)}
       ${eta('Bemerkung','bemerkung',d.bemerkung)}
     </div></div>
+    <div class="card"><h3>🏷️ Tags</h3>
+      <div id="tagChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">${parseTags(d.tags).length?parseTags(d.tags).map(tagChipForm).join(''):'<span style="color:var(--muted);font-size:13px">Keine Tags</span>'}</div>
+      <div style="display:flex;gap:8px;align-items:center;max-width:460px">
+        <input id="tagAddInput" list="tagFormDL" placeholder="Tag eingeben + Enter…" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();tagFormAdd()}" style="flex:1;padding:8px 10px;font-size:14px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;box-sizing:border-box">
+        <button type="button" class="tab" onclick="tagFormAdd()">+ Hinzufügen</button>
+      </div>
+      <datalist id="tagFormDL"></datalist>
+      <input type="hidden" id="ef_tags" value="${esc(_tagStore(parseTags(d.tags)))}">
+    </div>
     <div class="edit-actions">
       <button class="neuBtn savebtn" onclick="speichereKandidat(${neu?'null':`'${d.id}'`})">✓ Speichern</button>
       <button class="neuBtn cancelbtn" onclick="${neu?'zurueckZurListe()':`detailKandidat('${d.id}')`}">Abbrechen</button>
@@ -2775,6 +2794,7 @@ function zeigeFormular(d){
     <div id="saveMsg" style="margin-top:12px;font-size:13px"></div>
   `;
   window.scrollTo(0,0);
+  _tagFormVorschlaege();
 }
 
 function gv(id){ const el=document.getElementById('ef_'+id); return el?el.value.trim():null; }
@@ -2835,6 +2855,7 @@ async function speichereKandidat(id){
     xing_profil:gv('xing_profil'), linkedin_profil:gv('linkedin_profil'),
     faehigkeiten:gv('faehigkeiten'), wechselmotivation:gv('wechselmotivation'),
     profil_zusammenfassung:gv('profil_zusammenfassung'), bemerkung:gv('bemerkung'),
+    geburtstag:gv('geburtstag')||null, tags:gv('tags')||null,
     geaendert_am:new Date().toISOString(),
     letzte_aktivitaet:new Date().toISOString(),
   };
