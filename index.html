@@ -2124,7 +2124,6 @@ function _profilText(d, erf, ausb, anonym){
   if(ort) L.push('Region: '+ort);
   if(d.qualifikation) L.push('Qualifikation: '+d.qualifikation);
   if(d.studiengang) L.push('Studiengang: '+d.studiengang);
-  if(d.faehigkeiten) L.push('Fähigkeiten: '+d.faehigkeiten);
   if(d.gehalt_erwartet) L.push('Gehaltsvorstellung: '+d.gehalt_erwartet);
   if(d.kuendigungsfrist) L.push('Verfügbarkeit / Kündigungsfrist: '+d.kuendigungsfrist);
   if(d.umzugsbereitschaft) L.push('Umzugsbereitschaft: '+d.umzugsbereitschaft);
@@ -2378,9 +2377,8 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails)
             ${zeile('LinkedIn', link(d.linkedin_profil))}
           </div>
         </div>
-        ${(d.faehigkeiten||tags)?`<div class="dpanel-sub">
-          ${d.faehigkeiten?`<span class="dcol-h">Fähigkeiten</span>${(d.faehigkeiten||'').split(',').map(s=>s.trim()).filter(Boolean).map(s=>`<span class="tag">${esc(s)}</span>`).join('')}`:''}
-          ${tags?`<span class="dcol-h" style="margin-top:6px">Tags</span>${tags}`:''}
+        ${tags?`<div class="dpanel-sub">
+          <span class="dcol-h">Tags</span>${tags}
         </div>`:''}
         ${d.profil_zusammenfassung||d.bemerkung?`<div class="dpanel-sub">
           ${d.profil_zusammenfassung?`<span class="dcol-h">Profil</span><div style="font-size:12px;color:var(--muted);margin-top:3px;margin-bottom:6px">${esc(d.profil_zusammenfassung)}</div>`:''}
@@ -2773,7 +2771,6 @@ function zeigeFormular(d){
       ${ef('Kontaktstatus','kontaktstatus',d.kontaktstatus)}
       ${ef('XING Profil','xing_profil',d.xing_profil)}
       ${ef('LinkedIn Profil','linkedin_profil',d.linkedin_profil)}
-      ${eta('Fähigkeiten (kommagetrennt)','faehigkeiten',d.faehigkeiten)}
       ${eta('Wechselmotivation','wechselmotivation',d.wechselmotivation)}
       ${eta('Profil','profil_zusammenfassung',d.profil_zusammenfassung)}
       ${eta('Bemerkung','bemerkung',d.bemerkung)}
@@ -2853,7 +2850,7 @@ async function speichereKandidat(id){
     bei_firma_seit:gv('bei_firma_seit'), in_position_seit:gv('in_position_seit'),
     kontaktstatus:gv('kontaktstatus'),
     xing_profil:gv('xing_profil'), linkedin_profil:gv('linkedin_profil'),
-    faehigkeiten:gv('faehigkeiten'), wechselmotivation:gv('wechselmotivation'),
+    wechselmotivation:gv('wechselmotivation'),
     profil_zusammenfassung:gv('profil_zusammenfassung'), bemerkung:gv('bemerkung'),
     geburtstag:gv('geburtstag')||null, tags:gv('tags')||null,
     geaendert_am:new Date().toISOString(),
