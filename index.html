@@ -269,6 +269,7 @@
     <div style="margin:-4px 0 12px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="kPosUnter" onchange="ladeKandidaten()" style="min-width:auto;width:14px;height:14px;padding:0;margin:0">Position ＋ niedrigere einbeziehen</label>
       <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="kMitProfil" onchange="nachfassToggle()" style="min-width:auto;width:14px;height:14px;padding:0;margin:0">🔗 nur mit XING/LinkedIn-Profil</label>
+      <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="kNurHot" onchange="ladeKandidaten()" style="min-width:auto;width:14px;height:14px;padding:0;margin:0">🔥 nur Hot</label>
       <button class="tab" onclick="toggleTagPanel()">🏷️ Nach Tags filtern <span id="tagFilterCount"></span></button>
       <button class="tab" onclick="toggleSpaltenPanel()">🗂 Spalten</button>
       <button class="tab" onclick="duplikateFinden()" title="Doppelte Kandidaten nach Name oder E-Mail suchen">🔍 Duplikate</button>
@@ -1631,6 +1632,8 @@ async function ladeKandidaten(){
   const lueckeLabel=luecke?(' · '+(LUECKE_LABEL[luecke]||luecke)):'';
   const mitProfil=document.getElementById('kMitProfil').checked;
   const profilLabel=mitProfil?' · mit Profil':'';
+  const nurHot=!!(document.getElementById('kNurHot')||{}).checked;
+  const hotLabel=nurHot?' · 🔥 Hot':'';
   const plz=document.getElementById('kPlz').value.trim();
   const radius=document.getElementById('kRadius').value;
   const body=document.getElementById('kBody'); body.innerHTML='';
@@ -1646,7 +1649,7 @@ async function ladeKandidaten(){
     if(posListe) rows=rows.filter(r=>posListe.includes(r.berufsbezeichnung));
     // Die Umkreis-Funktion liefert nur Basisfelder → volle Datensätze nachladen,
     // wenn Tag-Filter aktiv ist ODER Spalten angezeigt werden, die sie nicht enthält.
-    if(rows.length && (tagFilterAktiv() || brauchtVolleDaten() || luecke || mitProfil)){
+    if(rows.length && (tagFilterAktiv() || brauchtVolleDaten() || luecke || mitProfil || nurHot)){
       const ids=rows.map(r=>r.id); const map={};
       for(let i=0;i<ids.length;i+=300){ const teil=ids.slice(i,i+300);
         const {data:td}=await sb.from('kandidaten').select('*').in('id',teil);
@@ -1656,7 +1659,8 @@ async function ladeKandidaten(){
     if(tagFilterAktiv()) rows=rows.filter(r=>tagsMatchFilter(r.tags));
     if(luecke) rows=rows.filter(r=>lueckeMatch(r,luecke));
     if(mitProfil) rows=rows.filter(r=>hatProfil(r));
-    document.getElementById('kCount').textContent=rows.length+' Kandidaten im Umkreis von '+radius+' km um '+plz+posLabel+lueckeLabel+profilLabel+tagFilterLabel();
+    if(nurHot) rows=rows.filter(r=>r.ist_hot);
+    document.getElementById('kCount').textContent=rows.length+' Kandidaten im Umkreis von '+radius+' km um '+plz+posLabel+lueckeLabel+profilLabel+hotLabel+tagFilterLabel();
     rows.forEach(r=>body.appendChild(zeileKandidat(r,true)));
     if(!rows.length) body.innerHTML='<tr><td colspan="'+spaltenAnzahl()+'" class="empty">Keine Treffer.</td></tr>';
     return;
@@ -1668,6 +1672,7 @@ async function ladeKandidaten(){
   if(posListe) query=query.in('berufsbezeichnung',posListe);
   if(luecke) query=lueckeQuery(query,luecke);
   if(mitProfil) query=query.or('xing_profil.ilike.%http%,linkedin_profil.ilike.%http%');
+  if(nurHot) query=query.eq('ist_hot',true);
   if(q) query=query.or(`voller_name.ilike.%${q}%,berufsbezeichnung.ilike.%${q}%,faehigkeiten.ilike.%${q}%,stadt.ilike.%${q}%,arbeitgeber.ilike.%${q}%`);
   const tmod=tagModusWert();
   if(tmod==='leer'){ query=query.or('tags.is.null,tags.eq.,tags.eq.;;'); }
@@ -1680,7 +1685,7 @@ async function ladeKandidaten(){
   query=query.order('letzte_aktivitaet',{ascending:false,nullsFirst:false});
   const {data,error}=await query;
   if(error){document.getElementById('kCount').textContent='Fehler: '+error.message;return;}
-  document.getElementById('kCount').textContent=(data.length)+' Kandidaten'+(data.length>=200?' (erste 200)':'')+posLabel+lueckeLabel+profilLabel+tagFilterLabel();
+  document.getElementById('kCount').textContent=(data.length)+' Kandidaten'+(data.length>=200?' (erste 200)':'')+posLabel+lueckeLabel+profilLabel+hotLabel+tagFilterLabel();
   data.forEach(r=>body.appendChild(zeileKandidat(r,false)));
   if(!data.length) body.innerHTML='<tr><td colspan="'+spaltenAnzahl()+'" class="empty">Keine Treffer.</td></tr>';
 }
@@ -2102,6 +2107,11 @@ async function abwerbeschutzToggle(id, aktuell){
   if(error){ alert('Fehler: '+error.message); return; }
   detailKandidat(id); // Seite neu laden
 }
+async function hotToggle(id, aktuell){
+  const {error} = await sb.from('kandidaten').update({ist_hot: !aktuell}).eq('id', id);
+  if(error){ alert('Fehler: '+error.message); return; }
+  detailKandidat(id);
+}
 
 // ===== Kandidatenprofil an Firma/Kontakt senden =====
 function _profilText(d, erf, ausb, anonym){
@@ -2313,6 +2323,7 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails)
           ? `<button class="editbtn" style="margin-left:0;cursor:default;opacity:.6" title="Automatisch geschützt: ${esc(d.arbeitgeber)} ist ein Auftraggeber">🔒 Auto-Schutz</button>`
           : `<button class="editbtn" style="margin-left:0;font-weight:${d.abwerbeschutz?'700':'500'}" title="${d.abwerbeschutz?'Abwerbeschutz manuell aufheben':'Abwerbeschutz manuell aktivieren'}" onclick="abwerbeschutzToggle('${d.id}',${d.abwerbeschutz?'true':'false'})">${d.abwerbeschutz?'🔒 Manuell':'🔓 Schützen'}</button>`
         }
+        <button class="editbtn" style="margin-left:0;font-weight:${d.ist_hot?'700':'500'}" title="${d.ist_hot?'Hot-Markierung entfernen':'Als Hot markieren'}" onclick="hotToggle('${d.id}',${d.ist_hot?'true':'false'})">${d.ist_hot?'🔥 Hot':'🔥 markieren'}</button>
         <button class="editbtn" style="margin-left:0" onclick="bearbeiteKandidat('${d.id}')">✎ Bearbeiten</button>
         <button class="editbtn" style="margin-left:0;color:var(--muted)" onclick="kandidatLoeschen('${d.id}','${esc(d.voller_name)}')">🗑️ Löschen</button>
         <button class="editbtn" style="margin-left:0" onclick="mailSendenDialog('${esc(d.email||d.email_beruflich||'')}','${d.id}','${esc(d.voller_name)}','${esc(d.anrede||'')}','${esc(d.nachname||'')}')">📧 E-Mail senden</button>
