@@ -320,6 +320,7 @@
     <div id="cSelBar" style="display:none;align-items:center;gap:8px;background:var(--accent);color:#fff;padding:8px 14px;border-radius:6px;margin-bottom:8px;flex-wrap:wrap">
       <span id="cSelCount" style="font-weight:600"></span>
       <button onclick="kundenAnKandidat()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">👤 An Kandidat senden</button>
+      <button onclick="kundenMassenupdate()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">✏️ Ändern</button>
       <button onclick="kundenCsvExport()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">📥 CSV</button>
       <button onclick="kundeSelAufheben()" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.4);padding:5px 10px;border-radius:4px;cursor:pointer;font-size:13px;margin-left:auto">✕ Aufheben</button>
     </div>
@@ -2942,6 +2943,58 @@ function updateKundeSelBar(){
 function kundeSelToggle(id,cb){ if(cb.checked) selectedKundenIds.add(id); else selectedKundenIds.delete(id); updateKundeSelBar(); }
 function kundeSelAll(checked){ document.querySelectorAll('.kunde-cb').forEach(cb=>{ cb.checked=checked; if(checked) selectedKundenIds.add(cb.dataset.id); else selectedKundenIds.delete(cb.dataset.id); }); updateKundeSelBar(); }
 function kundeSelAufheben(){ selectedKundenIds.clear(); document.querySelectorAll('.kunde-cb').forEach(cb=>cb.checked=false); const all=document.getElementById('cSelAll'); if(all){all.checked=false;all.indeterminate=false;} updateKundeSelBar(); }
+
+// ---- Firmen-Massenbearbeitung ----
+function kundenMassenupdate(){
+  if(!selectedKundenIds.size){ zeigeMeldung('Keine Firmen ausgewählt','warn'); return; }
+  const dlg=document.createElement('dialog');
+  dlg.style.cssText='background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:24px;max-width:520px;width:95vw';
+  dlg.innerHTML=`<h3 style="margin:0 0 14px">✏️ Massenbearbeitung — ${selectedKundenIds.size} Firmen</h3>
+    <label style="font-size:13px;color:var(--muted)">Feld</label>
+    <select id="kMassFeld" onchange="kundenMassFeldWechseln(this)" style="width:100%;padding:8px;font-size:14px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;margin:6px 0 14px">
+      <option value="">– Feld wählen –</option>
+      <option value="typ">Typ</option>
+      <option value="branche">Branche</option>
+      <option value="stadt">Ort</option>
+      <option value="bundesland">Bundesland</option>
+      <option value="land">Land</option>
+    </select>
+    <div id="kMassWertBox"></div>
+    <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted);margin-top:12px;cursor:pointer">
+      <input type="checkbox" id="kMassNurLeere" style="width:15px;height:15px"> Nur leere Felder füllen (vorhandene Werte nicht überschreiben)
+    </label>
+    <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="this.closest('dialog').close();this.closest('dialog').remove()" style="padding:7px 16px;border-radius:4px;cursor:pointer;background:var(--panel2);border:1px solid var(--line)">Abbrechen</button>
+      <button onclick="kundenMassAnwenden(this.closest('dialog'))" style="padding:7px 20px;border-radius:4px;cursor:pointer;background:var(--accent);color:#fff;border:none;font-weight:600">Auf alle anwenden</button>
+    </div>`;
+  document.body.appendChild(dlg); dlg.showModal();
+}
+function kundenMassFeldWechseln(sel){
+  const box=sel.closest('dialog').querySelector('#kMassWertBox');
+  const feld=sel.value; if(!feld){ box.innerHTML=''; return; }
+  const st='width:100%;padding:8px;font-size:14px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;margin-top:6px;box-sizing:border-box';
+  if(feld==='typ') box.innerHTML=`<label style="font-size:13px;color:var(--muted)">Neuer Typ</label><select id="kMassWert" style="${st}">${['Auftraggeber','Auftraggeber-Potenzial','Lieferant','Sonstige'].map(t=>`<option>${t}</option>`).join('')}</select>`;
+  else box.innerHTML=`<label style="font-size:13px;color:var(--muted)">Neuer Wert</label><input id="kMassWert" style="${st}" placeholder="Wert eingeben…">`;
+}
+async function kundenMassAnwenden(dlg){
+  const feld=dlg.querySelector('#kMassFeld').value;
+  const wertEl=dlg.querySelector('#kMassWert');
+  if(!feld||!wertEl||!wertEl.value.trim()){ zeigeMeldung('Feld und Wert wählen','warn'); return; }
+  const wert=wertEl.value.trim();
+  const nurLeere=dlg.querySelector('#kMassNurLeere').checked;
+  const btn=dlg.querySelector('button[onclick^="kundenMassAnwenden"]'); if(btn){ btn.disabled=true; btn.textContent='⏳ …'; }
+  // Nur leere: IDs einschränken auf Firmen, deren Feld aktuell leer ist
+  let ids=[...selectedKundenIds];
+  if(nurLeere){ ids=ids.filter(id=>{ const r=_kundenGeladen.find(x=>x.id===id); return r && !((r[feld]||'').toString().trim()); }); }
+  if(!ids.length){ zeigeMeldung('Keine passenden Firmen (alle Felder schon gefüllt)','warn'); if(btn){btn.disabled=false;btn.textContent='Auf alle anwenden';} return; }
+  for(let i=0;i<ids.length;i+=100){
+    const {error}=await sb.from('kunden').update({[feld]:wert}).in('id',ids.slice(i,i+100));
+    if(error){ zeigeMeldung('Fehler: '+error.message,'err'); dlg.close(); dlg.remove(); return; }
+  }
+  dlg.close(); dlg.remove();
+  zeigeMeldung(`✅ ${ids.length} Firmen aktualisiert (${feld})`,'ok');
+  ladeKunden();
+}
 
 function updateKontaktSelBar(){
   const bar=document.getElementById('ktSelBar'); if(!bar) return;
