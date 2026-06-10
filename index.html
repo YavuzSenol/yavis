@@ -242,15 +242,10 @@
       <div class="field"><label>Suche (Name, Beruf, Skills, Ort)</label>
         <input id="kSuche" placeholder="z.B. TGA Projektleiter" style="min-width:260px"></div>
       <div class="field"><label>Position</label>
-        <select id="kPosition" onchange="ladeKandidaten()"><option value="">alle Positionen</option>
-          <option>Geschäftsführung</option><option>COO</option><option>Niederlassungsleitung</option>
-          <option>Kaufmännische Leitung</option><option>Technische Leitung</option><option>Bereichsleitung</option>
-          <option>Abteilungsleitung</option><option>Teamleitung</option><option>Gesamtprojektleitung</option>
-          <option>Projektleitung</option><option>Projektingenieur</option><option>Ingenieur</option>
-          <option>Vertriebsingenieur</option><option>Fachplanung</option><option>technische Systemplanung</option>
-          <option>Bauleitung</option><option>Objektüberwachung</option><option>Kalkulator</option>
-          <option>BIM Konstrukteur</option><option>Techniker</option><option>Arbeitssicherheit</option>
-        </select></div>
+        <div class="msdd" id="kPosDD">
+          <button type="button" class="msdd-btn" id="kPosBtn" onclick="msddToggle('kPosDD')">alle Positionen ▾</button>
+          <div class="msdd-panel" id="kPosDD-panel" style="display:none"></div>
+        </div></div>
       <div class="field"><label>Datenlücken</label>
         <select id="kLuecke" onchange="ladeKandidaten()">
           <option value="">alle</option>
@@ -271,6 +266,14 @@
       .rchip{padding:4px 11px;border-radius:14px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer;font-size:12px;user-select:none}
       .rchip:hover{color:var(--ink)}
       .rchip.on{background:var(--panel2);color:var(--accent);border-color:var(--accent);font-weight:600}
+      .msdd{position:relative;display:inline-block}
+      .msdd-btn{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:8px 12px;font-size:14px;cursor:pointer;min-width:170px;text-align:left}
+      .msdd-panel{position:absolute;z-index:40;top:calc(100% + 3px);left:0;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px;max-height:300px;overflow:auto;min-width:230px;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+      .msdd-opt{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:4px;font-size:13px;cursor:pointer;white-space:nowrap}
+      .msdd-opt:hover{background:var(--panel2)}
+      .msdd-opt input{width:15px;height:15px;cursor:pointer;accent-color:var(--accent)}
+      .msdd-foot{display:flex;justify-content:space-between;gap:8px;padding:6px 4px 2px;border-top:1px solid var(--line);margin-top:4px}
+      .msdd-foot button{background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer}
     </style>
     <div class="rfilter" id="rolleFilterBar" style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin:-2px 0 12px">
       <span style="font-size:12px;color:var(--muted);margin-right:2px">Rolle:</span>
@@ -1560,7 +1563,8 @@ function zurStartseite(){
   // Alle Filter zurücksetzen
   const gs=document.getElementById('globalSuche'); if(gs) gs.value='';
   document.getElementById('kSuche').value='';
-  document.getElementById('kPosition').value='';
+  document.querySelectorAll('#kPosDD-panel input:checked').forEach(c=>c.checked=false);
+  { const b=document.getElementById('kPosBtn'); if(b) b.textContent='alle Positionen ▾'; }
   const kl=document.getElementById('kLuecke'); if(kl) kl.value='';
   const mp=document.getElementById('kMitProfil'); if(mp) mp.checked=false;
   const pu=document.getElementById('kPosUnter'); if(pu) pu.checked=false;
@@ -1649,6 +1653,28 @@ function nachfassToggle(){
   ladeKandidaten();
 }
 
+// ===== Mehrfach-Auswahl-Dropdown (Position) =====
+function _posMsddFuellen(){
+  const p=document.getElementById('kPosDD-panel'); if(!p||p.dataset.filled) return;
+  p.innerHTML=Object.keys(POSITION_STUFE).map(pos=>`<label class="msdd-opt"><input type="checkbox" value="${esc(pos)}" onchange="msddPosChanged()">${esc(pos)}</label>`).join('')
+    +`<div class="msdd-foot"><button type="button" onclick="msddPosClear()">zurücksetzen</button><button type="button" onclick="msddToggle('kPosDD')">schließen</button></div>`;
+  p.dataset.filled='1';
+}
+function msddToggle(id){
+  if(id==='kPosDD') _posMsddFuellen();
+  const panel=document.getElementById(id+'-panel');
+  panel.style.display = panel.style.display==='none' ? 'block':'none';
+}
+function _posMsddSel(){ return [...document.querySelectorAll('#kPosDD-panel input:checked')].map(c=>c.value); }
+function msddPosChanged(){
+  const sel=_posMsddSel();
+  document.getElementById('kPosBtn').textContent=(sel.length?(sel.length===1?sel[0]:sel.length+' Positionen'):'alle Positionen')+' ▾';
+  ladeKandidaten();
+}
+function msddPosClear(){ document.querySelectorAll('#kPosDD-panel input:checked').forEach(c=>c.checked=false); msddPosChanged(); }
+// Klick außerhalb schließt offene Mehrfach-Dropdowns
+document.addEventListener('click',e=>{ if(!e.target.closest('.msdd')) document.querySelectorAll('.msdd-panel').forEach(p=>p.style.display='none'); });
+
 // ===== Rollen-Filter (Stufe 2) =====
 let rolleFilter='alle';
 function setRolleFilter(v){
@@ -1669,10 +1695,10 @@ async function ladeKandidaten(){
   await ladeAuftraggeberNamen();
   selectedKandIds.clear(); updateSelBar();
   const q=document.getElementById('kSuche').value.trim();
-  const position=document.getElementById('kPosition').value;
+  const posSel=_posMsddSel();
   const posUnter=document.getElementById('kPosUnter').checked;
-  const posListe=position?(posUnter?positionenUndDarunter(position):[position]):null;
-  const posLabel=position?(' · '+position+(posUnter?' & darunter':'')):'';
+  const posListe=posSel.length?(posUnter?[...new Set(posSel.flatMap(p=>positionenUndDarunter(p)))]:posSel):null;
+  const posLabel=posSel.length?(' · '+(posSel.length===1?posSel[0]:posSel.length+' Pos.')+(posUnter?' & darunter':'')):'';
   const luecke=document.getElementById('kLuecke').value;
   const lueckeLabel=luecke?(' · '+(LUECKE_LABEL[luecke]||luecke)):'';
   const mitProfil=document.getElementById('kMitProfil').checked;
