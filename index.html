@@ -492,6 +492,15 @@
           </select>
         </div>
         <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Rolle</div>
+          <select id="rmRolle" style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
+            <option value="">alle</option>
+            <option value="kandidat">👤 Kandidat</option>
+            <option value="ansprechpartner">👔 Ansprechpartner</option>
+            <option value="doppel">Doppelrolle</option>
+          </select>
+        </div>
+        <div>
           <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Umzugsbereitschaft</div>
           <input id="rmUmzug" placeholder="z.B. bundesweit" onkeydown="if(event.key==='Enter')rechercheAusfuehren()"
                  style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:150px">
@@ -595,8 +604,11 @@
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:6px">
               <input type="checkbox" id="rmIstHot" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)"> 🔥 Ist Hot
             </label>
-            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:6px">
               <input type="checkbox" id="rmHatProfil" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)"> 🔗 XING/LinkedIn
+            </label>
+            <label title="hat mindestens ein hochgeladenes Dokument (i.d.R. Lebenslauf)" style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+              <input type="checkbox" id="rmHatDok" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)"> 📄 hat Dokument (CV)
             </label>
           </div>
         </div>
@@ -7085,6 +7097,18 @@ function _alterAus(geb){
   const m=now.getMonth()-d.getMonth(); if(m<0||(m===0&&now.getDate()<d.getDate())) a--;
   return a;
 }
+// IDs aller Personen mit mindestens einem Dokument (einmal laden, dann cachen)
+let _dokIdsCache=null;
+async function _ladeDokIds(){
+  if(_dokIdsCache) return _dokIdsCache;
+  const s=new Set(); let off=0;
+  while(true){
+    const {data}=await sb.from('dokumente').select('kandidat_id').not('kandidat_id','is',null).range(off,off+999);
+    (data||[]).forEach(d=>s.add(d.kandidat_id));
+    if(!data||data.length<1000) break; off+=1000;
+  }
+  _dokIdsCache=s; return s;
+}
 
 // ===== Gespeicherte Suchen (Recherche-Maske) =====
 function rmFilterLesen(){
@@ -7100,7 +7124,8 @@ function rmFilterLesen(){
     alterVon:g('rmAlterVon')?.value||'', alterBis:g('rmAlterBis')?.value||'',
     qualifikation:g('rmQualifikation')?.value||'', studiengang:g('rmStudiengang')?.value||'',
     abw:g('rmAbwerbeschutz')?.value||'', quelle:msddSel('rmQuelleDD'),
-    istHot:!!g('rmIstHot')?.checked, hatProfil:!!g('rmHatProfil')?.checked
+    istHot:!!g('rmIstHot')?.checked, hatProfil:!!g('rmHatProfil')?.checked,
+    rolle:g('rmRolle')?.value||'', hatDok:!!g('rmHatDok')?.checked
   };
 }
 function _msddSetSel(id, vals){ document.querySelectorAll('#'+id+'-panel input').forEach(c=>{ c.checked=(vals||[]).includes(c.value); }); msddUpdateLabel(id); }
@@ -7115,6 +7140,7 @@ function rmFilterSetzen(f){
   sv('rmGehaltVon',f.gehaltVon); sv('rmGehaltBis',f.gehaltBis); sv('rmErfVon',f.erfVon); sv('rmErfBis',f.erfBis);
   sv('rmAlterVon',f.alterVon); sv('rmAlterBis',f.alterBis); sv('rmQualifikation',f.qualifikation); sv('rmStudiengang',f.studiengang);
   sv('rmAbwerbeschutz',f.abw); ck('rmIstHot',f.istHot); ck('rmHatProfil',f.hatProfil);
+  sv('rmRolle',f.rolle); ck('rmHatDok',f.hatDok);
   _msddSetSel('rmExWertDD', f.ausschluss); _msddSetSel('rmBundeslandDD', f.bundesland); _msddSetSel('rmQuelleDD', f.quelle);
   const det=document.getElementById('rmErweitert'); if(det) det.open=true;
 }
@@ -7172,6 +7198,8 @@ async function rechercheMaskeAusfuehren() {
   const hatProfil   = !!(document.getElementById('rmHatProfil')?.checked);
   const abwSchutz   = document.getElementById('rmAbwerbeschutz')?.value||'';
   const quelle      = msddSel('rmQuelleDD');
+  const rolle       = document.getElementById('rmRolle')?.value||'';
+  const hatDok      = !!(document.getElementById('rmHatDok')?.checked);
 
   let rows = [];
 
@@ -7182,7 +7210,7 @@ async function rechercheMaskeAusfuehren() {
     if (error) { anzEl.textContent = 'Fehler: ' + error.message; return; }
     const rpcRows = data || [];
     // Volle Datensätze nachladen wenn Client-Filter nötig
-    const brauchtVoll = _rmGewaehltePos.size || statusVal || hatMail || hatTel || ausschluss.length || umzugVal || bundesland.length || quelle.length || gehaltVon!=null || gehaltBis!=null || erfVon!=null || erfBis!=null || alterVon!=null || alterBis!=null || qualifikation || studiengang;
+    const brauchtVoll = _rmGewaehltePos.size || statusVal || hatMail || hatTel || ausschluss.length || umzugVal || bundesland.length || quelle.length || gehaltVon!=null || gehaltBis!=null || erfVon!=null || erfBis!=null || alterVon!=null || alterBis!=null || qualifikation || studiengang || rolle || hatDok;
     if (rpcRows.length && brauchtVoll) {
       const ids = rpcRows.map(r => r.id);
       const map = {};
@@ -7211,6 +7239,10 @@ async function rechercheMaskeAusfuehren() {
     if (abwSchutz==='ja')   q = q.eq('abwerbeschutz', true);
     if (abwSchutz==='nein') q = q.eq('abwerbeschutz', false);
     if (quelle.length) q = q.in('quelle', quelle);
+    if (rolle==='kandidat')        q = q.ilike('rollen','%;Kandidat;%');
+    else if (rolle==='ansprechpartner') q = q.ilike('rollen','%;Ansprechpartner;%');
+    else if (rolle==='doppel')     q = q.ilike('rollen','%;Kandidat;%').ilike('rollen','%;Ansprechpartner;%');
+    if (hatDok)       q = q.in('id', [...await _ladeDokIds()]);
     if (freitext)     q = q.or(`voller_name.ilike.%${freitext}%,arbeitgeber.ilike.%${freitext}%,faehigkeiten.ilike.%${freitext}%,stadt.ilike.%${freitext}%`);
     const { data, error } = await q;
     if (error) { anzEl.textContent = 'Fehler: ' + error.message; return; }
@@ -7250,6 +7282,10 @@ async function rechercheMaskeAusfuehren() {
   if (abwSchutz==='ja')   rows=rows.filter(r=>r.abwerbeschutz);
   if (abwSchutz==='nein') rows=rows.filter(r=>!r.abwerbeschutz);
   if (quelle.length) rows=rows.filter(r=>quelle.includes(r.quelle));
+  if (rolle==='kandidat')        rows=rows.filter(r=>(r.rollen||'').includes(';Kandidat;'));
+  else if (rolle==='ansprechpartner') rows=rows.filter(r=>(r.rollen||'').includes(';Ansprechpartner;'));
+  else if (rolle==='doppel')     rows=rows.filter(r=>(r.rollen||'').includes(';Kandidat;')&&(r.rollen||'').includes(';Ansprechpartner;'));
+  if (hatDok){ const dokSet=await _ladeDokIds(); rows=rows.filter(r=>dokSet.has(r.id)); }
   if (keinKontakt) { const cutoff=new Date(); cutoff.setDate(cutoff.getDate()-keinKontakt); rows=rows.filter(r=>!r.letzte_aktivitaet||new Date(r.letzte_aktivitaet)<cutoff); }
 
   // ----------- Ergebnis-Label -----------
@@ -7352,9 +7388,9 @@ function rechercheMaskeZuruecksetzen() {
   document.querySelectorAll('#rmExWertDD-panel input').forEach(c=>{ c.checked=_rmExWertStd.includes(c.value); });
   msddUpdateLabel('rmExWertDD');
   ['rmFreitext','rmArbeitgeber','rmTags','rmGehaltVon','rmGehaltBis','rmErfVon','rmErfBis','rmAlterVon','rmAlterBis','rmQualifikation','rmStudiengang'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
-  ['rmKeinKontakt','rmAbwerbeschutz'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  ['rmKeinKontakt','rmAbwerbeschutz','rmRolle'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   msddClear('rmBundeslandDD'); msddClear('rmQuelleDD');
-  ['rmIstHot','rmHatProfil'].forEach(id=>{const e=document.getElementById(id);if(e)e.checked=false;});
+  ['rmIstHot','rmHatProfil','rmHatDok'].forEach(id=>{const e=document.getElementById(id);if(e)e.checked=false;});
   const anzEl = document.getElementById('rmAnzahl'); if (anzEl) anzEl.textContent = '';
   const bodyEl = document.getElementById('rmBody'); if (bodyEl) bodyEl.innerHTML = '';
 }
