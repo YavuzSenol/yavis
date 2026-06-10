@@ -16,9 +16,14 @@ recruiting_app.html
 
 # Stufe-2-Arbeitsdaten (enthalten Personendaten / Hilfsskripte) — NIEMALS committen
 _backup_db/
+_backup_*/
 _stufe2_dubletten.json
 _stufe2_*.py
 _stufe4_*.py
+_reparatur_*.py
+_diag_*.py
+_deploy_*.py
+REPARATUR_dubletten.md
 UEBERGABE_rollen_stufe2_plan.md
 
 # Lokale Vorschau-Hilfe (Auto-Login, enthält Zugangsdaten) — NIEMALS committen
