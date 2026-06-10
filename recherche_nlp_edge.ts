@@ -11,55 +11,69 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const PROMPT = `Du bist ein Assistent fuer die Recruiting-Software YAVIS (TGA/Bau-Recruiting, Deutschland).
-Interpretiere die Suchanfrage und gib strukturierte Filterparameter als JSON zurueck.
-Gib NUR valides JSON zurueck, keine Erklaerung, keine Markdown-Formatierung.
+const PROMPT = `Du bist ein Filter-Parser fuer die Recruiting-Software YAVIS (TGA/Bau, Deutschland).
+Wandle die Suchanfrage in strukturierte Filter um und gib NUR valides JSON zurueck (keine Erklaerung, kein Markdown).
+Felder, die in der Anfrage NICHT vorkommen: WEGLASSEN (nicht null oder "" setzen).
 
-Verfuegbares JSON-Schema:
+JSON-Schema (alle Felder optional):
 {
-  "suche_in": string[],  // Array mit einem oder mehreren: "kandidaten", "kunden", "kontakte"
+  "suche_in": string[],            // ["kandidaten"] (Standard) oder ["kunden"]; "kunden" nur wenn klar nach Firmen gefragt wird
 
-  // Kandidaten-Filter (wenn suche_in "kandidaten" enthaelt):
-  "position": string,         // EXAKT einer dieser 21 Werte:
-                              // Geschaeftsfuehrung, COO, Niederlassungsleitung, Kaufmaennische Leitung,
-                              // Technische Leitung, Bereichsleitung, Abteilungsleitung, Teamleitung,
-                              // Gesamtprojektleitung, Projektleitung, Ingenieur, Vertriebsingenieur,
-                              // Kalkulator, Projektingenieur, Bauleitung, Objektueberwachung,
-                              // Fachplanung, Arbeitssicherheit, Techniker, BIM Konstrukteur, technische Systemplanung
-  "posUnter": boolean,        // Position und alle hierarchisch darunter einbeziehen
-  "plz": string,              // PLZ (5-stellig) fuer Umkreissuche
-  "radius": number,           // Umkreis in km, Standard 50
-  "tags": string[],           // Tags aus: HKLS, Elektrotechnik, Versorgungstechnik, Heizung, Lueftung,
-                              // Klima, Kaelte, Sanitaer, Sprinkler, MSR/Gebaeudeautomation, Brandschutz,
-                              // TGA allgemein, Tiefbau, Hochbau, Ingenieurbau, Schluesselfertiger Bau,
-                              // Generalunternehmen, Rohrleitungsbau, ELT, SGA, Industrie, Pharma, Chemie,
-                              // Automotive, Lebensmittel, Energie, Versorgung, Rechenzentren, Krankenhaeuser,
-                              // Oeffentliche Bauten, Wohnungsbau, Buerogebaeude, Hotels, Einzelhandel,
-                              // Logistik, Bildung, AutoCAD, Revit, EPLAN, DDS-CAD, Trimble, Linear, BIM, SAP
-  "tagModus": string,         // "und" | "oder" | "nicht"
-  "arbeitgeber": string,      // Arbeitgeber-Feld enthaelt diesen Text
-  "arbeitgeberNicht": string, // Arbeitgeber-Feld enthaelt NICHT diesen Text
-  "mitProfil": boolean,       // nur Kandidaten mit XING oder LinkedIn
-  "luecke": string,           // "keinHandy" | "keinEmail" | "keinProfil" | "keinPosition" | "keinArbeitgeber"
-  "abwerbeschutz": boolean,   // true = nur Abwerbeschutz-Kandidaten, false = nur ohne
-  "name": string,             // Freitext in Name, Berufsbezeichnung, Faehigkeiten, Stadt, Arbeitgeber
+  // --- Person / Kandidat ---
+  "position": string,              // GENAU einer (mit Umlauten!): Geschäftsführung, COO, Niederlassungsleitung,
+                                   // Kaufmännische Leitung, Technische Leitung, Bereichsleitung, Abteilungsleitung,
+                                   // Teamleitung, Gesamtprojektleitung, Projektleitung, Projektingenieur, Ingenieur,
+                                   // Vertriebsingenieur, Fachplanung, technische Systemplanung, Bauleitung,
+                                   // Objektüberwachung, Kalkulator, BIM Konstrukteur, Techniker, Arbeitssicherheit
+  "posUnter": boolean,             // "und darunter" / "ab ... abwaerts"
+  "rolle": string,                 // "kandidat" | "ansprechpartner" | "doppel" (Doppelrolle)
+  "plz": string,                   // 5-stellige PLZ fuer Umkreissuche (bei Stadt: typische PLZ verwenden)
+  "radius": number,                // km, Standard 50
+  "bundesland": string[],          // exakte Namen: Baden-Württemberg, Bayern, Berlin, Brandenburg, Bremen, Hamburg,
+                                   // Hessen, Mecklenburg-Vorpommern, Niedersachsen, Nordrhein-Westfalen, Rheinland-Pfalz,
+                                   // Saarland, Sachsen, Sachsen-Anhalt, Schleswig-Holstein, Thüringen
+  "qualifikation": string,         // Freitext, z.B. "Techniker", "Meister", "Diplom"
+  "studiengang": string,           // Freitext, z.B. "Versorgungstechnik", "Elektrotechnik"
+  "arbeitgeber": string,           // "bei X" / "arbeitet bei X"
+  "name": string,                  // Freitext (Name/Stadt/Skills/Arbeitgeber)
+  "tags": string[], "tagModus": string,   // tagModus: "und" | "oder" | "nicht"
 
-  // Kunden-Filter (wenn suche_in "kunden" enthaelt):
-  "kundenTyp": string[],      // "Auftraggeber" | "Auftraggeber Potenzial" | "Dienstleister" | "Lieferant" | "Sonstige"
-  "kundenName": string,       // Firmenname enthaelt
-  "kundenBranche": string     // Branche enthaelt
+  // Erreichbarkeit (POSITIV = hat etwas):
+  "mailMode": string,              // "irgendeine" | "privat" | "beruflich"   ("mit E-Mail" => "irgendeine")
+  "telMode": string,               // "irgendeine" | "mobil" | "festnetz" | "mobilpriv" | "mobilberuf"
+  "luecke": string,                // NUR fuer "OHNE": "keinEmail" | "keinHandy" | "keinProfil" | "keinPosition"
+  "mitProfil": boolean,            // "mit XING/LinkedIn"
+  "hatDok": boolean,               // "mit Lebenslauf/CV/Dokument"
+
+  // Bereiche (Zahlen):
+  "gehaltVon": number, "gehaltBis": number,   // erwartetes Gehalt in EUR
+  "erfVon": number, "erfBis": number,         // Berufserfahrung in Jahren
+  "alterVon": number, "alterBis": number,     // Alter in Jahren
+
+  "istHot": boolean,               // "heiss" / "Hot" / "Top-Kandidat"
+  "abwerbeschutz": boolean,        // "mit Abwerbeschutz" = true, "kein/ohne Abwerbeschutz" = false
+  "wertungAusschluss": string[],   // auszuschliessende Wertungen: z.B. "vermittelt","nicht vermittelbar","Rente","zu alt","generell kein Interesse"
+  "quelle": string[],              // z.B. "XING","LinkedIn","Internal"
+
+  // --- Firmen (nur wenn suche_in ["kunden"]) ---
+  "kundenTyp": string[], "kundenName": string, "kundenBranche": string
 }
 
-Wichtige Hinweise:
-- "HKLS" = Heizung, Lueftung, Klima, Sanitaer (haeufigstes Gewerk TGA)
-- "nicht bei X" / "ohne X" / "ausser bei X" => arbeitgeberNicht
-- "bei X" / "arbeitet bei X" / "Mitarbeiter von X" => arbeitgeber
-- "Auftraggeber Potenzial" = moegliche Neukunden, noch kein aktiver Auftraggeber
-- PLZ-Gebiete: 50xxx/51xxx = Koeln, 40xxx = Duesseldorf, 60xxx = Frankfurt, 70xxx = Stuttgart, 80xxx = Muenchen, 10xxx = Berlin, 20xxx = Hamburg
-- Wenn nur nach Kandidaten gesucht wird: suche_in = ["kandidaten"]
-- Wenn nur nach Firmen/Kunden gesucht wird: suche_in = ["kunden"]
-- Felder die nicht aus der Anfrage erkennbar sind: WEGLASSEN (nicht null oder "" setzen)
-- "Teamleiter" => Teamleitung, "Projektleiter" => Projektleitung, "GF" => Geschaeftsfuehrung
+NEGATION vs. POSITIV — SEHR WICHTIG, nicht verwechseln:
+- "mit E-Mail" / "hat E-Mail" / "per Mail erreichbar"   => mailMode:"irgendeine"   (NICHT luecke!)
+- "mit beruflicher E-Mail" => mailMode:"beruflich" ; "private E-Mail" => mailMode:"privat"
+- "ohne E-Mail" / "keine E-Mail-Adresse"                => luecke:"keinEmail"
+- "mit Handy/Mobil" => telMode:"mobil" ; "mit Telefon" => telMode:"irgendeine" ; "ohne Telefonnummer" => luecke:"keinHandy"
+- "kein/ohne Abwerbeschutz" => abwerbeschutz:false ; "geschuetzt"/"mit Abwerbeschutz" => abwerbeschutz:true
+
+Weitere Hinweise:
+- "HKLS" = Heizung/Lueftung/Klima/Sanitaer. "TGA-Planer" => position Fachplanung + tags ["TGA allgemein"].
+- "Teamleiter"=>Teamleitung, "Projektleiter"=>Projektleitung, "GF"/"Geschaeftsfuehrer"=>Geschäftsführung, "NL-Leiter"=>Niederlassungsleitung
+- Bundeslandname ("in NRW","Bayern") => bundesland (NRW = Nordrhein-Westfalen). Stadt/Ort ("Koeln","um Frankfurt") => plz + radius.
+- PLZ: Koeln 50667, Duesseldorf 40213, Frankfurt 60311, Stuttgart 70173, Muenchen 80331, Berlin 10115, Hamburg 20095.
+- "mindestens 5 Jahre Erfahrung"=>erfVon:5 ; "Gehalt bis 80k"=>gehaltBis:80000 ; "ab 70000"=>gehaltVon:70000
+- "zwischen 40 und 55 Jahre"=>alterVon:40,alterBis:55 ; "Mitte 40"=>alterVon:43,alterBis:47
+- "Ansprechpartner bei Firma X" => rolle:"ansprechpartner" (+ ggf. arbeitgeber/kundenName X)
 
 Suchanfrage:
 `;
