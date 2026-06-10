@@ -268,11 +268,9 @@
       <button class="neuBtn" onclick="profilEinlesenStart()" title="LinkedIn/XING-Profil oder Text einfügen → KI legt Kandidat an">📋 Aus Profil/Text</button>
     </div>
     <style>
-      .rchip{padding:5px 12px;border-radius:16px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;font-size:13px;user-select:none}
-      .rchip.on{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700}
-      .role-badge{display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;margin-left:6px;vertical-align:middle}
-      .role-badge.ansp{background:#2a2150;color:#b9a8f0;border:1px solid #4a3a8c}
-      .role-badge.kand{background:#1e3a2e;color:#6ee7a8;border:1px solid #2e6b4a}
+      .rchip{padding:4px 11px;border-radius:14px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer;font-size:12px;user-select:none}
+      .rchip:hover{color:var(--ink)}
+      .rchip.on{background:var(--panel2);color:var(--accent);border-color:var(--accent);font-weight:600}
     </style>
     <div class="rfilter" id="rolleFilterBar" style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin:-2px 0 12px">
       <span style="font-size:12px;color:var(--muted);margin-right:2px">Rolle:</span>
@@ -2065,7 +2063,7 @@ async function ladeWiedervorlagen(){
 function telLink(nr){ if(!nr) return '–'; const c=String(nr).replace(/[^\d+]/g,'');
   return `<a class="calllink" href="tel:${c}" onclick="event.stopPropagation()">${esc(nr)}</a>`; }
 const SPALTEN_DEF=[
-  {key:'voller_name', label:'Name', render:r=>`${istGeschuetzt(r)?'🔒 ':''}${r.ist_hot?'<span class="pill hot">HOT</span> ':''}${esc(r.voller_name)||'–'}${(r.rollen||'').includes(';Ansprechpartner;')?'<span class="role-badge ansp">👔 AP</span>':''}`},
+  {key:'voller_name', label:'Name', render:r=>`${istGeschuetzt(r)?'🔒 ':''}${r.ist_hot?'<span class="pill hot">HOT</span> ':''}${esc(r.voller_name)||'–'}`},
   {key:'nachname', label:'Nachname', render:r=>esc(r.nachname)||'–'},
   {key:'vorname', label:'Vorname', render:r=>esc(r.vorname)||'–'},
   {key:'berufsbezeichnung', label:'Berufsbezeichnung', render:r=>esc(r.berufsbezeichnung||r.funktion)||'–'},
@@ -2466,7 +2464,7 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
       ${fotoHtml}
       <div>
         <h2 style="margin:0 0 2px">${geschuetzt?'🔒 ':''}${d.ist_hot?'🔥 ':''}${esc(d.voller_name)||'Kandidat'}</h2>
-        <div class="detail-sub" style="margin:0">${esc(d.berufsbezeichnung)||''}${d.arbeitgeber?' · '+esc(d.arbeitgeber):''}${d.status?' · <span class="pill">'+esc(d.status)+'</span>':''}${istAnsprechpartner?' · <span class="pill" style="border-color:var(--accent2);color:var(--accent2)">👔 Ansprechpartner</span>':''}</div>
+        <div class="detail-sub" style="margin:0">${esc(d.berufsbezeichnung)||''}${d.arbeitgeber?' · '+esc(d.arbeitgeber):''}${d.status?' · <span class="pill">'+esc(d.status)+'</span>':''}${istAnsprechpartner?' · <span style="color:var(--muted);font-size:12px">👔 Ansprechpartner</span>':''}</div>
       </div>
       <div style="display:flex;gap:8px;margin-left:auto">
         <button class="cvbtn" id="cvBtn" onclick="cvAuslesen('${d.id}')">📄 CV einlesen</button>
@@ -2875,14 +2873,35 @@ function neuerKandidat(){
   zeigeFormular({id:null});
 }
 
+// ---- Autovervollständigung: erste Buchstaben -> erster eindeutiger Treffer ----
+let _alleTagsCache=[];
+function _prefixMatch(val, opts){
+  val=(val||'').trim().toLowerCase(); if(!val||!opts||!opts.length) return null;
+  const exact=opts.find(o=>String(o).toLowerCase()===val); if(exact) return exact;
+  const pref=opts.filter(o=>String(o).toLowerCase().startsWith(val));
+  if(pref.length===1) return pref[0];
+  const cont=opts.filter(o=>String(o).toLowerCase().includes(val));
+  if(cont.length===1) return cont[0];
+  return null; // mehrdeutig oder kein Treffer
+}
+// Generisch an ein <input list="..."> hängen: Enter übernimmt den eindeutigen Treffer
+function _autoEnter(inp, getOpts, onPick){
+  if(!inp) return;
+  inp.addEventListener('keydown', e=>{
+    if(e.key!=='Enter') return;
+    const m=_prefixMatch(inp.value, getOpts());
+    if(m){ e.preventDefault(); inp.value=m; if(onPick) onPick(m); }
+  });
+}
+
 // ---- Tag-Editor (Kandidaten-Formular) ----
 function _tagStore(arr){ return arr.length ? ';'+arr.join(';')+';' : ''; }
 function tagChipForm(t){ return `<span class="tag" style="display:inline-flex;align-items:center;gap:5px">${esc(t)}<span onclick="tagFormRemove('${esc(t)}')" style="cursor:pointer;color:var(--muted);font-weight:700" title="Entfernen">×</span></span>`; }
 function _tagFormArr(){ const el=document.getElementById('ef_tags'); return el?parseTags(el.value):[]; }
 function _tagFormRender(arr){ const h=document.getElementById('ef_tags'); if(h) h.value=_tagStore(arr); const c=document.getElementById('tagChips'); if(c) c.innerHTML=arr.length?arr.map(tagChipForm).join(''):'<span style="color:var(--muted);font-size:13px">Keine Tags</span>'; }
-function tagFormAdd(){ const inp=document.getElementById('tagAddInput'); if(!inp) return; const t=normTag(inp.value); inp.value=''; if(!t) return; const arr=_tagFormArr(); if(!arr.includes(t)){ arr.push(t); _tagFormRender(arr); } }
+function tagFormAdd(){ const inp=document.getElementById('tagAddInput'); if(!inp) return; const raw=inp.value.trim(); if(!raw) return; const t=normTag(_prefixMatch(raw,_alleTagsCache)||raw); inp.value=''; if(!t) return; const arr=_tagFormArr(); if(!arr.includes(t)){ arr.push(t); _tagFormRender(arr); } }
 function tagFormRemove(t){ _tagFormRender(_tagFormArr().filter(x=>x!==t)); }
-async function _tagFormVorschlaege(){ const dl=document.getElementById('tagFormDL'); if(!dl) return; const alle=await ladeAlleTags(); dl.innerHTML=(alle||[]).map(t=>'<option value="'+esc(t)+'">').join(''); }
+async function _tagFormVorschlaege(){ const dl=document.getElementById('tagFormDL'); if(!dl) return; const alle=await ladeAlleTags(); _alleTagsCache=alle||[]; dl.innerHTML=_alleTagsCache.map(t=>'<option value="'+esc(t)+'">').join(''); }
 
 function zeigeFormular(d){
   ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
@@ -2900,7 +2919,11 @@ function zeigeFormular(d){
       </div>
       <div class="edit-grid">
         ${ef('Funktion (als Ansprechpartner)','funktion',d.funktion)}
-        <div class="edit-field"><label>Firma (als Ansprechpartner)</label><select id="ef_firma_id"><option value="">— keine —</option></select></div>
+        <div class="edit-field"><label>Firma (als Ansprechpartner)</label>
+          <input id="ef_firma_name" list="firmaDL" placeholder="Firma tippen + Enter…" autocomplete="off">
+          <datalist id="firmaDL"></datalist>
+          <input type="hidden" id="ef_firma_id" value="${esc(d.firma_id||'')}">
+        </div>
       </div>
       <div style="font-size:11px;color:var(--muted);margin-top:8px">Mind. eine Rolle. „Funktion" + „Firma" gelten für die Ansprechpartner-Rolle (getrennt von der Kandidaten-Berufsbezeichnung).</div>
     </div>
@@ -2931,7 +2954,9 @@ function zeigeFormular(d){
       ${ef('Land','land_beruf',d.land_beruf||'Deutschland')}
     </div><div class="meta" style="color:var(--muted);font-size:11px;margin-top:8px">Umkreissuche nutzt: PLZ privat → Vorwahl privat → PLZ beruflich → Vorwahl beruflich.</div></div>
     <div class="card"><h3>Beruflich</h3><div class="edit-grid">
-      ${ef('Derzeitige Berufsbezeichnung','berufsbezeichnung',d.berufsbezeichnung)}
+      <div class="edit-field"><label>Derzeitige Berufsbezeichnung</label>
+        <input id="ef_berufsbezeichnung" list="posDL" value="${d.berufsbezeichnung?String(d.berufsbezeichnung).replace(/"/g,'&quot;'):''}" autocomplete="off">
+        <datalist id="posDL"></datalist></div>
       ${ef('Position laut CV (Original)','position_original',d.position_original)}
       ${ef('Arbeitgeber','arbeitgeber',d.arbeitgeber)}
       ${ef('Bei Firma seit','bei_firma_seit',d.bei_firma_seit)}
@@ -2981,15 +3006,33 @@ function zeigeFormular(d){
   window.scrollTo(0,0);
   _tagFormVorschlaege();
   _firmaSelectFuellen(d.firma_id);
+  _posDatalistFuellen();
+}
+
+// Berufsbezeichnung-Tippfeld: 21 Positionen als Vorschläge, Enter übernimmt den eindeutigen Treffer
+function _posDatalistFuellen(){
+  const dl=document.getElementById('posDL'), inp=document.getElementById('ef_berufsbezeichnung');
+  if(!dl||!inp) return;
+  const pos=Object.keys(POSITION_STUFE);
+  dl.innerHTML=pos.map(p=>'<option value="'+esc(p)+'">').join('');
+  _autoEnter(inp, ()=>pos, null);
 }
 
 function gv(id){ const el=document.getElementById('ef_'+id); return el?el.value.trim():null; }
 
-// Firma-Dropdown im Personen-Formular mit allen Firmen füllen (Ansprechpartner-Rolle)
+// Firma-Tippfeld im Personen-Formular: Vorschläge + Name->ID-Auflösung (Ansprechpartner-Rolle)
+let _firmaNamen=[], _firmaNameToId={};
 async function _firmaSelectFuellen(sel){
-  const el=document.getElementById('ef_firma_id'); if(!el) return;
+  const inp=document.getElementById('ef_firma_name'), dl=document.getElementById('firmaDL'), hid=document.getElementById('ef_firma_id');
+  if(!inp||!dl||!hid) return;
   const {data}=await sb.from('kunden').select('id,name').order('name');
-  (data||[]).forEach(k=>{ const o=document.createElement('option'); o.value=k.id; o.textContent=k.name||k.id; if(k.id===sel) o.selected=true; el.appendChild(o); });
+  _firmaNamen=[]; _firmaNameToId={};
+  (data||[]).forEach(k=>{ if(!k.name) return; _firmaNamen.push(k.name); _firmaNameToId[k.name.toLowerCase()]=k.id; });
+  dl.innerHTML=_firmaNamen.map(n=>'<option value="'+esc(n)+'">').join('');
+  if(sel){ const cur=(data||[]).find(k=>k.id===sel); if(cur) inp.value=cur.name; }
+  const setId=()=>{ const m=_prefixMatch(inp.value,_firmaNamen); if(m){ inp.value=m; hid.value=_firmaNameToId[m.toLowerCase()]||''; } else if(!inp.value.trim()){ hid.value=''; } };
+  inp.addEventListener('change', setId);
+  _autoEnter(inp, ()=>_firmaNamen, setId);
 }
 
 // Vorwahl aus Telefonnummer extrahieren und Koordinaten suchen
@@ -3030,10 +3073,13 @@ async function speichereKandidat(id){
   const ra=!!(document.getElementById('ef_rolle_ansprechpartner')||{}).checked;
   let rollen=';'+[rk?'Kandidat':null, ra?'Ansprechpartner':null].filter(Boolean).join(';')+';';
   if(rollen===';;') rollen=';Kandidat;'; // mind. eine Rolle
+  let firmaId=gv('firma_id')||null;
+  const _fn=document.getElementById('ef_firma_name');
+  if(_fn){ const m=_prefixMatch(_fn.value,_firmaNamen); firmaId = m?(_firmaNameToId[m.toLowerCase()]||null) : (_fn.value.trim()?firmaId:null); }
   const obj={
     vorname, nachname,
     voller_name:[vorname,nachname].filter(Boolean).join(' ')||null,
-    rollen, funktion:gv('funktion'), firma_id:gv('firma_id')||null,
+    rollen, funktion:gv('funktion'), firma_id:firmaId,
     email:gv('email'), email_beruflich:gv('email_beruflich'),
     telefon:gv('telefon'), mobil:gv('mobil'),
     telefon_privat:gv('telefon_privat'), mobil_privat:gv('mobil_privat'),
