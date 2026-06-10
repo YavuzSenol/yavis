@@ -191,7 +191,7 @@
   <input id="globalSuche" list="sucheVerlauf" autocomplete="off" placeholder="🔍 Alles durchsuchen – Name, Firma, Telefon …" onkeydown="if(event.key==='Enter')globaleSuche()" style="margin-left:auto;flex:0 1 360px;min-width:200px;font-size:13px">
   <datalist id="sucheVerlauf"></datalist>
   <button class="go" onclick="globaleSuche()" style="padding:9px 16px;margin-left:6px">Suchen</button>
-  <button class="go" onclick="oeffneRecherche()" title="Erweiterte KI-Recherche (Strg+R)" style="padding:9px 14px;margin-left:4px;background:var(--accent2,#7c3aed)">🔍 Recherche</button>
+  <button class="go" onclick="geheZuTab('recherche')" title="Recherche (Strg+R)" style="padding:9px 14px;margin-left:4px;background:var(--accent2,#7c3aed)">🔍 Recherche</button>
   <button class="tab" id="einstellungenBtn" onclick="oeffneEinstellungen()" style="display:none;margin-left:6px;font-size:17px;padding:6px 11px" title="Einstellungen">⚙️</button>
 </header>
 
@@ -428,20 +428,30 @@
   <div id="view-recherche" style="display:none">
     <div style="margin-bottom:14px">
       <h2 style="font-size:20px;font-weight:700;margin:0 0 4px;color:var(--fg)">🔍 Recherche</h2>
-      <div style="font-size:13px;color:var(--muted)">Kandidaten · Firmen · Ansprechpartner — interne Datenbank</div>
+      <div style="font-size:13px;color:var(--muted)">Personen · Firmen — interne Datenbank</div>
+    </div>
+    <!-- KI / Sprache -->
+    <div class="card" style="margin-bottom:14px;padding:12px 14px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">✨ In Worten beschreiben (KI / Sprache)</div>
+      <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
+        <textarea id="rmKiText" rows="2" placeholder="z.B.: Projektleiter TGA in Köln, mit E-Mail, kein Abwerbeschutz" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();rmKiInterpret();}" style="flex:1;min-width:260px;resize:vertical;font-size:14px;padding:9px 11px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;font-family:inherit;box-sizing:border-box"></textarea>
+        <button onclick="rmKiInterpret()" style="padding:9px 16px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;white-space:nowrap">✨ interpretieren</button>
+        <button id="rmMicBtn" title="Spracheingabe (Deutsch)" onclick="rechercheMic('rmKiText','rmMicBtn',rmKiInterpret)" style="padding:9px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;cursor:pointer;font-size:16px">🎤</button>
+      </div>
+      <div id="rmKiStatus" style="font-size:12px;margin-top:6px"></div>
     </div>
     <!-- Entity-Tabs -->
     <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--line)">
       <button id="rmTab-kandidaten" onclick="rmTabWechseln('kandidaten')"
         style="padding:9px 20px;font-size:13px;font-weight:600;cursor:pointer;border:none;background:none;border-bottom:3px solid var(--accent);color:var(--accent);margin-bottom:-2px">
-        👤 Kandidaten
+        👥 Personen
       </button>
       <button id="rmTab-firmen" onclick="rmTabWechseln('firmen')"
         style="padding:9px 20px;font-size:13px;font-weight:600;cursor:pointer;border:none;background:none;border-bottom:3px solid transparent;color:var(--muted)">
         🏢 Firmen
       </button>
       <button id="rmTab-kontakte" onclick="rmTabWechseln('kontakte')"
-        style="padding:9px 20px;font-size:13px;font-weight:600;cursor:pointer;border:none;background:none;border-bottom:3px solid transparent;color:var(--muted)">
+        style="display:none;padding:9px 20px;font-size:13px;font-weight:600;cursor:pointer;border:none;background:none;border-bottom:3px solid transparent;color:var(--muted)">
         🤝 Kontakte
       </button>
     </div>
@@ -4395,12 +4405,13 @@ async function rechercheKontaktQuery(f){
 
 // ===== SPRACHEINGABE für Recherche =====
 let micRecognition=null; let micAktiv=false;
-function rechercheMic(){
+function rechercheMic(targetId,btnId,onDone){
+  targetId=targetId||'rechercheText'; btnId=btnId||'micBtn'; onDone=onDone||rechercheInterpretieren;
   if(!('SpeechRecognition' in window||'webkitSpeechRecognition' in window)){
     alert('Spracheingabe wird von diesem Browser nicht unterstützt.\nBitte Chrome oder Edge verwenden.');
     return;
   }
-  const btn=document.getElementById('micBtn');
+  const btn=document.getElementById(btnId);
   if(micAktiv){ micRecognition&&micRecognition.stop(); return; }
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   micRecognition=new SR();
@@ -4416,7 +4427,7 @@ function rechercheMic(){
     s.textContent='@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}';
     document.head.appendChild(s);
   }
-  const ta=document.getElementById('rechercheText');
+  const ta=document.getElementById(targetId);
   let interim='';
   micRecognition.onresult=e=>{
     let final='', int='';
@@ -4434,7 +4445,7 @@ function rechercheMic(){
     btn.title='Spracheingabe (Deutsch)';
     ta.placeholder='z.B.: Projektleiter in Köln mit HKLS-Erfahrung, nicht bei ENGIE, mit LinkedIn-Profil';
     // Automatisch interpretieren wenn Text vorhanden
-    if(ta.value.trim()) rechercheInterpretieren();
+    if(ta.value.trim()) onDone();
   };
   micRecognition.onerror=e=>{
     micAktiv=false;
@@ -4447,7 +4458,7 @@ function rechercheMic(){
 // Ctrl+R → Recherche öffnen
 document.addEventListener('keydown',e=>{
   if(e.ctrlKey&&e.key==='r'&&!e.target.matches('input,textarea,select')){
-    e.preventDefault(); oeffneRecherche();
+    e.preventDefault(); geheZuTab('recherche');
   }
 });
 
@@ -6922,6 +6933,35 @@ function rmTabWechseln(tab) {
   document.getElementById('rmBody').innerHTML = '';
   const anzEl = document.getElementById('rmAnzahl'); if(anzEl) anzEl.textContent='';
 }
+// KI/Sprache in der Recherche-Maske: Freitext -> NLP -> Maskenfelder füllen -> suchen
+async function rmKiInterpret(){
+  const ta=document.getElementById('rmKiText'), st=document.getElementById('rmKiStatus');
+  const text=(ta&&ta.value||'').trim(); if(!text){ return; }
+  if(st){ st.style.color='var(--muted)'; st.textContent='⏳ KI interpretiert …'; }
+  try{
+    const resp=await fetch('https://afbyqrwqnccgudpqxziv.supabase.co/functions/v1/recherche-nlp',{
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text})
+    });
+    const data=await resp.json();
+    if(!data.ok) throw new Error(data.error||'Fehler');
+    rmKiAnwenden(data.filter||{});
+    if(st){ st.style.color='var(--ok)'; st.textContent='✓ Verstanden — Filter unten übernommen, Suche läuft …'; }
+    rmTabWechseln('kandidaten');
+    rechercheAusfuehren();
+  }catch(e){ if(st){ st.style.color='var(--hot)'; st.textContent='❌ '+String(e.message); } }
+}
+function rmKiAnwenden(f){
+  const set=(id,val)=>{ const el=document.getElementById(id); if(el&&val!=null&&val!=='') el.value=val; };
+  if(f.position){ _rmGewaehltePos.clear(); _rmGewaehltePos.add(f.position); if(f.posUnter) positionenUndDarunter(f.position).forEach(p=>_rmGewaehltePos.add(p)); zeigeRechercheMaske(); }
+  set('rmPlz', f.plz); if(f.radius) set('rmRadius', String(f.radius));
+  set('rmArbeitgeber', f.arbeitgeber);
+  set('rmFreitext', f.name);
+  if(f.tags&&f.tags.length) set('rmTags', f.tags.join(', '));
+  const hp=document.getElementById('rmHatProfil'); if(hp&&f.mitProfil) hp.checked=true;
+  if(f.abwerbeschutz===false) set('rmAbwerbeschutz','nein'); else if(f.abwerbeschutz===true) set('rmAbwerbeschutz','ja');
+  if(f.arbeitgeber||f.name||(f.tags&&f.tags.length)||f.abwerbeschutz!=null||f.mitProfil){ const det=document.getElementById('rmErweitert'); if(det) det.open=true; }
+}
+
 function rmFirmTypToggle(chip) {
   const typ = chip.dataset.typ;
   if (_rmFirmTyp.has(typ)) {
