@@ -18,4 +18,8 @@ recruiting_app.html
 _backup_db/
 _stufe2_dubletten.json
 _stufe2_*.py
+_stufe4_*.py
 UEBERGABE_rollen_stufe2_plan.md
+
+# Lokale Vorschau-Hilfe (Auto-Login, enthält Zugangsdaten) — NIEMALS committen
+_dev_autologin.js

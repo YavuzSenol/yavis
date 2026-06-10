@@ -1150,7 +1150,19 @@ function toggleTheme(){
 
 const cfg = { url: localStorage.getItem('sb_url'), key: localStorage.getItem('sb_key') };
 
+function _ladeDevLogin(){
+  return new Promise(res=>{
+    const s=document.createElement('script'); s.src='_dev_autologin.js';
+    s.onload=()=>res(); s.onerror=()=>res(); // Datei fehlt (z.B. live) -> einfach weiter
+    document.head.appendChild(s);
+  });
+}
 async function init(){
+  // Auto-Login NUR in der lokalen Vorschau (localhost); Datei ist gitignored, auf der Live-Seite nicht vorhanden
+  if(location.hostname==='localhost'||location.hostname==='127.0.0.1'){
+    await _ladeDevLogin();
+    if(window._DEV){ try{ localStorage.setItem('sb_url',_DEV.url); localStorage.setItem('sb_key',_DEV.key); cfg.url=_DEV.url; cfg.key=_DEV.key; }catch(e){} }
+  }
   if(cfg.url && cfg.key){
     try { sb = supabase.createClient(cfg.url, cfg.key); } catch(e) {
       document.getElementById('setup').style.display='block'; return;
@@ -1165,7 +1177,11 @@ async function init(){
 async function pruefeLogin(){
   try {
     const res = await sb.auth.getSession();
-    const session = res?.data?.session;
+    let session = res?.data?.session;
+    // Vorschau: automatisch anmelden, wenn noch keine Session
+    if(!session && window._DEV){
+      try{ const {data}=await sb.auth.signInWithPassword({email:_DEV.email,password:_DEV.password}); session=data?.session||null; }catch(e){}
+    }
     if(session){
       zeigeApp();
     } else {
