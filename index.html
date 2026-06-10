@@ -268,6 +268,20 @@
       <button class="neuBtn" onclick="neuerKandidat()">+ Neuer Kandidat</button>
       <button class="neuBtn" onclick="profilEinlesenStart()" title="LinkedIn/XING-Profil oder Text einfügen → KI legt Kandidat an">📋 Aus Profil/Text</button>
     </div>
+    <style>
+      .rchip{padding:5px 12px;border-radius:16px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;font-size:13px;user-select:none}
+      .rchip.on{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700}
+      .role-badge{display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;margin-left:6px;vertical-align:middle}
+      .role-badge.ansp{background:#2a2150;color:#b9a8f0;border:1px solid #4a3a8c}
+      .role-badge.kand{background:#1e3a2e;color:#6ee7a8;border:1px solid #2e6b4a}
+    </style>
+    <div class="rfilter" id="rolleFilterBar" style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin:-2px 0 12px">
+      <span style="font-size:12px;color:var(--muted);margin-right:2px">Rolle:</span>
+      <span class="rchip on" data-rolle="alle" onclick="setRolleFilter('alle')">Alle</span>
+      <span class="rchip" data-rolle="kandidat" onclick="setRolleFilter('kandidat')">Kandidat</span>
+      <span class="rchip" data-rolle="ansprechpartner" onclick="setRolleFilter('ansprechpartner')">👔 Ansprechpartner</span>
+      <span class="rchip" data-rolle="doppel" onclick="setRolleFilter('doppel')">Doppelrolle</span>
+    </div>
     <div style="margin:-4px 0 12px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="kPosUnter" onchange="ladeKandidaten()" style="min-width:auto;width:14px;height:14px;padding:0;margin:0">Position ＋ niedrigere einbeziehen</label>
       <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="kMitProfil" onchange="nachfassToggle()" style="min-width:auto;width:14px;height:14px;padding:0;margin:0">🔗 nur mit XING/LinkedIn-Profil</label>
@@ -1638,6 +1652,22 @@ function nachfassToggle(){
   ladeKandidaten();
 }
 
+// ===== Rollen-Filter (Stufe 2) =====
+let rolleFilter='alle';
+function setRolleFilter(v){
+  rolleFilter=v;
+  document.querySelectorAll('#rolleFilterBar .rchip').forEach(c=>c.classList.toggle('on', c.dataset.rolle===v));
+  ladeKandidaten();
+}
+function rolleMatch(r){
+  const ro=(r.rollen||'');
+  if(rolleFilter==='kandidat') return ro.includes(';Kandidat;');
+  if(rolleFilter==='ansprechpartner') return ro.includes(';Ansprechpartner;');
+  if(rolleFilter==='doppel') return ro.includes(';Kandidat;')&&ro.includes(';Ansprechpartner;');
+  return true;
+}
+function rolleLabel(){ return ({kandidat:' · Rolle: Kandidat',ansprechpartner:' · Rolle: Ansprechpartner',doppel:' · Doppelrolle'})[rolleFilter]||''; }
+
 async function ladeKandidaten(){
   await ladeAuftraggeberNamen();
   selectedKandIds.clear(); updateSelBar();
@@ -1667,7 +1697,7 @@ async function ladeKandidaten(){
     if(posListe) rows=rows.filter(r=>posListe.includes(r.berufsbezeichnung));
     // Die Umkreis-Funktion liefert nur Basisfelder → volle Datensätze nachladen,
     // wenn Tag-Filter aktiv ist ODER Spalten angezeigt werden, die sie nicht enthält.
-    if(rows.length && (tagFilterAktiv() || brauchtVolleDaten() || luecke || mitProfil || nurHot)){
+    if(rows.length && (tagFilterAktiv() || brauchtVolleDaten() || luecke || mitProfil || nurHot || rolleFilter!=='alle')){
       const ids=rows.map(r=>r.id); const map={};
       for(let i=0;i<ids.length;i+=300){ const teil=ids.slice(i,i+300);
         const {data:td}=await sb.from('kandidaten').select('*').in('id',teil);
@@ -1678,7 +1708,8 @@ async function ladeKandidaten(){
     if(luecke) rows=rows.filter(r=>lueckeMatch(r,luecke));
     if(mitProfil) rows=rows.filter(r=>hatProfil(r));
     if(nurHot) rows=rows.filter(r=>r.ist_hot);
-    document.getElementById('kCount').textContent=rows.length+' Kandidaten im Umkreis von '+radius+' km um '+plz+posLabel+lueckeLabel+profilLabel+hotLabel+tagFilterLabel();
+    if(rolleFilter!=='alle') rows=rows.filter(rolleMatch);
+    document.getElementById('kCount').textContent=rows.length+' Kandidaten im Umkreis von '+radius+' km um '+plz+posLabel+lueckeLabel+profilLabel+hotLabel+tagFilterLabel()+rolleLabel();
     rows.forEach(r=>body.appendChild(zeileKandidat(r,true)));
     if(!rows.length) body.innerHTML='<tr><td colspan="'+spaltenAnzahl()+'" class="empty">Keine Treffer.</td></tr>';
     return;
@@ -1700,10 +1731,13 @@ async function ladeKandidaten(){
     else if(tmod==='nicht') tagFilter.forEach(t=>{ query=query.not('tags','ilike',`%;${t};%`); });
     else tagFilter.forEach(t=>{ query=query.ilike('tags','%;'+t+';%'); }); // und
   }
+  if(rolleFilter==='kandidat') query=query.ilike('rollen','%;Kandidat;%');
+  else if(rolleFilter==='ansprechpartner') query=query.ilike('rollen','%;Ansprechpartner;%');
+  else if(rolleFilter==='doppel') query=query.ilike('rollen','%;Kandidat;%').ilike('rollen','%;Ansprechpartner;%');
   query=query.order('letzte_aktivitaet',{ascending:false,nullsFirst:false});
   const {data,error}=await query;
   if(error){document.getElementById('kCount').textContent='Fehler: '+error.message;return;}
-  document.getElementById('kCount').textContent=(data.length)+' Kandidaten'+(data.length>=200?' (erste 200)':'')+posLabel+lueckeLabel+profilLabel+hotLabel+tagFilterLabel();
+  document.getElementById('kCount').textContent=(data.length)+' Kandidaten'+(data.length>=200?' (erste 200)':'')+posLabel+lueckeLabel+profilLabel+hotLabel+tagFilterLabel()+rolleLabel();
   data.forEach(r=>body.appendChild(zeileKandidat(r,false)));
   if(!data.length) body.innerHTML='<tr><td colspan="'+spaltenAnzahl()+'" class="empty">Keine Treffer.</td></tr>';
 }
@@ -2038,7 +2072,7 @@ async function ladeWiedervorlagen(){
 function telLink(nr){ if(!nr) return '–'; const c=String(nr).replace(/[^\d+]/g,'');
   return `<a class="calllink" href="tel:${c}" onclick="event.stopPropagation()">${esc(nr)}</a>`; }
 const SPALTEN_DEF=[
-  {key:'voller_name', label:'Name', render:r=>`${istGeschuetzt(r)?'🔒 ':''}${r.ist_hot?'<span class="pill hot">HOT</span> ':''}${esc(r.voller_name)||'–'}`},
+  {key:'voller_name', label:'Name', render:r=>`${istGeschuetzt(r)?'🔒 ':''}${r.ist_hot?'<span class="pill hot">HOT</span> ':''}${esc(r.voller_name)||'–'}${(r.rollen||'').includes(';Ansprechpartner;')?'<span class="role-badge ansp">👔 AP</span>':''}`},
   {key:'nachname', label:'Nachname', render:r=>esc(r.nachname)||'–'},
   {key:'vorname', label:'Vorname', render:r=>esc(r.vorname)||'–'},
   {key:'berufsbezeichnung', label:'Berufsbezeichnung', render:r=>esc(r.berufsbezeichnung)||'–'},
