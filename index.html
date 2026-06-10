@@ -474,7 +474,7 @@
             <option>25</option><option selected>50</option><option>75</option><option>100</option><option>150</option>
           </select>
         </div>
-        <div>
+        <div style="display:none">
           <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Status</div>
           <select id="rmStatus" style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
             <option value="">alle Status</option>
@@ -525,15 +525,10 @@
           </div>
           <div>
             <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Bundesland</div>
-            <input id="rmBundesland" placeholder="z.B. NRW" onkeydown="if(event.key==='Enter')rechercheAusfuehren()"
-                   style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:110px">
-          </div>
-          <div>
-            <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Wertung mind.</div>
-            <select id="rmWertung" style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
-              <option value="">egal</option><option value="1">★ 1+</option><option value="2">★★ 2+</option>
-              <option value="3">★★★ 3+</option><option value="4">★★★★ 4+</option><option value="5">★★★★★ 5</option>
-            </select>
+            <div class="msdd" id="rmBundeslandDD">
+              <button type="button" class="msdd-btn" id="rmBundeslandDD-btn" onclick="msddToggle('rmBundeslandDD')" style="min-width:140px">alle Bundesländer ▾</button>
+              <div class="msdd-panel" id="rmBundeslandDD-panel" style="display:none"></div>
+            </div>
           </div>
           <div>
             <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Kein Kontakt seit</div>
@@ -560,8 +555,10 @@
           </div>
           <div>
             <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Quelle</div>
-            <input id="rmQuelle" placeholder="z.B. XING" onkeydown="if(event.key==='Enter')rechercheAusfuehren()"
-                   style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:110px">
+            <div class="msdd" id="rmQuelleDD">
+              <button type="button" class="msdd-btn" id="rmQuelleDD-btn" onclick="msddToggle('rmQuelleDD')" style="min-width:130px">alle Quellen ▾</button>
+              <div class="msdd-panel" id="rmQuelleDD-panel" style="display:none"></div>
+            </div>
           </div>
           <div>
             <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Weitere</div>
@@ -7027,6 +7024,8 @@ function zeigeRechercheMaske() {
     });
   }
   _rmExWertFuellen();
+  _rmFuelleAusFeld('rmBundeslandDD','bundesland','alle Bundesländer');
+  _rmFuelleAusFeld('rmQuelleDD','quelle','alle Quellen');
 }
 
 // Ausschluss-Dropdown (int. Wertung) aus echten DB-Werten füllen, Standard-Ausschlüsse vorausgewählt
@@ -7040,6 +7039,17 @@ async function _rmExWertFuellen(){
   }catch(e){}
   const opts=[...werte].sort((a,b)=>a.localeCompare(b,'de',{sensitivity:'base'}));
   msddBuild('rmExWertDD', opts, _rmExWertStd, 'keine Ausschlüsse', null);
+}
+// Generisch: Mehrfach-Dropdown aus distinct DB-Werten eines Feldes füllen
+async function _rmFuelleAusFeld(ddId, feld, labelAll){
+  const panel=document.getElementById(ddId+'-panel'); if(!panel||panel.dataset.filled) return;
+  const werte=new Set();
+  try{
+    const {data}=await sb.from('kandidaten').select(feld).not(feld,'is',null).limit(3000);
+    (data||[]).forEach(r=>{ const v=String(r[feld]||'').trim(); if(v) werte.add(v); });
+  }catch(e){}
+  const opts=[...werte].sort((a,b)=>a.localeCompare(b,'de',{sensitivity:'base'}));
+  msddBuild(ddId, opts, [], labelAll, null);
 }
 
 function rmChipToggle(chip, pos) {
@@ -7073,15 +7083,14 @@ async function rechercheMaskeAusfuehren() {
   const freitext    = (document.getElementById('rmFreitext')?.value    || '').trim();
   const arbeitgeber = (document.getElementById('rmArbeitgeber')?.value || '').trim();
   const tags        = (document.getElementById('rmTags')?.value        || '').trim();
-  const bundesland  = (document.getElementById('rmBundesland')?.value  || '').trim();
-  const wertung     = parseInt(document.getElementById('rmWertung')?.value||'0')||0;
+  const bundesland  = msddSel('rmBundeslandDD');
   const keinKontakt = parseInt(document.getElementById('rmKeinKontakt')?.value||'0')||0;
   const gehalt      = parseInt(document.getElementById('rmGehalt')?.value||'0')||0;
   const erfahrung   = parseInt(document.getElementById('rmErfahrung')?.value||'0')||0;
   const istHot      = !!(document.getElementById('rmIstHot')?.checked);
   const hatProfil   = !!(document.getElementById('rmHatProfil')?.checked);
   const abwSchutz   = document.getElementById('rmAbwerbeschutz')?.value||'';
-  const quelle      = (document.getElementById('rmQuelle')?.value      || '').trim();
+  const quelle      = msddSel('rmQuelleDD');
 
   let rows = [];
 
@@ -7092,7 +7101,7 @@ async function rechercheMaskeAusfuehren() {
     if (error) { anzEl.textContent = 'Fehler: ' + error.message; return; }
     const rpcRows = data || [];
     // Volle Datensätze nachladen wenn Client-Filter nötig
-    const brauchtVoll = _rmGewaehltePos.size || statusVal || hatMail || hatTel || ausschluss.length || umzugVal;
+    const brauchtVoll = _rmGewaehltePos.size || statusVal || hatMail || hatTel || ausschluss.length || umzugVal || bundesland.length || quelle.length;
     if (rpcRows.length && brauchtVoll) {
       const ids = rpcRows.map(r => r.id);
       const map = {};
@@ -7113,15 +7122,14 @@ async function rechercheMaskeAusfuehren() {
     if (statusVal)            q = q.eq('status', statusVal);
     if (arbeitgeber)  q = q.ilike('arbeitgeber', `%${arbeitgeber}%`);
     if (tags)         q = q.ilike('tags', `%${tags}%`);
-    if (bundesland)   q = q.ilike('bundesland', `%${bundesland}%`);
-    if (wertung)      q = q.gte('wertung', wertung);
+    if (bundesland.length) q = q.in('bundesland', bundesland);
     if (gehalt)       q = q.lte('gehalt_erwartet', gehalt);
     if (erfahrung)    q = q.gte('erfahrung_jahre', erfahrung);
     if (istHot)       q = q.eq('ist_hot', true);
     if (hatProfil)    q = q.or('xing_profil.ilike.%http%,linkedin_profil.ilike.%http%');
     if (abwSchutz==='ja')   q = q.eq('abwerbeschutz', true);
     if (abwSchutz==='nein') q = q.eq('abwerbeschutz', false);
-    if (quelle)       q = q.ilike('quelle', `%${quelle}%`);
+    if (quelle.length) q = q.in('quelle', quelle);
     if (freitext)     q = q.or(`voller_name.ilike.%${freitext}%,arbeitgeber.ilike.%${freitext}%,faehigkeiten.ilike.%${freitext}%,stadt.ilike.%${freitext}%`);
     const { data, error } = await q;
     if (error) { anzEl.textContent = 'Fehler: ' + error.message; return; }
@@ -7147,15 +7155,14 @@ async function rechercheMaskeAusfuehren() {
   if (freitext)    { const fl=freitext.toLowerCase(); rows=rows.filter(r=>(r.voller_name||'').toLowerCase().includes(fl)||(r.arbeitgeber||'').toLowerCase().includes(fl)||(r.faehigkeiten||'').toLowerCase().includes(fl)||(r.stadt||'').toLowerCase().includes(fl)); }
   if (arbeitgeber) { const al=arbeitgeber.toLowerCase(); rows=rows.filter(r=>(r.arbeitgeber||'').toLowerCase().includes(al)); }
   if (tags)        { const tl=tags.toLowerCase(); rows=rows.filter(r=>(r.tags||'').toLowerCase().includes(tl)); }
-  if (bundesland)  { const bl=bundesland.toLowerCase(); rows=rows.filter(r=>(r.bundesland||'').toLowerCase().includes(bl)); }
-  if (wertung)     rows=rows.filter(r=>(r.wertung||0)>=wertung);
+  if (bundesland.length) rows=rows.filter(r=>bundesland.includes(r.bundesland));
   if (gehalt)      rows=rows.filter(r=>!r.gehalt_erwartet||(r.gehalt_erwartet<=gehalt));
   if (erfahrung)   rows=rows.filter(r=>(r.erfahrung_jahre||0)>=erfahrung);
   if (istHot)      rows=rows.filter(r=>r.ist_hot);
   if (hatProfil)   rows=rows.filter(r=>(r.xing_profil||'').includes('http')||(r.linkedin_profil||'').includes('http'));
   if (abwSchutz==='ja')   rows=rows.filter(r=>r.abwerbeschutz);
   if (abwSchutz==='nein') rows=rows.filter(r=>!r.abwerbeschutz);
-  if (quelle)      { const ql=quelle.toLowerCase(); rows=rows.filter(r=>(r.quelle||'').toLowerCase().includes(ql)); }
+  if (quelle.length) rows=rows.filter(r=>quelle.includes(r.quelle));
   if (keinKontakt) { const cutoff=new Date(); cutoff.setDate(cutoff.getDate()-keinKontakt); rows=rows.filter(r=>!r.letzte_aktivitaet||new Date(r.letzte_aktivitaet)<cutoff); }
 
   // ----------- Ergebnis-Label -----------
@@ -7255,8 +7262,9 @@ function rechercheMaskeZuruecksetzen() {
   });
   document.querySelectorAll('#rmExWertDD-panel input').forEach(c=>{ c.checked=_rmExWertStd.includes(c.value); });
   msddUpdateLabel('rmExWertDD');
-  ['rmFreitext','rmArbeitgeber','rmTags','rmBundesland','rmGehalt','rmErfahrung','rmQuelle'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
-  ['rmWertung','rmKeinKontakt','rmAbwerbeschutz'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  ['rmFreitext','rmArbeitgeber','rmTags','rmGehalt','rmErfahrung'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  ['rmKeinKontakt','rmAbwerbeschutz'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  msddClear('rmBundeslandDD'); msddClear('rmQuelleDD');
   ['rmIstHot','rmHatProfil'].forEach(id=>{const e=document.getElementById(id);if(e)e.checked=false;});
   const anzEl = document.getElementById('rmAnzahl'); if (anzEl) anzEl.textContent = '';
   const bodyEl = document.getElementById('rmBody'); if (bodyEl) bodyEl.innerHTML = '';
