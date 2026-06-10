@@ -268,10 +268,10 @@
       .rchip.on{background:var(--panel2);color:var(--accent);border-color:var(--accent);font-weight:600}
       .msdd{position:relative;display:inline-block}
       .msdd-btn{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:8px 12px;font-size:14px;cursor:pointer;min-width:170px;text-align:left}
-      .msdd-panel{position:absolute;z-index:40;top:calc(100% + 3px);left:0;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px;max-height:300px;overflow:auto;min-width:230px;box-shadow:0 6px 18px rgba(0,0,0,.35)}
-      .msdd-opt{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:4px;font-size:13px;cursor:pointer;white-space:nowrap}
+      .msdd-panel{position:absolute;z-index:40;top:calc(100% + 3px);left:0;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:5px;max-height:320px;overflow:auto;min-width:170px;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+      .msdd-opt{display:flex;align-items:center;gap:7px;padding:4px 7px;border-radius:4px;font-size:13px;cursor:pointer;white-space:nowrap}
       .msdd-opt:hover{background:var(--panel2)}
-      .msdd-opt input{width:15px;height:15px;cursor:pointer;accent-color:var(--accent)}
+      .msdd-opt input[type=checkbox]{width:16px;height:16px;min-width:16px;flex:0 0 16px;margin:0;cursor:pointer;accent-color:var(--accent)}
       .msdd-foot{display:flex;justify-content:space-between;gap:8px;padding:6px 4px 2px;border-top:1px solid var(--line);margin-top:4px}
       .msdd-foot button{background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer}
     </style>
@@ -468,7 +468,10 @@
       </div>
       <div style="margin-bottom:18px">
         <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Position (Mehrfachauswahl)</div>
-        <div id="rmPosCont" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+        <div class="msdd" id="rmPosDD">
+          <button type="button" class="msdd-btn" id="rmPosDD-btn" onclick="msddToggle('rmPosDD')" style="min-width:200px">alle Positionen ▾</button>
+          <div class="msdd-panel" id="rmPosDD-panel" style="display:none"></div>
+        </div>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;margin-bottom:14px">
         <div>
@@ -495,11 +498,11 @@
         </div>
         <div>
           <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Erreichbarkeit</div>
-          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:5px">
-            <input type="checkbox" id="rmHatMail" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)"> ✉ E-Mail
+          <label title="hat irgendeine E-Mail-Adresse (privat ODER beruflich ODER zweite)" style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:5px">
+            <input type="checkbox" id="rmHatMail" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)"> ✉ hat E-Mail (egal welche)
           </label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
-            <input type="checkbox" id="rmHatTel" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)"> ☎ Tel/Mobil
+          <label title="hat irgendeine Nummer: Festnetz, Mobil, privat ODER beruflich" style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+            <input type="checkbox" id="rmHatTel" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)"> ☎ hat Telefon/Mobil (egal welche)
           </label>
         </div>
         <div style="min-width:200px">
@@ -511,9 +514,9 @@
         </div>
       </div>
       <!-- Erweiterte Filter -->
-      <details id="rmErweitert" style="margin-top:4px">
+      <details id="rmErweitert" open style="margin-top:4px">
         <summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);padding:8px 0;user-select:none;list-style:none">
-          ▶ Erweiterte Filter
+          ⚙️ Weitere Filter (Gehalt · Erfahrung · Alter · Qualifikation · Studiengang · Tags · Quelle …) — klicken zum Ein-/Ausklappen
         </summary>
         <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;padding:12px 0 4px;border-top:1px solid var(--line);margin-top:4px">
           <div>
@@ -630,8 +633,8 @@
                  style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:130px">
         </div>
         <div>
-          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Bundesland / Stadt</div>
-          <input id="rmFirmOrt" placeholder="z.B. NRW oder Köln" onkeydown="if(event.key==='Enter')rechercheAusfuehren()"
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Stadt</div>
+          <input id="rmFirmOrt" placeholder="z.B. Köln" onkeydown="if(event.key==='Enter')rechercheAusfuehren()"
                  style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:150px">
         </div>
         <div>
@@ -6846,7 +6849,7 @@ async function rechercheFirmenAusfuehren() {
     if (typen.length>1) rows=rows.filter(r=>typen.includes(r.typ));
     if (suche) {const sl=suche.toLowerCase();rows=rows.filter(r=>(r.name||'').toLowerCase().includes(sl)||(r.branche||'').toLowerCase().includes(sl)||(r.stadt||'').toLowerCase().includes(sl));}
     if (branche){const bl=branche.toLowerCase();rows=rows.filter(r=>(r.branche||'').toLowerCase().includes(bl));}
-    if (ort) {const ol=ort.toLowerCase();rows=rows.filter(r=>(r.stadt||'').toLowerCase().includes(ol)||(r.bundesland||'').toLowerCase().includes(ol));}
+    if (ort) {const ol=ort.toLowerCase();rows=rows.filter(r=>(r.stadt||'').toLowerCase().includes(ol));}
     rows.sort((a,b)=>haversineKm(cLat,cLng,a.lat,a.lng)-haversineKm(cLat,cLng,b.lat,b.lng));
     anzEl.textContent=rows.length+' Firmen im Umkreis von '+radius+' km um '+plz;
     rmRenderFirmen(bodyEl,rows,cLat,cLng); return;
@@ -6856,7 +6859,7 @@ async function rechercheFirmenAusfuehren() {
   if (typen.length===1) q=q.eq('typ',typen[0]);
   if (suche) q=q.or(`name.ilike.%${suche}%,branche.ilike.%${suche}%,stadt.ilike.%${suche}%`);
   if (branche&&!suche) q=q.ilike('branche',`%${branche}%`);
-  if (ort) q=q.or(`stadt.ilike.%${ort}%,bundesland.ilike.%${ort}%`);
+  if (ort) q=q.ilike('stadt',`%${ort}%`);
   const {data,error}=await q;
   if (error) { anzEl.textContent='Fehler: '+error.message; return; }
   let rows=data||[];
@@ -7031,32 +7034,11 @@ function rmFirmTypToggle(chip) {
   }
 }
 
+function _rmPosSync(){ _rmGewaehltePos.clear(); msddSel('rmPosDD').forEach(p=>_rmGewaehltePos.add(p)); }
 function zeigeRechercheMaske() {
-  const cont = document.getElementById('rmPosCont');
-  if (!cont) return;
-  if (!cont.childElementCount) {
-    // Chips beim ersten Öffnen rendern
-    POSITIONEN_LISTE.forEach(p => {
-      const chip = document.createElement('button');
-      chip.textContent = p;
-      chip.dataset.pos = p;
-      chip.style.cssText = 'padding:5px 12px;border-radius:20px;cursor:pointer;font-size:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);white-space:nowrap';
-      if (_rmGewaehltePos.has(p)) {
-        chip.style.background = 'var(--accent2)';
-        chip.style.borderColor = 'var(--accent2)';
-        chip.style.color = '#fff';
-      }
-      chip.onclick = () => rmChipToggle(chip, p);
-      cont.appendChild(chip);
-    });
-  } else {
-    // Chip-Zustände synchronisieren (nach Zurücksetzen)
-    cont.querySelectorAll('[data-pos]').forEach(chip => {
-      const aktiv = _rmGewaehltePos.has(chip.dataset.pos);
-      chip.style.background   = aktiv ? 'var(--accent2)' : 'var(--bg)';
-      chip.style.borderColor  = aktiv ? 'var(--accent2)' : 'var(--line)';
-      chip.style.color        = aktiv ? '#fff'           : 'var(--ink)';
-    });
+  // Position als Mehrfach-Auswahl-Dropdown (Auswahl gespiegelt in _rmGewaehltePos)
+  if (document.getElementById('rmPosDD-panel')) {
+    msddBuild('rmPosDD', POSITIONEN_LISTE, [..._rmGewaehltePos], 'alle Positionen', _rmPosSync);
   }
   // rmStatus-Dropdown mit aktueller Status-Liste befuellen
   const rmSel = document.getElementById('rmStatus');
@@ -7359,12 +7341,7 @@ function rechercheCsvExport() {
 
 function rechercheMaskeZuruecksetzen() {
   _rmGewaehltePos.clear();
-  const cont = document.getElementById('rmPosCont');
-  if (cont) cont.querySelectorAll('[data-pos]').forEach(c => {
-    c.style.background  = 'var(--bg)';
-    c.style.borderColor = 'var(--line)';
-    c.style.color       = 'var(--ink)';
-  });
+  if (document.getElementById('rmPosDD-panel')) msddBuild('rmPosDD', POSITIONEN_LISTE, [], 'alle Positionen', _rmPosSync);
   ['rmPlz', 'rmUmzug'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
