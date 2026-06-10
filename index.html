@@ -506,13 +506,24 @@
                  style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:150px">
         </div>
         <div>
-          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Erreichbarkeit</div>
-          <label title="hat irgendeine E-Mail-Adresse (privat ODER beruflich ODER zweite)" style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:5px">
-            <input type="checkbox" id="rmHatMail" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)"> ✉ hat E-Mail (egal welche)
-          </label>
-          <label title="hat irgendeine Nummer: Festnetz, Mobil, privat ODER beruflich" style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
-            <input type="checkbox" id="rmHatTel" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)"> ☎ hat Telefon/Mobil (egal welche)
-          </label>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">✉ E-Mail</div>
+          <select id="rmMail" style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
+            <option value="">egal</option>
+            <option value="irgendeine">hat irgendeine</option>
+            <option value="privat">hat private</option>
+            <option value="beruflich">hat berufliche</option>
+          </select>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">☎ Telefon</div>
+          <select id="rmTel" style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
+            <option value="">egal</option>
+            <option value="irgendeine">hat irgendeine</option>
+            <option value="mobil">hat Mobil</option>
+            <option value="festnetz">hat Festnetz</option>
+            <option value="mobilpriv">hat Mobil privat</option>
+            <option value="mobilberuf">hat Mobil beruflich</option>
+          </select>
         </div>
         <div style="min-width:200px">
           <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Ausschließen (Wertung)</div>
@@ -7097,6 +7108,10 @@ function _alterAus(geb){
   const m=now.getMonth()-d.getMonth(); if(m<0||(m===0&&now.getDate()<d.getDate())) a--;
   return a;
 }
+// Erreichbarkeit: granulare Prüf-Helfer
+function _v(x){ return !!(x&&String(x).trim()); }
+function _mailOk(r,mode){ if(mode==='privat')return _v(r.email); if(mode==='beruflich')return _v(r.email_beruflich); if(mode==='irgendeine')return _v(r.email)||_v(r.email_beruflich)||_v(r.email_zweit); return true; }
+function _telOk(r,mode){ if(mode==='mobil')return _v(r.mobil)||_v(r.mobil_privat); if(mode==='festnetz')return _v(r.telefon)||_v(r.telefon_privat); if(mode==='mobilpriv')return _v(r.mobil_privat); if(mode==='mobilberuf')return _v(r.mobil); if(mode==='irgendeine')return _v(r.mobil)||_v(r.mobil_privat)||_v(r.telefon)||_v(r.telefon_privat); return true; }
 // IDs aller Personen mit mindestens einem Dokument (einmal laden, dann cachen)
 let _dokIdsCache=null;
 async function _ladeDokIds(){
@@ -7116,7 +7131,7 @@ function rmFilterLesen(){
   return {
     pos:[..._rmGewaehltePos],
     plz:g('rmPlz')?.value||'', radius:g('rmRadius')?.value||'50', umzug:g('rmUmzug')?.value||'',
-    hatMail:!!g('rmHatMail')?.checked, hatTel:!!g('rmHatTel')?.checked,
+    mailMode:g('rmMail')?.value||'', telMode:g('rmTel')?.value||'',
     ausschluss:msddSel('rmExWertDD'), freitext:g('rmFreitext')?.value||'', arbeitgeber:g('rmArbeitgeber')?.value||'',
     tags:g('rmTags')?.value||'', bundesland:msddSel('rmBundeslandDD'), keinKontakt:g('rmKeinKontakt')?.value||'',
     gehaltVon:g('rmGehaltVon')?.value||'', gehaltBis:g('rmGehaltBis')?.value||'',
@@ -7135,7 +7150,7 @@ function rmFilterSetzen(f){
   const ck=(id,v)=>{ const e=document.getElementById(id); if(e) e.checked=!!v; };
   _rmGewaehltePos.clear(); (f.pos||[]).forEach(p=>_rmGewaehltePos.add(p)); zeigeRechercheMaske();
   sv('rmPlz',f.plz); sv('rmRadius',f.radius||'50'); sv('rmUmzug',f.umzug);
-  ck('rmHatMail',f.hatMail); ck('rmHatTel',f.hatTel);
+  sv('rmMail',f.mailMode); sv('rmTel',f.telMode);
   sv('rmFreitext',f.freitext); sv('rmArbeitgeber',f.arbeitgeber); sv('rmTags',f.tags); sv('rmKeinKontakt',f.keinKontakt);
   sv('rmGehaltVon',f.gehaltVon); sv('rmGehaltBis',f.gehaltBis); sv('rmErfVon',f.erfVon); sv('rmErfBis',f.erfBis);
   sv('rmAlterVon',f.alterVon); sv('rmAlterBis',f.alterBis); sv('rmQualifikation',f.qualifikation); sv('rmStudiengang',f.studiengang);
@@ -7178,8 +7193,8 @@ async function rechercheMaskeAusfuehren() {
 
   const plz       = (document.getElementById('rmPlz').value       || '').trim();
   const radius    =  document.getElementById('rmRadius').value;
-  const hatMail   =  document.getElementById('rmHatMail').checked;
-  const hatTel    =  document.getElementById('rmHatTel').checked;
+  const mailMode  = document.getElementById('rmMail')?.value||'';
+  const telMode   = document.getElementById('rmTel')?.value||'';
   const statusVal =  document.getElementById('rmStatus').value;
   const umzugVal  = (document.getElementById('rmUmzug').value      || '').trim();
   const ausschluss = msddSel('rmExWertDD').map(s => s.trim().toLowerCase()).filter(Boolean);
@@ -7210,7 +7225,7 @@ async function rechercheMaskeAusfuehren() {
     if (error) { anzEl.textContent = 'Fehler: ' + error.message; return; }
     const rpcRows = data || [];
     // Volle Datensätze nachladen wenn Client-Filter nötig
-    const brauchtVoll = _rmGewaehltePos.size || statusVal || hatMail || hatTel || ausschluss.length || umzugVal || bundesland.length || quelle.length || gehaltVon!=null || gehaltBis!=null || erfVon!=null || erfBis!=null || alterVon!=null || alterBis!=null || qualifikation || studiengang || rolle || hatDok;
+    const brauchtVoll = _rmGewaehltePos.size || statusVal || mailMode || telMode || ausschluss.length || umzugVal || bundesland.length || quelle.length || gehaltVon!=null || gehaltBis!=null || erfVon!=null || erfBis!=null || alterVon!=null || alterBis!=null || qualifikation || studiengang || rolle || hatDok;
     if (rpcRows.length && brauchtVoll) {
       const ids = rpcRows.map(r => r.id);
       const map = {};
@@ -7243,6 +7258,14 @@ async function rechercheMaskeAusfuehren() {
     else if (rolle==='ansprechpartner') q = q.ilike('rollen','%;Ansprechpartner;%');
     else if (rolle==='doppel')     q = q.ilike('rollen','%;Kandidat;%').ilike('rollen','%;Ansprechpartner;%');
     if (hatDok)       q = q.in('id', [...await _ladeDokIds()]);
+    if (mailMode==='privat')        q = q.not('email','is',null).neq('email','');
+    else if (mailMode==='beruflich') q = q.not('email_beruflich','is',null).neq('email_beruflich','');
+    else if (mailMode==='irgendeine') q = q.or('email.not.is.null,email_beruflich.not.is.null,email_zweit.not.is.null');
+    if (telMode==='mobil')          q = q.or('mobil.not.is.null,mobil_privat.not.is.null');
+    else if (telMode==='festnetz')  q = q.or('telefon.not.is.null,telefon_privat.not.is.null');
+    else if (telMode==='mobilpriv') q = q.not('mobil_privat','is',null).neq('mobil_privat','');
+    else if (telMode==='mobilberuf') q = q.not('mobil','is',null).neq('mobil','');
+    else if (telMode==='irgendeine') q = q.or('mobil.not.is.null,mobil_privat.not.is.null,telefon.not.is.null,telefon_privat.not.is.null');
     if (freitext)     q = q.or(`voller_name.ilike.%${freitext}%,arbeitgeber.ilike.%${freitext}%,faehigkeiten.ilike.%${freitext}%,stadt.ilike.%${freitext}%`);
     const { data, error } = await q;
     if (error) { anzEl.textContent = 'Fehler: ' + error.message; return; }
@@ -7252,8 +7275,8 @@ async function rechercheMaskeAusfuehren() {
   // ----------- Client-seitige Filter -----------
   if (plz && _rmGewaehltePos.size) rows = rows.filter(r => _rmGewaehltePos.has(r.berufsbezeichnung));
   if (plz && statusVal)            rows = rows.filter(r => r.status === statusVal);
-  if (hatMail)  rows = rows.filter(r => r.email || r.email_beruflich || r.email_zweit);
-  if (hatTel)   rows = rows.filter(r => r.mobil || r.mobil_privat || r.telefon || r.telefon_privat);
+  if (mailMode) rows = rows.filter(r=>_mailOk(r,mailMode));
+  if (telMode)  rows = rows.filter(r=>_telOk(r,telMode));
   if (umzugVal) {
     const ul = umzugVal.toLowerCase();
     rows = rows.filter(r => (r.umzugsbereitschaft || '').toLowerCase().includes(ul));
@@ -7410,8 +7433,8 @@ function rechercheMaskeZuruecksetzen() {
     const el = document.getElementById(id); if (el) el.value = '';
   });
   const sel = document.getElementById('rmStatus'); if (sel) sel.value = '';
-  ['rmHatMail', 'rmHatTel'].forEach(id => {
-    const el = document.getElementById(id); if (el) el.checked = false;
+  ['rmMail', 'rmTel'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
   });
   document.querySelectorAll('#rmExWertDD-panel input').forEach(c=>{ c.checked=_rmExWertStd.includes(c.value); });
   msddUpdateLabel('rmExWertDD');
