@@ -458,6 +458,14 @@
 
     <!-- ===== PANEL: KANDIDATEN ===== -->
     <div id="rmPanel-kandidaten" class="card" style="margin-bottom:16px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--line)">
+        <span style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">💾 Gespeicherte Suchen</span>
+        <select id="rmSuchenSel" onchange="if(this.value)rmSucheAnwenden(this.value)" style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;min-width:200px">
+          <option value="">— gespeicherte Suche wählen —</option>
+        </select>
+        <button onclick="rmSucheSpeichern()" style="padding:7px 13px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);font-size:13px;color:var(--ink)">＋ Aktuelle speichern</button>
+        <button onclick="rmSucheLoeschen()" title="Gewählte Suche löschen" style="padding:7px 11px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);font-size:13px;color:var(--ink)">🗑</button>
+      </div>
       <div style="margin-bottom:18px">
         <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Position (Mehrfachauswahl)</div>
         <div id="rmPosCont" style="display:flex;flex-wrap:wrap;gap:6px"></div>
@@ -7061,6 +7069,7 @@ function zeigeRechercheMaske() {
   _rmExWertFuellen();
   _rmFuelleAusFeld('rmBundeslandDD','bundesland','alle Bundesländer');
   _rmFuelleAusFeld('rmQuelleDD','quelle','alle Quellen');
+  rmSuchenRender();
 }
 
 // Ausschluss-Dropdown (int. Wertung) aus echten DB-Werten füllen, Standard-Ausschlüsse vorausgewählt
@@ -7094,6 +7103,49 @@ function _alterAus(geb){
   const m=now.getMonth()-d.getMonth(); if(m<0||(m===0&&now.getDate()<d.getDate())) a--;
   return a;
 }
+
+// ===== Gespeicherte Suchen (Recherche-Maske) =====
+function rmFilterLesen(){
+  const g=id=>document.getElementById(id);
+  return {
+    pos:[..._rmGewaehltePos],
+    plz:g('rmPlz')?.value||'', radius:g('rmRadius')?.value||'50', umzug:g('rmUmzug')?.value||'',
+    hatMail:!!g('rmHatMail')?.checked, hatTel:!!g('rmHatTel')?.checked,
+    ausschluss:msddSel('rmExWertDD'), freitext:g('rmFreitext')?.value||'', arbeitgeber:g('rmArbeitgeber')?.value||'',
+    tags:g('rmTags')?.value||'', bundesland:msddSel('rmBundeslandDD'), keinKontakt:g('rmKeinKontakt')?.value||'',
+    gehaltVon:g('rmGehaltVon')?.value||'', gehaltBis:g('rmGehaltBis')?.value||'',
+    erfVon:g('rmErfVon')?.value||'', erfBis:g('rmErfBis')?.value||'',
+    alterVon:g('rmAlterVon')?.value||'', alterBis:g('rmAlterBis')?.value||'',
+    qualifikation:g('rmQualifikation')?.value||'', studiengang:g('rmStudiengang')?.value||'',
+    abw:g('rmAbwerbeschutz')?.value||'', quelle:msddSel('rmQuelleDD'),
+    istHot:!!g('rmIstHot')?.checked, hatProfil:!!g('rmHatProfil')?.checked
+  };
+}
+function _msddSetSel(id, vals){ document.querySelectorAll('#'+id+'-panel input').forEach(c=>{ c.checked=(vals||[]).includes(c.value); }); msddUpdateLabel(id); }
+function rmFilterSetzen(f){
+  if(!f) return;
+  const sv=(id,v)=>{ const e=document.getElementById(id); if(e) e.value=(v==null?'':v); };
+  const ck=(id,v)=>{ const e=document.getElementById(id); if(e) e.checked=!!v; };
+  _rmGewaehltePos.clear(); (f.pos||[]).forEach(p=>_rmGewaehltePos.add(p)); zeigeRechercheMaske();
+  sv('rmPlz',f.plz); sv('rmRadius',f.radius||'50'); sv('rmUmzug',f.umzug);
+  ck('rmHatMail',f.hatMail); ck('rmHatTel',f.hatTel);
+  sv('rmFreitext',f.freitext); sv('rmArbeitgeber',f.arbeitgeber); sv('rmTags',f.tags); sv('rmKeinKontakt',f.keinKontakt);
+  sv('rmGehaltVon',f.gehaltVon); sv('rmGehaltBis',f.gehaltBis); sv('rmErfVon',f.erfVon); sv('rmErfBis',f.erfBis);
+  sv('rmAlterVon',f.alterVon); sv('rmAlterBis',f.alterBis); sv('rmQualifikation',f.qualifikation); sv('rmStudiengang',f.studiengang);
+  sv('rmAbwerbeschutz',f.abw); ck('rmIstHot',f.istHot); ck('rmHatProfil',f.hatProfil);
+  _msddSetSel('rmExWertDD', f.ausschluss); _msddSetSel('rmBundeslandDD', f.bundesland); _msddSetSel('rmQuelleDD', f.quelle);
+  const det=document.getElementById('rmErweitert'); if(det) det.open=true;
+}
+function rmSuchenLaden(){ try{ const a=JSON.parse(localStorage.getItem('yavis_recherchen')); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
+function rmSuchenSpeichern(arr){ localStorage.setItem('yavis_recherchen', JSON.stringify(arr)); }
+function rmSuchenRender(){ const sel=document.getElementById('rmSuchenSel'); if(!sel) return; const cur=sel.value; const arr=rmSuchenLaden();
+  sel.innerHTML='<option value="">— gespeicherte Suche wählen —</option>'+arr.map(s=>`<option value="${esc(s.name)}">${esc(s.name)}</option>`).join(''); sel.value=cur; }
+function rmSucheSpeichern(){ const name=(prompt('Name für diese Suche:')||'').trim(); if(!name) return;
+  const arr=rmSuchenLaden().filter(s=>s.name!==name); arr.push({name, filter:rmFilterLesen()}); rmSuchenSpeichern(arr); rmSuchenRender();
+  const sel=document.getElementById('rmSuchenSel'); if(sel) sel.value=name; zeigeMeldung('Suche „'+name+'" gespeichert ✓','ok'); }
+function rmSucheAnwenden(name){ const s=rmSuchenLaden().find(x=>x.name===name); if(!s) return; rmFilterSetzen(s.filter); rechercheAusfuehren(); }
+function rmSucheLoeschen(){ const sel=document.getElementById('rmSuchenSel'); const name=sel&&sel.value; if(!name){ zeigeMeldung('Erst eine gespeicherte Suche auswählen','warn'); return; }
+  if(!confirm('Suche „'+name+'" löschen?')) return; rmSuchenSpeichern(rmSuchenLaden().filter(x=>x.name!==name)); rmSuchenRender(); zeigeMeldung('Gelöscht','ok'); }
 
 function rmChipToggle(chip, pos) {
   if (_rmGewaehltePos.has(pos)) {
