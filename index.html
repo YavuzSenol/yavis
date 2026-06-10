@@ -215,7 +215,6 @@
   <button class="tab active" data-view="start">🏠 Start</button>
   <button class="tab" data-view="kandidaten">👥 Personen</button>
   <button class="tab" data-view="kunden">Firmen</button>
-  <button class="tab" data-view="kontakte">Ansprechpartner (alt)</button>
   <button class="tab" data-view="wiedervorlagen">📋 Wiedervorlagen</button>
   <button class="tab" data-view="projekte">📁 Projekte</button>
   <button class="tab" data-view="recherche">🔍 Recherche</button>
@@ -265,7 +264,7 @@
       <div class="field"><label>Radius km</label>
         <select id="kRadius"><option>25</option><option selected>50</option><option>75</option><option>100</option><option>150</option></select></div>
       <button class="go" onclick="ladeKandidaten()">Suchen</button>
-      <button class="neuBtn" onclick="neuerKandidat()">+ Neuer Kandidat</button>
+      <button class="neuBtn" onclick="neuerKandidat()">+ Neue Person</button>
       <button class="neuBtn" onclick="profilEinlesenStart()" title="LinkedIn/XING-Profil oder Text einfügen → KI legt Kandidat an">📋 Aus Profil/Text</button>
     </div>
     <style>
@@ -1599,7 +1598,7 @@ async function zeigeStart(){
     const [ka,ku,ko,auf]=await Promise.all([
       sb.from('kandidaten').select('*',{count:'exact',head:true}),
       sb.from('kunden').select('*',{count:'exact',head:true}),
-      sb.from('kontakte').select('*',{count:'exact',head:true}),
+      sb.from('kandidaten').select('*',{count:'exact',head:true}).ilike('rollen','%;Ansprechpartner;%'),
       sb.from('aufgaben').select('faelligkeitsdatum,status').neq('status','Completed').limit(2000),
     ]);
     const heute=heuteISO();
@@ -1612,9 +1611,9 @@ async function zeigeStart(){
         <div class="kachel" onclick="geheZuTab('wiedervorlagen')">
           <div class="k-ic">📋</div><div class="k-zahl" style="${faellig?'color:var(--hot)':''}">${faellig}</div>
           <div class="k-tit">Fällige Wiedervorlagen</div><div class="k-sub">${offen} offen insgesamt</div></div>
-        ${kachel('👤','Kandidaten',ka.count,'kandidaten')}
+        ${kachel('👥','Personen',ka.count,'kandidaten')}
         ${kachel('🏢','Firmen',ku.count,'kunden')}
-        ${kachel('📇','Ansprechpartner',ko.count,'kontakte')}
+        ${kachel('👔','Ansprechpartner',ko.count,'kandidaten')}
         ${kachelPlatz('📅','Termine / Kalender')}
         ${kachelPlatz('✉️','Newsletter')}
         ${kachelPlatz('ℹ️','Infos')}
@@ -1766,12 +1765,11 @@ async function pruefeAnruf(nummer){
   const count=document.getElementById('kCount');
   document.getElementById('kSuche').value=nummer;
   count.textContent='📞 Eingehender Anruf '+nummer+' – suche in Kandidaten, Kunden & Kontakten …';
-  const [ka,ku,ko]=await Promise.all([
+  const [ka,ku]=await Promise.all([
     sb.from('kandidaten').select('id,voller_name,berufsbezeichnung,stadt,status,telefon,mobil,telefon_privat,mobil_privat').limit(2000),
     sb.from('kunden').select('id,name,branche,stadt,telefon').limit(2000),
-    sb.from('kontakte').select('id,voller_name,berufsbezeichnung,stadt,telefon_beruflich,mobil,mobil_privat').limit(2000),
   ]);
-  const fehler=ka.error||ku.error||ko.error;
+  const fehler=ka.error||ku.error;
   if(fehler){ count.textContent='Fehler bei Anrufersuche: '+fehler.message; return; }
   const treffer=[];
   (ka.data||[]).forEach(r=>{ if([r.telefon,r.mobil,r.telefon_privat,r.mobil_privat].some(f=>nrPasst(f,nummer)))
@@ -1780,9 +1778,6 @@ async function pruefeAnruf(nummer){
   (ku.data||[]).forEach(r=>{ if(nrPasst(r.telefon,nummer))
     treffer.push({typ:'Kunde',ic:'🏢',id:r.id,name:r.name,sub:r.branche,ort:r.stadt,status:'Kunde',
       nr:r.telefon,open:()=>detailKunde(r.id)}); });
-  (ko.data||[]).forEach(r=>{ if([r.telefon_beruflich,r.mobil,r.mobil_privat].some(f=>nrPasst(f,nummer)))
-    treffer.push({typ:'Kontakt',ic:'📇',id:r.id,name:r.voller_name,sub:r.berufsbezeichnung,ort:r.stadt,status:'Kontakt',
-      nr:r.telefon_beruflich||r.mobil||r.mobil_privat,open:()=>detailKontakt(r.id)}); });
 
   if(treffer.length===1){ const t=treffer[0]; count.textContent='📞 Anrufer erkannt ('+t.typ+'): '+nummer; t.open();
     anrufNotizPopup(t.typ,t.id,t.name,nummer); return; }
@@ -2034,14 +2029,12 @@ async function ladeWiedervorlagen(){
   const ids=[...new Set(tasks.map(t=>t.verknuepft_mit).filter(Boolean))];
   const map={};
   if(ids.length){
-    const [ka,ku,ko]=await Promise.all([
+    const [ka,ku]=await Promise.all([
       sb.from('kandidaten').select('id,voller_name').in('id',ids),
       sb.from('kunden').select('id,name').in('id',ids),
-      sb.from('kontakte').select('id,voller_name').in('id',ids),
     ]);
     (ka.data||[]).forEach(r=>map[r.id]={typ:'Kandidat',ic:'👤',name:r.voller_name,open:()=>detailKandidat(r.id)});
     (ku.data||[]).forEach(r=>map[r.id]={typ:'Kunde',ic:'🏢',name:r.name,open:()=>detailKunde(r.id)});
-    (ko.data||[]).forEach(r=>map[r.id]={typ:'Kontakt',ic:'📇',name:r.voller_name,open:()=>detailKontakt(r.id)});
   }
   cnt.textContent=tasks.length+' Aufgabe'+(tasks.length===1?'':'n')+(modus==='alle'?'':modus==='faellig'?' (fällig/überfällig)':' (offen)');
   if(!tasks.length){ body.innerHTML='<tr><td colspan="5" class="empty">Keine Aufgaben.</td></tr>'; return; }
@@ -2340,7 +2333,7 @@ function _psSuche(inp){
   const q=inp.value.trim(); const dlg=inp.closest('dialog'); const box=dlg.querySelector('#psTreffer');
   if(q.length<2){ box.style.display='none'; box.innerHTML=''; return; }
   _psTimer=setTimeout(async()=>{
-    let qy=sb.from('kontakte').select('id,voller_name,nachname,email').or(`voller_name.ilike.%${q}%`).limit(12);
+    let qy=sb.from('kandidaten').select('id,voller_name,nachname,email').ilike('rollen','%;Ansprechpartner;%').ilike('voller_name',`%${q}%`).limit(12);
     if(softDeleteAktiv) qy=qy.is('geloescht_am',null);
     const {data}=await qy;
     dlg._psTreffer=data||[];
@@ -2898,7 +2891,18 @@ function zeigeFormular(d){
   page.innerHTML=`
     <div class="detail-head">
       <button class="back" onclick="${neu?'zurueckZurListe()':`detailKandidat('${d.id}')`}">← Abbrechen</button>
-      <h2>${neu?'Neuer Kandidat':'Bearbeiten: '+(esc(d.voller_name)||'')}</h2>
+      <h2>${neu?'Neue Person':'Bearbeiten: '+(esc(d.voller_name)||'')}</h2>
+    </div>
+    <div class="card"><h3>Rolle &amp; Firma</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:20px;font-size:14px;margin-bottom:12px">
+        <label style="display:flex;align-items:center;gap:7px;cursor:pointer"><input type="checkbox" id="ef_rolle_kandidat" ${(d.rollen||(neu?';Kandidat;':'')).includes(';Kandidat;')?'checked':''} style="width:16px;height:16px"> 👤 Kandidat</label>
+        <label style="display:flex;align-items:center;gap:7px;cursor:pointer"><input type="checkbox" id="ef_rolle_ansprechpartner" ${(d.rollen||'').includes(';Ansprechpartner;')?'checked':''} style="width:16px;height:16px"> 👔 Ansprechpartner</label>
+      </div>
+      <div class="edit-grid">
+        ${ef('Funktion (als Ansprechpartner)','funktion',d.funktion)}
+        <div class="edit-field"><label>Firma (als Ansprechpartner)</label><select id="ef_firma_id"><option value="">— keine —</option></select></div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px">Mind. eine Rolle. „Funktion" + „Firma" gelten für die Ansprechpartner-Rolle (getrennt von der Kandidaten-Berufsbezeichnung).</div>
     </div>
     <div class="card"><h3>Persönliche Daten</h3><div class="edit-grid">
       ${anredeSelect(d.begruessung)}
@@ -2976,9 +2980,17 @@ function zeigeFormular(d){
   `;
   window.scrollTo(0,0);
   _tagFormVorschlaege();
+  _firmaSelectFuellen(d.firma_id);
 }
 
 function gv(id){ const el=document.getElementById('ef_'+id); return el?el.value.trim():null; }
+
+// Firma-Dropdown im Personen-Formular mit allen Firmen füllen (Ansprechpartner-Rolle)
+async function _firmaSelectFuellen(sel){
+  const el=document.getElementById('ef_firma_id'); if(!el) return;
+  const {data}=await sb.from('kunden').select('id,name').order('name');
+  (data||[]).forEach(k=>{ const o=document.createElement('option'); o.value=k.id; o.textContent=k.name||k.id; if(k.id===sel) o.selected=true; el.appendChild(o); });
+}
 
 // Vorwahl aus Telefonnummer extrahieren und Koordinaten suchen
 async function vorwahlKoord(nr){
@@ -3014,9 +3026,14 @@ async function ermittleKoordinaten(obj){
 async function speichereKandidat(id){
   const msg=document.getElementById('saveMsg'); msg.textContent='Speichere…'; msg.style.color='var(--muted)';
   const vorname=gv('vorname'), nachname=gv('nachname');
+  const rk=!!(document.getElementById('ef_rolle_kandidat')||{}).checked;
+  const ra=!!(document.getElementById('ef_rolle_ansprechpartner')||{}).checked;
+  let rollen=';'+[rk?'Kandidat':null, ra?'Ansprechpartner':null].filter(Boolean).join(';')+';';
+  if(rollen===';;') rollen=';Kandidat;'; // mind. eine Rolle
   const obj={
     vorname, nachname,
     voller_name:[vorname,nachname].filter(Boolean).join(' ')||null,
+    rollen, funktion:gv('funktion'), firma_id:gv('firma_id')||null,
     email:gv('email'), email_beruflich:gv('email_beruflich'),
     telefon:gv('telefon'), mobil:gv('mobil'),
     telefon_privat:gv('telefon_privat'), mobil_privat:gv('mobil_privat'),
@@ -3065,7 +3082,7 @@ async function detailKunde(id){
   history.pushState({yavis:'detail'}, '', '');
   const [k, kont, stel, notiz, aufg, mails] = await Promise.all([
     sb.from('kunden').select('*').eq('id',id).single(),
-    sb.from('kontakte').select('*').eq('kunde_id',id),
+    sb.from('kandidaten').select('*').eq('firma_id',id),
     sb.from('stellen').select('*').eq('kunde_id',id),
     sb.from('notizen').select('*').eq('kunde_id',id).order('erstellt_am',{ascending:false}),
     sb.from('aufgaben').select('*').eq('verknuepft_mit',id).order('faelligkeitsdatum',{ascending:true,nullsFirst:false}),
@@ -3106,8 +3123,8 @@ async function detailKunde(id){
     ${d.info?`<div style="margin-top:14px"><div class="k" style="color:var(--muted);font-size:13px;margin-bottom:4px">Info</div><div class="v" style="font-size:13px">${esc(d.info)}</div></div>`:''}
     </div>
     ${kont_.length?`<div class="card"><h3>Ansprechpartner (${kont_.length})</h3>${
-      kont_.map(c=>`<div class="note" style="cursor:pointer" onclick="detailKontakt('${c.id}')"><strong>${esc(c.voller_name)||'–'}</strong>
-        <div class="meta">${esc(c.berufsbezeichnung)||''}${c.email?' · '+esc(c.email):''}${c.telefon_beruflich?' · '+esc(c.telefon_beruflich):''}</div></div>`).join('')
+      kont_.map(c=>`<div class="note" style="cursor:pointer" onclick="detailKandidat('${c.id}')"><strong>${esc(c.voller_name)||'–'}</strong>
+        <div class="meta">${esc(c.funktion||c.berufsbezeichnung)||''}${c.email?' · '+esc(c.email):''}${c.telefon?' · '+esc(c.telefon):''}</div></div>`).join('')
     }</div>`:''}
     ${stel_.length?`<div class="card"><h3>Stellen (${stel_.length})</h3>${
       stel_.map(s=>`<div class="note"><strong>${esc(s.jobtitel)||esc(s.position)||'–'}</strong>
@@ -3190,6 +3207,7 @@ async function speichereKunde(id){
 
 // ============ KONTAKTE ============
 async function detailKontakt(id){
+  return detailKandidat(id); // Stufe 2: Ansprechpartner sind Personen (gleiche ID in kandidaten); alter Code darunter tot
   history.pushState({yavis:'detail'}, '', '');
   const {data:d}=await sb.from('kontakte').select('*').eq('id',id).single();
   if(!d) return;
@@ -3993,22 +4011,20 @@ async function globaleSuche(){
   let kaR, kuR, koR;
   if(istTelefon){
     // Telefon-Suche: format-unabhängig, Teil-Nummer (Ausschnitt) reicht
-    const [ka,ku,ko]=await Promise.all([
+    const [ka,ku]=await Promise.all([
       sb.from('kandidaten').select('id,voller_name,berufsbezeichnung,stadt,arbeitgeber,telefon,mobil,telefon_privat,mobil_privat').limit(2000),
       sb.from('kunden').select('id,name,typ,branche,stadt,telefon').limit(2000),
-      sb.from('kontakte').select('id,voller_name,berufsbezeichnung,email,kunde_id,telefon_beruflich,mobil,mobil_privat').limit(2000),
     ]);
     kaR=(ka.data||[]).filter(r=>[r.telefon,r.mobil,r.telefon_privat,r.mobil_privat].some(f=>nrEnthaelt(f,term)));
     kuR=(ku.data||[]).filter(r=>nrEnthaelt(r.telefon,term));
-    koR=(ko.data||[]).filter(r=>[r.telefon_beruflich,r.mobil,r.mobil_privat].some(f=>nrEnthaelt(f,term)));
+    koR=[];
   } else {
     const like='%'+term+'%';
-    const [ka,ku,ko]=await Promise.all([
-      sb.from('kandidaten').select('id,voller_name,berufsbezeichnung,stadt,arbeitgeber,email,mobil,telefon').or(`voller_name.ilike.${like},berufsbezeichnung.ilike.${like},stadt.ilike.${like},email.ilike.${like},arbeitgeber.ilike.${like}`).limit(50),
+    const [ka,ku]=await Promise.all([
+      sb.from('kandidaten').select('id,voller_name,berufsbezeichnung,funktion,stadt,arbeitgeber,email,mobil,telefon').or(`voller_name.ilike.${like},berufsbezeichnung.ilike.${like},funktion.ilike.${like},stadt.ilike.${like},email.ilike.${like},arbeitgeber.ilike.${like}`).limit(50),
       sb.from('kunden').select('id,name,typ,branche,stadt').or(`name.ilike.${like},branche.ilike.${like},stadt.ilike.${like}`).limit(50),
-      sb.from('kontakte').select('id,voller_name,berufsbezeichnung,email,kunde_id').or(`voller_name.ilike.${like},berufsbezeichnung.ilike.${like},email.ilike.${like}`).limit(50),
     ]);
-    kaR=ka.data||[]; kuR=ku.data||[]; koR=ko.data||[];
+    kaR=ka.data||[]; kuR=ku.data||[]; koR=[];
   }
   const fids=[...new Set((koR||[]).map(r=>r.kunde_id).filter(Boolean))];
   const fmap={}; if(fids.length){ const {data:fd}=await sb.from('kunden').select('id,name').in('id',fids); (fd||[]).forEach(f=>fmap[f.id]=f.name); }
@@ -4298,9 +4314,9 @@ async function rechercheKundQuery(f){
   const {data}=await q; return data||[];
 }
 async function rechercheKontaktQuery(f){
-  let q=sb.from('kontakte').select('*');
-  if(f.name) q=q.or(`voller_name.ilike.%${f.name}%,stadt.ilike.%${f.name}%,berufsbezeichnung.ilike.%${f.name}%`);
-  if(f.position) q=q.ilike('berufsbezeichnung',`%${f.position}%`);
+  let q=sb.from('kandidaten').select('*').ilike('rollen','%;Ansprechpartner;%');
+  if(f.name) q=q.or(`voller_name.ilike.%${f.name}%,stadt_beruf.ilike.%${f.name}%,funktion.ilike.%${f.name}%`);
+  if(f.position) q=q.ilike('funktion',`%${f.position}%`);
   q=q.order('letzte_aktivitaet',{ascending:false,nullsFirst:false}).limit(100);
   const {data}=await q; return data||[];
 }
@@ -5545,11 +5561,10 @@ async function msSyncOutlook(){
 
     // Passende Einträge in Kandidaten, Firmen UND Ansprechpartnern suchen
     const emailListe=[...emailMap.keys()].slice(0,100);
-    const [k1,k2,ku,ko]=await Promise.all([
+    const [k1,k2,ku]=await Promise.all([
       sb.from('kandidaten').select('id,voller_name,email,email_beruflich').in('email',emailListe),
       sb.from('kandidaten').select('id,voller_name,email,email_beruflich').in('email_beruflich',emailListe),
       sb.from('kunden').select('id,name,email').in('email',emailListe),
-      sb.from('kontakte').select('id,voller_name,email').in('email',emailListe),
     ]);
     const treffer=[]; const seen=new Set();
     function addTreffer(eid,name,typ,...emails){
@@ -5559,7 +5574,6 @@ async function msSyncOutlook(){
     }
     [...(k1.data||[]),...(k2.data||[])].forEach(k=>addTreffer(k.id,k.voller_name,'Kandidat',k.email,k.email_beruflich));
     (ku.data||[]).forEach(k=>addTreffer(k.id,k.name,'Firma',k.email));
-    (ko.data||[]).forEach(k=>addTreffer(k.id,k.voller_name,'Ansprechpartner',k.email));
 
     if(!treffer.length){
       zeigeMeldung(`${messages.length} E-Mails geprüft — keine passenden Einträge gefunden`,'warn');
@@ -6484,17 +6498,15 @@ async function ladePapierkorb() {
     zeigeMeldung('Papierkorb-Spalte fehlt noch. Bitte zuerst das SQL in Supabase ausführen (siehe Einrichtung).', 'err');
     return;
   }
-  const [kanRes, kdRes, ktRes] = await Promise.all([
+  const [kanRes, kdRes] = await Promise.all([
     sb.from('kandidaten').select('id,voller_name,geloescht_am').not('geloescht_am','is',null).order('geloescht_am',{ascending:false}),
     sb.from('kunden').select('id,name,geloescht_am').not('geloescht_am','is',null).order('geloescht_am',{ascending:false}),
-    sb.from('kontakte').select('id,voller_name,geloescht_am').not('geloescht_am','is',null).order('geloescht_am',{ascending:false}),
   ]);
   let existing = document.getElementById('papierkorbDlg');
   if (existing) { existing.close(); existing.remove(); }
   const rows = [];
   (kanRes.data||[]).forEach(r=>rows.push({typ:'Kandidat', id:r.id, name:r.voller_name, ts:r.geloescht_am}));
   (kdRes.data||[]).forEach(r=>rows.push({typ:'Firma', id:r.id, name:r.name, ts:r.geloescht_am}));
-  (ktRes.data||[]).forEach(r=>rows.push({typ:'Kontakt', id:r.id, name:r.voller_name, ts:r.geloescht_am}));
   rows.sort((a,b)=>b.ts.localeCompare(a.ts));
   const tableRows = rows.length ? rows.map(r=>`
     <tr>
@@ -6760,15 +6772,15 @@ async function rechercheKontakteAusfuehren() {
     kundeIds=(kd||[]).map(k=>k.id);
     if(!kundeIds.length){anzEl.textContent='0 Treffer';bodyEl.innerHTML='<div style="color:var(--muted);font-size:14px;padding:16px 0">Keine Firma "'+esc(firma)+'" gefunden.</div>';return;}
   }
-  let q=sb.from('kontakte').select('*').limit(300);
+  let q=sb.from('kandidaten').select('*').ilike('rollen','%;Ansprechpartner;%').limit(300);
   if(softDeleteAktiv) q=q.is('geloescht_am',null);
   if(name)    q=q.ilike('voller_name','%'+name+'%');
-  if(funktion)q=q.ilike('berufsbezeichnung','%'+funktion+'%');
+  if(funktion)q=q.ilike('funktion','%'+funktion+'%');
   if(hatMail) q=q.not('email','is',null).neq('email','');
-  if(kundeIds)q=q.in('kunde_id',kundeIds);
+  if(kundeIds)q=q.in('firma_id',kundeIds);
   const {data,error}=await q;
   if(error){anzEl.textContent='Fehler: '+error.message;return;}
-  const firmaIds=[...new Set((data||[]).map(r=>r.kunde_id).filter(Boolean))];
+  const firmaIds=[...new Set((data||[]).map(r=>r.firma_id).filter(Boolean))];
   const firmaMap={};
   if(firmaIds.length){const {data:fd}=await sb.from('kunden').select('id,name').in('id',firmaIds);(fd||[]).forEach(f=>firmaMap[f.id]=f.name);}
   anzEl.textContent=data.length+' Kontakte gefunden';
@@ -6782,13 +6794,13 @@ async function rechercheKontakteAusfuehren() {
     +'<th style="padding:7px 10px 8px;color:var(--muted);font-weight:600">Telefon</th>'
     +'</tr></thead><tbody>';
   (data||[]).forEach(r=>{
-    const f=r.kunde_id?(firmaMap[r.kunde_id]||'–'):'–';
-    htm+='<tr onclick="detailKontakt(\''+r.id+'\')" style="cursor:pointer;border-bottom:1px solid var(--line)" onmouseover="this.style.background=\'var(--panel2)\'" onmouseout="this.style.background=\'\'">'
+    const f=r.firma_id?(firmaMap[r.firma_id]||'–'):'–';
+    htm+='<tr onclick="detailKandidat(\''+r.id+'\')" style="cursor:pointer;border-bottom:1px solid var(--line)" onmouseover="this.style.background=\'var(--panel2)\'" onmouseout="this.style.background=\'\'">'
       +'<td style="padding:7px 10px;font-weight:600">'+esc(r.voller_name||'–')+'</td>'
-      +'<td style="padding:7px 10px;color:var(--muted);font-size:12px">'+esc(r.berufsbezeichnung||'–')+'</td>'
+      +'<td style="padding:7px 10px;color:var(--muted);font-size:12px">'+esc(r.funktion||r.berufsbezeichnung||'–')+'</td>'
       +'<td style="padding:7px 10px;color:var(--muted);font-size:12px">'+esc(f)+'</td>'
       +'<td style="padding:7px 10px;font-size:12px">'+(r.email?'<a href="mailto:'+esc(r.email)+'" onclick="event.stopPropagation()" class="calllink">'+esc(r.email)+'</a>':'–')+'</td>'
-      +'<td style="padding:7px 10px;color:var(--muted);font-size:12px">'+esc(r.telefon_beruflich||r.mobil||'–')+'</td>'
+      +'<td style="padding:7px 10px;color:var(--muted);font-size:12px">'+esc(r.telefon||r.mobil||'–')+'</td>'
       +'</tr>';
   });
   _rmLetzteErgebnisse = {tab:'kontakte', rows:data, firmaMap};
