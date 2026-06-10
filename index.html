@@ -538,14 +538,33 @@
             </select>
           </div>
           <div>
-            <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Gehalt erw. bis €</div>
-            <input id="rmGehalt" placeholder="80000" type="number" min="0" step="5000" onkeydown="if(event.key==='Enter')rechercheAusfuehren()"
-                   style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:100px">
+            <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Gehalt erw. € (von–bis)</div>
+            <div style="display:flex;gap:5px">
+              <input id="rmGehaltVon" placeholder="von" type="number" min="0" step="5000" onkeydown="if(event.key==='Enter')rechercheAusfuehren()" style="padding:7px 8px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:80px">
+              <input id="rmGehaltBis" placeholder="bis" type="number" min="0" step="5000" onkeydown="if(event.key==='Enter')rechercheAusfuehren()" style="padding:7px 8px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:80px">
+            </div>
           </div>
           <div>
-            <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Erfahrung mind.</div>
-            <input id="rmErfahrung" placeholder="Jahre" type="number" min="0" max="40" onkeydown="if(event.key==='Enter')rechercheAusfuehren()"
-                   style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:80px">
+            <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Erfahrung J. (von–bis)</div>
+            <div style="display:flex;gap:5px">
+              <input id="rmErfVon" placeholder="von" type="number" min="0" max="50" onkeydown="if(event.key==='Enter')rechercheAusfuehren()" style="padding:7px 8px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:60px">
+              <input id="rmErfBis" placeholder="bis" type="number" min="0" max="50" onkeydown="if(event.key==='Enter')rechercheAusfuehren()" style="padding:7px 8px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:60px">
+            </div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Alter (von–bis)</div>
+            <div style="display:flex;gap:5px">
+              <input id="rmAlterVon" placeholder="von" type="number" min="0" max="99" onkeydown="if(event.key==='Enter')rechercheAusfuehren()" style="padding:7px 8px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:60px">
+              <input id="rmAlterBis" placeholder="bis" type="number" min="0" max="99" onkeydown="if(event.key==='Enter')rechercheAusfuehren()" style="padding:7px 8px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:60px">
+            </div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Qualifikation</div>
+            <input id="rmQualifikation" placeholder="z.B. Techniker" onkeydown="if(event.key==='Enter')rechercheAusfuehren()" style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:150px">
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Studiengang</div>
+            <input id="rmStudiengang" placeholder="z.B. Versorgungstechnik" onkeydown="if(event.key==='Enter')rechercheAusfuehren()" style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:160px">
           </div>
           <div>
             <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Abwerbeschutz</div>
@@ -7067,6 +7086,14 @@ async function _rmFuelleAusFeld(ddId, feld, labelAll){
   const opts=[...werte].sort((a,b)=>a.localeCompare(b,'de',{sensitivity:'base'}));
   msddBuild(ddId, opts, [], labelAll, null);
 }
+// Alter aus Geburtstag (ignoriert Platzhalter-Jahrgänge < 1910)
+function _alterAus(geb){
+  if(!geb) return null; const d=new Date(geb); if(isNaN(d.getTime())) return null;
+  const y=d.getFullYear(); if(y<1910) return null;
+  const now=new Date(); let a=now.getFullYear()-y;
+  const m=now.getMonth()-d.getMonth(); if(m<0||(m===0&&now.getDate()<d.getDate())) a--;
+  return a;
+}
 
 function rmChipToggle(chip, pos) {
   if (_rmGewaehltePos.has(pos)) {
@@ -7101,8 +7128,12 @@ async function rechercheMaskeAusfuehren() {
   const tags        = (document.getElementById('rmTags')?.value        || '').trim();
   const bundesland  = msddSel('rmBundeslandDD');
   const keinKontakt = parseInt(document.getElementById('rmKeinKontakt')?.value||'0')||0;
-  const gehalt      = parseInt(document.getElementById('rmGehalt')?.value||'0')||0;
-  const erfahrung   = parseInt(document.getElementById('rmErfahrung')?.value||'0')||0;
+  const _num=id=>{ const v=parseFloat(String(document.getElementById(id)?.value||'').replace(',','.')); return isNaN(v)?null:v; };
+  const gehaltVon=_num('rmGehaltVon'), gehaltBis=_num('rmGehaltBis');
+  const erfVon=_num('rmErfVon'), erfBis=_num('rmErfBis');
+  const alterVon=_num('rmAlterVon'), alterBis=_num('rmAlterBis');
+  const qualifikation=(document.getElementById('rmQualifikation')?.value||'').trim();
+  const studiengang =(document.getElementById('rmStudiengang')?.value||'').trim();
   const istHot      = !!(document.getElementById('rmIstHot')?.checked);
   const hatProfil   = !!(document.getElementById('rmHatProfil')?.checked);
   const abwSchutz   = document.getElementById('rmAbwerbeschutz')?.value||'';
@@ -7117,7 +7148,7 @@ async function rechercheMaskeAusfuehren() {
     if (error) { anzEl.textContent = 'Fehler: ' + error.message; return; }
     const rpcRows = data || [];
     // Volle Datensätze nachladen wenn Client-Filter nötig
-    const brauchtVoll = _rmGewaehltePos.size || statusVal || hatMail || hatTel || ausschluss.length || umzugVal || bundesland.length || quelle.length;
+    const brauchtVoll = _rmGewaehltePos.size || statusVal || hatMail || hatTel || ausschluss.length || umzugVal || bundesland.length || quelle.length || gehaltVon!=null || gehaltBis!=null || erfVon!=null || erfBis!=null || alterVon!=null || alterBis!=null || qualifikation || studiengang;
     if (rpcRows.length && brauchtVoll) {
       const ids = rpcRows.map(r => r.id);
       const map = {};
@@ -7139,8 +7170,8 @@ async function rechercheMaskeAusfuehren() {
     if (arbeitgeber)  q = q.ilike('arbeitgeber', `%${arbeitgeber}%`);
     if (tags)         q = q.ilike('tags', `%${tags}%`);
     if (bundesland.length) q = q.in('bundesland', bundesland);
-    if (gehalt)       q = q.lte('gehalt_erwartet', gehalt);
-    if (erfahrung)    q = q.gte('erfahrung_jahre', erfahrung);
+    if (qualifikation) q = q.ilike('qualifikation', `%${qualifikation}%`);
+    if (studiengang)   q = q.ilike('studiengang', `%${studiengang}%`);
     if (istHot)       q = q.eq('ist_hot', true);
     if (hatProfil)    q = q.or('xing_profil.ilike.%http%,linkedin_profil.ilike.%http%');
     if (abwSchutz==='ja')   q = q.eq('abwerbeschutz', true);
@@ -7172,8 +7203,14 @@ async function rechercheMaskeAusfuehren() {
   if (arbeitgeber) { const al=arbeitgeber.toLowerCase(); rows=rows.filter(r=>(r.arbeitgeber||'').toLowerCase().includes(al)); }
   if (tags)        { const tl=tags.toLowerCase(); rows=rows.filter(r=>(r.tags||'').toLowerCase().includes(tl)); }
   if (bundesland.length) rows=rows.filter(r=>bundesland.includes(r.bundesland));
-  if (gehalt)      rows=rows.filter(r=>!r.gehalt_erwartet||(r.gehalt_erwartet<=gehalt));
-  if (erfahrung)   rows=rows.filter(r=>(r.erfahrung_jahre||0)>=erfahrung);
+  const _gn=v=>{ const n=parseFloat(String(v||'').replace(',','.')); return isNaN(n)?null:n; };
+  if(gehaltVon!=null) rows=rows.filter(r=>{const g=_gn(r.gehalt_erwartet); return g!=null&&g>0&&g>=gehaltVon;});
+  if(gehaltBis!=null) rows=rows.filter(r=>{const g=_gn(r.gehalt_erwartet); return g!=null&&g>0&&g<=gehaltBis;});
+  if(erfVon!=null) rows=rows.filter(r=>{const e=_gn(r.erfahrung_jahre); return e!=null&&e>=erfVon;});
+  if(erfBis!=null) rows=rows.filter(r=>{const e=_gn(r.erfahrung_jahre); return e!=null&&e<=erfBis;});
+  if(alterVon!=null||alterBis!=null) rows=rows.filter(r=>{const a=_alterAus(r.geburtstag); if(a==null) return false; if(alterVon!=null&&a<alterVon) return false; if(alterBis!=null&&a>alterBis) return false; return true;});
+  if(qualifikation){ const ql=qualifikation.toLowerCase(); rows=rows.filter(r=>(r.qualifikation||'').toLowerCase().includes(ql)); }
+  if(studiengang){ const sl=studiengang.toLowerCase(); rows=rows.filter(r=>(r.studiengang||'').toLowerCase().includes(sl)); }
   if (istHot)      rows=rows.filter(r=>r.ist_hot);
   if (hatProfil)   rows=rows.filter(r=>(r.xing_profil||'').includes('http')||(r.linkedin_profil||'').includes('http'));
   if (abwSchutz==='ja')   rows=rows.filter(r=>r.abwerbeschutz);
@@ -7278,7 +7315,7 @@ function rechercheMaskeZuruecksetzen() {
   });
   document.querySelectorAll('#rmExWertDD-panel input').forEach(c=>{ c.checked=_rmExWertStd.includes(c.value); });
   msddUpdateLabel('rmExWertDD');
-  ['rmFreitext','rmArbeitgeber','rmTags','rmGehalt','rmErfahrung'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  ['rmFreitext','rmArbeitgeber','rmTags','rmGehaltVon','rmGehaltBis','rmErfVon','rmErfBis','rmAlterVon','rmAlterBis','rmQualifikation','rmStudiengang'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   ['rmKeinKontakt','rmAbwerbeschutz'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   msddClear('rmBundeslandDD'); msddClear('rmQuelleDD');
   ['rmIstHot','rmHatProfil'].forEach(id=>{const e=document.getElementById(id);if(e)e.checked=false;});
