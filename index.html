@@ -213,9 +213,9 @@
 <div class="layout">
 <nav class="sidebar">
   <button class="tab active" data-view="start">🏠 Start</button>
-  <button class="tab" data-view="kandidaten">Kandidaten</button>
+  <button class="tab" data-view="kandidaten">👥 Personen</button>
   <button class="tab" data-view="kunden">Firmen</button>
-  <button class="tab" data-view="kontakte">Ansprechpartner</button>
+  <button class="tab" data-view="kontakte">Ansprechpartner (alt)</button>
   <button class="tab" data-view="wiedervorlagen">📋 Wiedervorlagen</button>
   <button class="tab" data-view="projekte">📁 Projekte</button>
   <button class="tab" data-view="recherche">🔍 Recherche</button>
@@ -2075,9 +2075,9 @@ const SPALTEN_DEF=[
   {key:'voller_name', label:'Name', render:r=>`${istGeschuetzt(r)?'🔒 ':''}${r.ist_hot?'<span class="pill hot">HOT</span> ':''}${esc(r.voller_name)||'–'}${(r.rollen||'').includes(';Ansprechpartner;')?'<span class="role-badge ansp">👔 AP</span>':''}`},
   {key:'nachname', label:'Nachname', render:r=>esc(r.nachname)||'–'},
   {key:'vorname', label:'Vorname', render:r=>esc(r.vorname)||'–'},
-  {key:'berufsbezeichnung', label:'Berufsbezeichnung', render:r=>esc(r.berufsbezeichnung)||'–'},
+  {key:'berufsbezeichnung', label:'Berufsbezeichnung', render:r=>esc(r.berufsbezeichnung||r.funktion)||'–'},
   {key:'arbeitgeber', label:'Arbeitgeber', render:r=>esc(r.arbeitgeber)||'–'},
-  {key:'stadt', label:'Stadt', render:r=>esc(r.stadt)||''},
+  {key:'stadt', label:'Stadt', render:r=>esc(r.stadt||r.stadt_beruf)||''},
   {key:'plz', label:'PLZ', render:r=>esc(r.plz)||''},
   {key:'email', label:'E-Mail', render:r=>r.email?`<a class="calllink" href="mailto:${esc(r.email)}" onclick="event.stopPropagation()">${esc(r.email)}</a>`:'–'},
   {key:'telefon', label:'Telefon', render:r=>telLink(r.telefon||r.telefon_privat)},
@@ -2430,6 +2430,7 @@ async function detailKandidat(id){
 
 // Hinweis, wenn dieselbe Person auch in der anderen Rolle existiert (Kandidat ↔ Ansprechpartner)
 async function zeigeDublettenHinweis(eigenerTyp, name){
+  return; // Stufe 2: Rollen sind jetzt an EINER Person gebündelt — Hinweis obsolet (würde bei migrierten AP fälschlich feuern)
   if(!name) return;
   const res = eigenerTyp==='Kandidat'
     ? await sb.from('kontakte').select('id,voller_name').ilike('voller_name',name).limit(1)
