@@ -494,11 +494,12 @@
             <input type="checkbox" id="rmHatTel" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)"> ☎ Tel/Mobil
           </label>
         </div>
-        <div style="flex:1;min-width:200px">
+        <div style="min-width:200px">
           <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Ausschließen (int. Wertung)</div>
-          <textarea id="rmExWert" rows="2" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();rechercheAusfuehren();}"
-                    placeholder="vermittelt, gesperrt …"
-                    style="width:100%;padding:7px 10px;font-size:12px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;resize:vertical;font-family:inherit;box-sizing:border-box;line-height:1.5">vermittelt, nicht vermittelbar, generell kein Interesse, kein Kontakt erwünscht</textarea>
+          <div class="msdd" id="rmExWertDD">
+            <button type="button" class="msdd-btn" id="rmExWertDD-btn" onclick="msddToggle('rmExWertDD')">Standard-Ausschlüsse ▾</button>
+            <div class="msdd-panel" id="rmExWertDD-panel" style="display:none"></div>
+          </div>
         </div>
       </div>
       <!-- Erweiterte Filter -->
@@ -1684,6 +1685,23 @@ function msddPosChanged(){
 function msddPosClear(){ document.querySelectorAll('#kPosDD-panel input:checked').forEach(c=>c.checked=false); msddPosChanged(); }
 // Klick außerhalb schließt offene Mehrfach-Dropdowns
 document.addEventListener('click',e=>{ if(!e.target.closest('.msdd')) document.querySelectorAll('.msdd-panel').forEach(p=>p.style.display='none'); });
+
+// ----- Generische Mehrfach-Auswahl-Dropdowns (für Recherche-Maske) -----
+const _msddConf={};
+function msddBuild(id, options, selected, labelAll, onChange){
+  const panel=document.getElementById(id+'-panel'); if(!panel) return;
+  _msddConf[id]={labelAll:labelAll||'alle', onChange:onChange||null};
+  const sel=selected||[];
+  panel.innerHTML=options.map(o=>`<label class="msdd-opt"><input type="checkbox" value="${esc(o)}" ${sel.includes(o)?'checked':''} onchange="msddChanged('${id}')">${esc(o)}</label>`).join('')
+    +`<div class="msdd-foot"><button type="button" onclick="msddClear('${id}')">zurücksetzen</button><button type="button" onclick="msddClose('${id}')">schließen</button></div>`;
+  panel.dataset.filled='1';
+  msddUpdateLabel(id);
+}
+function msddSel(id){ return [...document.querySelectorAll('#'+id+'-panel input:checked')].map(c=>c.value); }
+function msddUpdateLabel(id){ const sel=msddSel(id); const btn=document.getElementById(id+'-btn'); const c=_msddConf[id]||{}; if(btn) btn.textContent=(sel.length?(sel.length===1?sel[0]:sel.length+' gewählt'):(c.labelAll||'alle'))+' ▾'; }
+function msddChanged(id){ msddUpdateLabel(id); const c=_msddConf[id]; if(c&&c.onChange) c.onChange(); }
+function msddClear(id){ document.querySelectorAll('#'+id+'-panel input:checked').forEach(c=>c.checked=false); msddChanged(id); }
+function msddClose(id){ const p=document.getElementById(id+'-panel'); if(p) p.style.display='none'; }
 
 // ===== Rollen-Filter (Stufe 2) =====
 let rolleFilter='alle';
@@ -7008,6 +7026,20 @@ function zeigeRechercheMaske() {
       rmSel.appendChild(o);
     });
   }
+  _rmExWertFuellen();
+}
+
+// Ausschluss-Dropdown (int. Wertung) aus echten DB-Werten füllen, Standard-Ausschlüsse vorausgewählt
+const _rmExWertStd=['vermittelt','nicht vermittelbar','generell kein Interesse','kein Kontakt erwünscht'];
+async function _rmExWertFuellen(){
+  const panel=document.getElementById('rmExWertDD-panel'); if(!panel||panel.dataset.filled) return;
+  const werte=new Set(_rmExWertStd);
+  try{
+    const {data}=await sb.from('kandidaten').select('wertung_intern').not('wertung_intern','is',null).limit(3000);
+    (data||[]).forEach(r=>String(r.wertung_intern||'').split(/[;,]/).forEach(t=>{ const v=t.trim(); if(v) werte.add(v); }));
+  }catch(e){}
+  const opts=[...werte].sort((a,b)=>a.localeCompare(b,'de',{sensitivity:'base'}));
+  msddBuild('rmExWertDD', opts, _rmExWertStd, 'keine Ausschlüsse', null);
 }
 
 function rmChipToggle(chip, pos) {
@@ -7037,10 +7069,7 @@ async function rechercheMaskeAusfuehren() {
   const hatTel    =  document.getElementById('rmHatTel').checked;
   const statusVal =  document.getElementById('rmStatus').value;
   const umzugVal  = (document.getElementById('rmUmzug').value      || '').trim();
-  const exText    = (document.getElementById('rmExWert').value      || '').trim();
-  const ausschluss = exText
-    ? exText.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
-    : [];
+  const ausschluss = msddSel('rmExWertDD').map(s => s.trim().toLowerCase()).filter(Boolean);
   const freitext    = (document.getElementById('rmFreitext')?.value    || '').trim();
   const arbeitgeber = (document.getElementById('rmArbeitgeber')?.value || '').trim();
   const tags        = (document.getElementById('rmTags')?.value        || '').trim();
@@ -7224,8 +7253,8 @@ function rechercheMaskeZuruecksetzen() {
   ['rmHatMail', 'rmHatTel'].forEach(id => {
     const el = document.getElementById(id); if (el) el.checked = false;
   });
-  const exEl = document.getElementById('rmExWert');
-  if (exEl) exEl.value = 'vermittelt, nicht vermittelbar, generell kein Interesse, kein Kontakt erwünscht';
+  document.querySelectorAll('#rmExWertDD-panel input').forEach(c=>{ c.checked=_rmExWertStd.includes(c.value); });
+  msddUpdateLabel('rmExWertDD');
   ['rmFreitext','rmArbeitgeber','rmTags','rmBundesland','rmGehalt','rmErfahrung','rmQuelle'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   ['rmWertung','rmKeinKontakt','rmAbwerbeschutz'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   ['rmIstHot','rmHatProfil'].forEach(id=>{const e=document.getElementById(id);if(e)e.checked=false;});
