@@ -495,7 +495,7 @@
           </label>
         </div>
         <div style="min-width:200px">
-          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Ausschließen (int. Wertung)</div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Ausschließen (Wertung)</div>
           <div class="msdd" id="rmExWertDD">
             <button type="button" class="msdd-btn" id="rmExWertDD-btn" onclick="msddToggle('rmExWertDD')">Standard-Ausschlüsse ▾</button>
             <div class="msdd-panel" id="rmExWertDD-panel" style="display:none"></div>
@@ -7030,13 +7030,13 @@ function zeigeRechercheMaske() {
 }
 
 // Ausschluss-Dropdown (int. Wertung) aus echten DB-Werten füllen, Standard-Ausschlüsse vorausgewählt
-const _rmExWertStd=['vermittelt','nicht vermittelbar','generell kein Interesse','kein Kontakt erwünscht'];
+const _rmExWertStd=['generell kein Interesse','nicht vermittelbar','kein Kontakt erwünscht','keine Kontaktmöglichkeit','Rente','zu alt'];
 async function _rmExWertFuellen(){
   const panel=document.getElementById('rmExWertDD-panel'); if(!panel||panel.dataset.filled) return;
   const werte=new Set(_rmExWertStd);
   try{
-    const {data}=await sb.from('kandidaten').select('wertung_intern').not('wertung_intern','is',null).limit(3000);
-    (data||[]).forEach(r=>String(r.wertung_intern||'').split(/[;,]/).forEach(t=>{ const v=t.trim(); if(v) werte.add(v); }));
+    const {data}=await sb.from('kandidaten').select('wertung').not('wertung','is',null).limit(3000);
+    (data||[]).forEach(r=>String(r.wertung||'').split(';').forEach(t=>{ const v=t.trim(); if(v) werte.add(v); }));
   }catch(e){}
   const opts=[...werte].sort((a,b)=>a.localeCompare(b,'de',{sensitivity:'base'}));
   msddBuild('rmExWertDD', opts, _rmExWertStd, 'keine Ausschlüsse', null);
@@ -7139,7 +7139,7 @@ async function rechercheMaskeAusfuehren() {
   }
   if (ausschluss.length) {
     rows = rows.filter(r => {
-      const wi = (r.wertung_intern || '').toLowerCase();
+      const wi = (r.wertung || '').toLowerCase();
       return !ausschluss.some(a => wi.includes(a));
     });
   }
@@ -7477,7 +7477,7 @@ async function nlSucheAusfuehren() {
   // Ausschluesse (wertung_intern)
   if (ausschluss.length) {
     rows = rows.filter(r => {
-      const wi = (r.wertung_intern || '').toLowerCase();
+      const wi = (r.wertung || '').toLowerCase();
       return !ausschluss.some(a => wi.includes(a));
     });
   }
