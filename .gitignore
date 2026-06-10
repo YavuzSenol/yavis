@@ -13,3 +13,9 @@ zoho backup/
 Python Lebensläufe/
 UEBERGABE_YAVIS.md
 recruiting_app.html
+
+# Stufe-2-Arbeitsdaten (enthalten Personendaten / Hilfsskripte) — NIEMALS committen
+_backup_db/
+_stufe2_dubletten.json
+_stufe2_*.py
+UEBERGABE_rollen_stufe2_plan.md
