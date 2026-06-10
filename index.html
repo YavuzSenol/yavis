@@ -2382,12 +2382,15 @@ async function detailKandidat(id){
     sb.from('emails').select('*').eq('entity_id',id).order('erstellt_am',{ascending:false}).limit(100),
   ]);
   const d=k.data; if(!d) return;
+  // Firma (Ansprechpartner-Rolle) auflösen, falls verknüpft
+  let firmaName=null;
+  if(d.firma_id){ const fr=await sb.from('kunden').select('name').eq('id',d.firma_id).single(); firmaName=fr.data?.name||null; }
   // Foto laden (signierte URL, 2h gültig)
   let fotoUrl=null;
   const fotoPfad=`kandidat/${id}/foto.jpg`;
   const {data:fotoData}=await sb.storage.from('dokumente').createSignedUrl(fotoPfad,7200);
   if(fotoData?.signedUrl) fotoUrl=fotoData.signedUrl;
-  zeigeKandidatSeite(d, ausb.data||[], erf.data||[], notiz.data||[], bew.data||[], aufg.data||[], dok.data||[], fotoUrl, mailRes.data||[]);
+  zeigeKandidatSeite(d, ausb.data||[], erf.data||[], notiz.data||[], bew.data||[], aufg.data||[], dok.data||[], fotoUrl, mailRes.data||[], firmaName);
   zeigeDublettenHinweis('Kandidat', d.voller_name);
 }
 
@@ -2407,8 +2410,9 @@ async function zeigeDublettenHinweis(eigenerTyp, name){
   if(head && head.nextSibling) page.insertBefore(banner, head.nextSibling); else page.appendChild(banner);
 }
 
-function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails){
+function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails, firmaName){
   mails=mails||[];
+  const istAnsprechpartner=(d.rollen||'').includes(';Ansprechpartner;');
   dok = dok || [];
   kontextDatensatz={typ:'Kandidat',id:d.id,name:d.voller_name};
   const geschuetzt = istGeschuetzt(d);
@@ -2434,7 +2438,7 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails)
       ${fotoHtml}
       <div>
         <h2 style="margin:0 0 2px">${geschuetzt?'🔒 ':''}${d.ist_hot?'🔥 ':''}${esc(d.voller_name)||'Kandidat'}</h2>
-        <div class="detail-sub" style="margin:0">${esc(d.berufsbezeichnung)||''}${d.arbeitgeber?' · '+esc(d.arbeitgeber):''}${d.status?' · <span class="pill">'+esc(d.status)+'</span>':''}</div>
+        <div class="detail-sub" style="margin:0">${esc(d.berufsbezeichnung)||''}${d.arbeitgeber?' · '+esc(d.arbeitgeber):''}${d.status?' · <span class="pill">'+esc(d.status)+'</span>':''}${istAnsprechpartner?' · <span class="pill" style="border-color:var(--accent2);color:var(--accent2)">👔 Ansprechpartner</span>':''}</div>
       </div>
       <div style="display:flex;gap:8px;margin-left:auto">
         <button class="cvbtn" id="cvBtn" onclick="cvAuslesen('${d.id}')">📄 CV einlesen</button>
@@ -2532,6 +2536,11 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails)
           ${zeile('Kündigungsfrist', esc(d.kuendigungsfrist))}
           ${zeile('Wechselmotiv.', esc(d.wechselmotivation))}
         </div>
+        ${istAnsprechpartner?`<div class="dpanel-sub">
+          <span class="dcol-h">👔 Als Ansprechpartner</span>
+          ${zeile('Funktion', esc(d.funktion))}
+          ${zeile('Firma', firmaName?`<a href="#" onclick="event.preventDefault();detailKunde('${d.firma_id}')" style="color:var(--accent2)" title="Zur Firma springen">${esc(firmaName)}</a>`:(d.firma_id?esc(d.firma_id):''))}
+        </div>`:''}
       </div>
 
     </div>
