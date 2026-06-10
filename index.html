@@ -7313,11 +7313,18 @@ async function rechercheMaskeAusfuehren() {
   });
   html += '</tbody></table></div>';
   _rmLetzteErgebnisse = {tab:'kandidaten', rows};
-  bodyEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+  bodyEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px;flex-wrap:wrap">'
     + '<span style="font-size:12px;color:var(--muted)">' + rows.length + ' Treffer</span>'
-    + '<button onclick="rechercheCsvExport()" style="padding:5px 13px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);font-size:12px;color:var(--ink)">📥 CSV</button>'
-    + '</div>' + html;
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap">'
+    +   '<button onclick="rmTrefferMail()" style="padding:5px 13px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);font-size:12px;color:var(--ink)">✉️ Serienmail an alle</button>'
+    +   '<button onclick="rmTrefferTags()" style="padding:5px 13px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);font-size:12px;color:var(--ink)">🏷 Tags an alle</button>'
+    +   '<button onclick="rechercheCsvExport()" style="padding:5px 13px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);font-size:12px;color:var(--ink)">📥 CSV</button>'
+    + '</div></div>' + html;
 }
+// Mit allen Treffern arbeiten (nutzt die erprobten Auswahl-Funktionen über selectedKandIds)
+function _rmTrefferIds(){ const e=_rmLetzteErgebnisse; if(!e||e.tab!=='kandidaten'||!(e.rows&&e.rows.length)){ zeigeMeldung('Keine Treffer.','warn'); return null; } return e.rows.map(r=>r.id); }
+function rmTrefferMail(){ const ids=_rmTrefferIds(); if(!ids) return; selectedKandIds=new Set(ids); serienMailAuswahl(); }
+function rmTrefferTags(){ const ids=_rmTrefferIds(); if(!ids) return; selectedKandIds=new Set(ids); selTagsModal('hinzu'); }
 
 function rechercheCsvExport() {
   if (!_rmLetzteErgebnisse || !_rmLetzteErgebnisse.rows || !_rmLetzteErgebnisse.rows.length) {
