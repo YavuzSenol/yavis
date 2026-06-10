@@ -7088,7 +7088,14 @@ function zeigeRechercheMaske() {
   _rmFuelleAusFeld('rmBundeslandDD','bundesland','alle Bundesländer');
   _rmFuelleAusFeld('rmQuelleDD','quelle','alle Quellen');
   rmSuchenRender();
+  // Live-Recherche: Ergebnisse aktualisieren sich automatisch bei jeder Filteränderung (entprellt)
+  ['kandidaten','firmen','kontakte'].forEach(t=>{
+    const p=document.getElementById('rmPanel-'+t);
+    if(p && !p.dataset.liveBound){ p.dataset.liveBound='1'; p.addEventListener('input',rmLiveSuche); p.addEventListener('change',rmLiveSuche); }
+  });
 }
+let _rmLiveTimer=null;
+function rmLiveSuche(){ clearTimeout(_rmLiveTimer); _rmLiveTimer=setTimeout(()=>{ try{ rechercheAusfuehren(); }catch(e){} }, 400); }
 
 // Ausschluss-Dropdown (int. Wertung) aus echten DB-Werten füllen, Standard-Ausschlüsse vorausgewählt
 const _rmExWertStd=['generell kein Interesse','nicht vermittelbar','kein Kontakt erwünscht','keine Kontaktmöglichkeit','Rente','zu alt'];
