@@ -7300,49 +7300,77 @@ async function rechercheMaskeAusfuehren() {
     return;
   }
 
-  // ----------- Tabelle rendern -----------
-  const hatKm = plz && rows.some(r => r.entfernung_km != null);
-  let html = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">'
-    + '<thead><tr style="border-bottom:2px solid var(--line);text-align:left">'
-    + '<th style="padding:7px 10px 8px;color:var(--muted);font-weight:600">Name</th>'
-    + '<th style="padding:7px 10px 8px;color:var(--muted);font-weight:600">Position</th>'
-    + '<th style="padding:7px 10px 8px;color:var(--muted);font-weight:600">Ort</th>'
-    + (hatKm ? '<th style="padding:7px 10px 8px;color:var(--muted);font-weight:600">Entfernung</th>' : '')
-    + '<th style="padding:7px 8px 8px;color:var(--muted);font-weight:600" title="Erreichbarkeit">✉&nbsp;☎</th>'
-    + '</tr></thead><tbody>';
-
-  rows.forEach(r => {
-    const hatM = !!(r.email || r.email_beruflich || r.email_zweit);
-    const hatT = !!(r.mobil || r.mobil_privat || r.telefon || r.telefon_privat);
-    const ort  = [r.plz, r.stadt].filter(Boolean).join(' ') || '–';
-    const km   = r.entfernung_km != null ? Math.round(r.entfernung_km) + ' km' : '';
-    const err  = [
-      hatM ? '<span title="E-Mail vorhanden" style="color:var(--accent2)">✉</span>' : '',
-      hatT ? '<span title="Telefon/Mobil vorhanden" style="color:#10b981">☎</span>' : ''
-    ].filter(Boolean).join('&nbsp;');
-    html += '<tr onclick="detailKandidat(\'' + r.id + '\')" style="cursor:pointer;border-bottom:1px solid var(--line)"'
-          + ' onmouseover="this.style.background=\'var(--panel2)\'" onmouseout="this.style.background=\'\'">'
-          + '<td style="padding:7px 10px;font-weight:600">'      + esc(r.voller_name || '–')        + '</td>'
-          + '<td style="padding:7px 10px;color:var(--muted);font-size:12px">' + esc(r.berufsbezeichnung || '–') + '</td>'
-          + '<td style="padding:7px 10px;color:var(--muted);font-size:12px">' + esc(ort)            + '</td>'
-          + (hatKm ? '<td style="padding:7px 10px;color:var(--muted);font-size:12px">' + km + '</td>' : '')
-          + '<td style="padding:7px 8px">' + (err || '–') + '</td>'
-          + '</tr>';
-  });
-  html += '</tbody></table></div>';
-  _rmLetzteErgebnisse = {tab:'kandidaten', rows};
-  bodyEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px;flex-wrap:wrap">'
-    + '<span style="font-size:12px;color:var(--muted)">' + rows.length + ' Treffer</span>'
-    + '<div style="display:flex;gap:6px;flex-wrap:wrap">'
-    +   '<button onclick="rmTrefferMail()" style="padding:5px 13px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);font-size:12px;color:var(--ink)">✉️ Serienmail an alle</button>'
-    +   '<button onclick="rmTrefferTags()" style="padding:5px 13px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);font-size:12px;color:var(--ink)">🏷 Tags an alle</button>'
-    +   '<button onclick="rechercheCsvExport()" style="padding:5px 13px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);font-size:12px;color:var(--ink)">📥 CSV</button>'
-    + '</div></div>' + html;
+  // ----------- Tabelle rendern (konfigurierbare + sortierbare Spalten) -----------
+  _rmLetzteErgebnisse = {tab:'kandidaten', rows, plz: plz||null, radius};
+  _rmSort = {key:null, dir:1};
+  _rmRenderTabelle();
 }
 // Mit allen Treffern arbeiten (nutzt die erprobten Auswahl-Funktionen über selectedKandIds)
 function _rmTrefferIds(){ const e=_rmLetzteErgebnisse; if(!e||e.tab!=='kandidaten'||!(e.rows&&e.rows.length)){ zeigeMeldung('Keine Treffer.','warn'); return null; } return e.rows.map(r=>r.id); }
 function rmTrefferMail(){ const ids=_rmTrefferIds(); if(!ids) return; selectedKandIds=new Set(ids); serienMailAuswahl(); }
 function rmTrefferTags(){ const ids=_rmTrefferIds(); if(!ids) return; selectedKandIds=new Set(ids); selTagsModal('hinzu'); }
+
+// ===== Trefferliste: konfigurierbare + sortierbare Spalten =====
+const RM_COLS=[
+ {key:'voller_name',label:'Name',get:r=>r.voller_name||'',render:r=>'<b>'+esc(r.voller_name||'–')+'</b>'},
+ {key:'berufsbezeichnung',label:'Position',get:r=>r.berufsbezeichnung||r.funktion||'',render:r=>esc(r.berufsbezeichnung||r.funktion||'–')},
+ {key:'funktion',label:'Funktion (AP)',get:r=>r.funktion||'',render:r=>esc(r.funktion||'–')},
+ {key:'arbeitgeber',label:'Arbeitgeber',get:r=>r.arbeitgeber||'',render:r=>esc(r.arbeitgeber||'–')},
+ {key:'stadt',label:'Ort',get:r=>r.stadt||'',render:r=>esc([r.plz,r.stadt].filter(Boolean).join(' ')||'–')},
+ {key:'plz',label:'PLZ',get:r=>r.plz||'',render:r=>esc(r.plz||'–')},
+ {key:'email',label:'E-Mail',get:r=>r.email||r.email_beruflich||'',render:r=>esc(r.email||r.email_beruflich||'–')},
+ {key:'telefon',label:'Telefon/Mobil',get:r=>r.telefon||r.mobil||r.mobil_privat||r.telefon_privat||'',render:r=>esc(r.telefon||r.mobil||r.mobil_privat||r.telefon_privat||'–')},
+ {key:'status',label:'Status',get:r=>r.status||'',render:r=>esc(r.status||'–')},
+ {key:'wertung',label:'Wertung',get:r=>r.wertung||'',render:r=>esc(r.wertung||'–')},
+ {key:'erfahrung_jahre',label:'Erf.(J)',get:r=>{const n=parseFloat(String(r.erfahrung_jahre||'').replace(',','.'));return isNaN(n)?-1:n;},render:r=>esc(r.erfahrung_jahre||'–')},
+ {key:'gehalt_erwartet',label:'Gehalt erw.',get:r=>{const n=parseFloat(String(r.gehalt_erwartet||'').replace(',','.'));return isNaN(n)?-1:n;},render:r=>esc(r.gehalt_erwartet||'–')},
+ {key:'qualifikation',label:'Qualifikation',get:r=>r.qualifikation||'',render:r=>esc(r.qualifikation||'–')},
+ {key:'studiengang',label:'Studiengang',get:r=>r.studiengang||'',render:r=>esc(r.studiengang||'–')},
+ {key:'rollen',label:'Rolle',get:r=>r.rollen||'',render:r=>{const ro=r.rollen||'';const t=[];if(ro.includes(';Kandidat;'))t.push('Kand.');if(ro.includes(';Ansprechpartner;'))t.push('AP');return t.join('+')||'–';}},
+];
+const RM_COLS_MAP=Object.fromEntries(RM_COLS.map(c=>[c.key,c]));
+let rmSpalten=(()=>{try{const s=JSON.parse(localStorage.getItem('rm_spalten'));if(Array.isArray(s)&&s.length)return s.filter(k=>RM_COLS_MAP[k]);}catch(e){}return ['voller_name','berufsbezeichnung','stadt','telefon'];})();
+let _rmSort={key:null,dir:1};
+function rmSort(key){ if(_rmSort.key===key) _rmSort.dir*=-1; else {_rmSort.key=key;_rmSort.dir=1;} _rmRenderTabelle(); }
+function rmSpaltenPanelToggle(){ const p=document.getElementById('rmSpaltenPanel'); if(p) p.style.display=(p.style.display==='none'?'flex':'none'); }
+function rmSpalteSet(key,on){ if(on){ if(!rmSpalten.includes(key)) rmSpalten.push(key); } else { rmSpalten=rmSpalten.filter(k=>k!==key); if(!rmSpalten.length) rmSpalten=['voller_name']; } localStorage.setItem('rm_spalten',JSON.stringify(rmSpalten)); _rmRenderTabelle(); }
+function _rmRenderTabelle(){
+  const e=_rmLetzteErgebnisse, bodyEl=document.getElementById('rmBody'); if(!e||e.tab!=='kandidaten'||!bodyEl) return;
+  let rows=e.rows.slice();
+  const hatKm = e.plz && rows.some(r=>r.entfernung_km!=null);
+  if(_rmSort.key){
+    if(_rmSort.key==='__km') rows.sort((a,b)=>(((a.entfernung_km==null?1e9:a.entfernung_km)-(b.entfernung_km==null?1e9:b.entfernung_km))*_rmSort.dir));
+    else { const c=RM_COLS_MAP[_rmSort.key]; if(c) rows.sort((a,b)=>{const x=c.get(a),y=c.get(b); if(typeof x==='number'&&typeof y==='number')return (x-y)*_rmSort.dir; return String(x).localeCompare(String(y),'de',{numeric:true,sensitivity:'base'})*_rmSort.dir;}); }
+  }
+  const cols=rmSpalten.map(k=>RM_COLS_MAP[k]).filter(Boolean);
+  const arr=k=>_rmSort.key===k?(_rmSort.dir>0?' ▲':' ▼'):'';
+  let html='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="border-bottom:2px solid var(--line);text-align:left">';
+  cols.forEach(c=>{ html+='<th onclick="rmSort(\''+c.key+'\')" style="padding:7px 10px 8px;color:var(--muted);font-weight:600;cursor:pointer;user-select:none;white-space:nowrap">'+esc(c.label)+arr(c.key)+'</th>'; });
+  if(hatKm) html+='<th onclick="rmSort(\'__km\')" style="padding:7px 10px 8px;color:var(--muted);font-weight:600;cursor:pointer;user-select:none">Entfernung'+arr('__km')+'</th>';
+  html+='<th style="padding:7px 8px 8px;color:var(--muted);font-weight:600" title="Erreichbarkeit">✉&nbsp;☎</th></tr></thead><tbody>';
+  rows.forEach(r=>{
+    const hatM=!!(r.email||r.email_beruflich||r.email_zweit), hatT=!!(r.mobil||r.mobil_privat||r.telefon||r.telefon_privat);
+    const err=[hatM?'<span title="E-Mail vorhanden" style="color:var(--accent2)">✉</span>':'',hatT?'<span title="Telefon/Mobil vorhanden" style="color:#10b981">☎</span>':''].filter(Boolean).join('&nbsp;');
+    html+='<tr onclick="detailKandidat(\''+r.id+'\')" style="cursor:pointer;border-bottom:1px solid var(--line)" onmouseover="this.style.background=\'var(--panel2)\'" onmouseout="this.style.background=\'\'">';
+    cols.forEach(c=>{ html+='<td style="padding:7px 10px;color:var(--ink);font-size:12px">'+c.render(r)+'</td>'; });
+    if(hatKm) html+='<td style="padding:7px 10px;color:var(--muted);font-size:12px">'+(r.entfernung_km!=null?Math.round(r.entfernung_km)+' km':'')+'</td>';
+    html+='<td style="padding:7px 8px">'+(err||'–')+'</td></tr>';
+  });
+  html+='</tbody></table></div>';
+  const btn='padding:5px 13px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);font-size:12px;color:var(--ink)';
+  const bar='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px;flex-wrap:wrap">'
+    +'<span style="font-size:12px;color:var(--muted)">'+e.rows.length+' Treffer</span>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+    +'<button onclick="rmSpaltenPanelToggle()" style="'+btn+'">🗂 Spalten</button>'
+    +'<button onclick="rmTrefferMail()" style="'+btn+'">✉️ Serienmail an alle</button>'
+    +'<button onclick="rmTrefferTags()" style="'+btn+'">🏷 Tags an alle</button>'
+    +'<button onclick="rechercheCsvExport()" style="'+btn+'">📥 CSV</button>'
+    +'</div></div>';
+  const panel='<div id="rmSpaltenPanel" style="display:none;border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:10px;margin-bottom:8px;flex-wrap:wrap;gap:4px 14px">'
+    +RM_COLS.map(c=>'<label class="msdd-opt" style="display:inline-flex"><input type="checkbox" '+(rmSpalten.includes(c.key)?'checked':'')+' onchange="rmSpalteSet(\''+c.key+'\',this.checked)">'+esc(c.label)+'</label>').join('')
+    +'</div>';
+  bodyEl.innerHTML=bar+panel+html;
+}
 
 function rechercheCsvExport() {
   if (!_rmLetzteErgebnisse || !_rmLetzteErgebnisse.rows || !_rmLetzteErgebnisse.rows.length) {
