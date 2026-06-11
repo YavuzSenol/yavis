@@ -163,6 +163,13 @@
     border-radius:5px;font-size:15px;line-height:1;padding:4px 9px}
   .recnav-btn:disabled{opacity:.35;cursor:default}
   .recnav-pos{font-size:11px;color:var(--muted);min-width:46px;text-align:center}
+  /* Direkt-Bearbeiten (Inline) */
+  .inl-ta{width:100%;background:transparent;border:1px dashed transparent;border-radius:4px;color:var(--ink);
+    font:inherit;font-size:12px;padding:4px 6px;resize:none;min-height:30px;box-sizing:border-box;overflow:hidden;transition:border-color .12s,background .12s}
+  .inl-ta:hover{border-color:var(--line)}
+  .inl-ta:focus{border-color:var(--accent2);background:var(--bg);outline:none}
+  .inl-ta::placeholder{color:var(--muted);font-style:italic}
+  .inl-saved{font-size:10px;margin-left:2px}
   .timeline-item{border-left:2px solid var(--line);padding:0 0 10px 12px;position:relative}
   .timeline-item:before{content:'';position:absolute;left:-5px;top:4px;width:8px;height:8px;
     border-radius:50%;background:var(--accent)}
@@ -2827,7 +2834,7 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
         ${wvErl.length?`<details class="wverl"><summary>erledigte (${wvErl.length})</summary>${wvErl.slice(0,15).map(t=>`<div class="wvitem done"><div class="wvbet">${esc(t.betreff)||'–'}</div><div class="wvbes">${t.faelligkeitsdatum?fmtDatum(t.faelligkeitsdatum):''}${t.status?' · '+esc(t.status):''}</div></div>`).join('')}</details>`:''}
         <button class="neuBtn" style="margin-top:8px" onclick="aufgabeNeuPopup()">+ wiedervorlage</button>
         <div class="dsubh">Bemerkung</div>
-        <div style="font-size:12px;color:var(--muted);white-space:pre-wrap">${d.bemerkung?esc(d.bemerkung):'—'}</div>
+        <textarea class="inl-ta" data-id="${d.id}" data-feld="bemerkung" data-orig="${esc(d.bemerkung||'').replace(/"/g,'&quot;')}" placeholder="Bemerkung eingeben …" onblur="_inlSave(this)" oninput="_inlAutogrow(this)">${esc(d.bemerkung||'')}</textarea>
       </div>
 
       </div>
@@ -2864,6 +2871,7 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
   `;
   window.scrollTo(0,0);
   setTimeout(initAbschnitteSortierung, 0);
+  setTimeout(()=>{ document.querySelectorAll('#detailPage .inl-ta').forEach(_inlAutogrow); }, 0);
 }
 
 function zurueckZurListe(){
@@ -2902,6 +2910,28 @@ document.addEventListener('keydown', (e)=>{
   e.preventDefault();
   kandidatBlaettern(e.key==='ArrowRight'?1:-1);
 });
+
+// ===== Direkt-Bearbeiten (Inline) =====
+// Wiederverwendbares Muster: Feld anklicken, tippen, beim Verlassen automatisch speichern.
+function _inlAutogrow(el){ if(!el) return; el.style.height='auto'; el.style.height=Math.max(30, el.scrollHeight)+'px'; }
+function _inlFeedback(el, txt, err){
+  let fb=el.parentElement.querySelector('.inl-saved');
+  if(!fb){ fb=document.createElement('span'); fb.className='inl-saved'; el.parentElement.appendChild(fb); }
+  fb.textContent=txt; fb.style.color = err ? 'var(--hot)' : '#10b981';
+  if(!err) setTimeout(()=>{ if(fb && fb.textContent===txt) fb.textContent=''; }, 2500);
+}
+async function _inlSave(el){
+  const id=el.dataset.id, feld=el.dataset.feld;
+  if(!id||!feld) return;
+  const val=(el.value||'').trim();
+  if(val === (el.dataset.orig||'')) return; // nichts geändert
+  _inlFeedback(el, 'speichere …', false);
+  const patch={}; patch[feld]=val||null; patch.geaendert_am=new Date().toISOString();
+  const {error}=await sb.from('kandidaten').update(patch).eq('id', id);
+  if(error){ _inlFeedback(el, 'Fehler: '+error.message, true); return; }
+  el.dataset.orig=val;
+  _inlFeedback(el, 'gespeichert ✓', false);
+}
 
 function initAbschnitteSortierung() {
   const page = document.getElementById('detailPage');
