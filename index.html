@@ -133,7 +133,8 @@
     border-top:1px solid var(--line);padding-top:6px}
   .dempty{color:var(--muted);font-size:12px}
   .dchecks{display:flex;flex-wrap:wrap;gap:8px;margin-top:5px}
-  .dchk{font-size:11px;color:var(--muted);display:inline-flex;align-items:center;gap:3px}
+  .dchk{font-size:11px;color:var(--muted);display:inline-flex;align-items:center;gap:3px;cursor:pointer;border:1px solid transparent;border-radius:4px;padding:1px 4px}
+  .dchk:hover{border-color:var(--line)}
   .dchk.on{color:var(--hot);font-weight:600}
   .dwg{display:grid;grid-template-columns:1fr 1fr;gap:10px 26px}
   @media(max-width:640px){.dwg{grid-template-columns:1fr}}
@@ -177,6 +178,18 @@
   .inl-in:focus{border-color:var(--accent2);background:var(--bg);outline:none;text-align:left}
   .inl-in::placeholder{color:var(--muted)}
   .inl-act{flex:0 0 auto;cursor:pointer;color:var(--accent2);font-size:12px;text-decoration:none;user-select:none}
+  .inl-sel{width:100%;text-align:right;background:transparent;border:1px dashed transparent;border-radius:4px;
+    color:var(--ink);font:inherit;font-size:12px;padding:2px 4px;cursor:pointer}
+  .inl-sel:hover{border-color:var(--line)}
+  .inl-sel:focus{border-color:var(--accent2);background:var(--bg);outline:none}
+  .fae-box{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-bottom:6px}
+  .fae-chip{display:inline-flex;align-items:center;gap:4px}
+  .fae-x{cursor:pointer;color:var(--muted);font-weight:700}
+  .fae-x:hover{color:var(--hot)}
+  .fae-add{border:1px dashed var(--line);background:transparent;color:var(--ink);font:inherit;font-size:11px;
+    border-radius:4px;padding:2px 6px;width:92px}
+  .fae-add:focus{border-color:var(--accent2);background:var(--bg);outline:none;width:130px}
+  .fae-saved{font-size:10px}
   .timeline-item{border-left:2px solid var(--line);padding:0 0 10px 12px;position:relative}
   .timeline-item:before{content:'';position:absolute;left:-5px;top:4px;width:8px;height:8px;
     border-radius:50%;background:var(--accent)}
@@ -2653,8 +2666,10 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
   const actTel=`<span class="inl-act" title="Anrufen" onclick="_inlTel(this)">☎</span>`;
   const actMail=`<span class="inl-act" title="E-Mail schreiben" onclick="_inlMail(this,'${d.id}','${esc(d.voller_name)}')">✉</span>`;
   const actOpen=`<span class="inl-act" title="Profil öffnen" onclick="_inlOpen(this)">↗</span>`;
+  const _statusOpts=(typeof statusListe==='function'?statusListe():['Aktiv suchend','Offen für Angebote','Nicht verfügbar','Platziert','Gesperrt']);
+  const statusSel=`<select class="inl-sel" data-id="${d.id}" data-feld="status" data-orig="${esc(d.status||'')}" onchange="_inlSave(this)"><option value="">—</option>${_statusOpts.map(o=>`<option ${o===d.status?'selected':''}>${esc(o)}</option>`).join('')}${(d.status&&!_statusOpts.includes(d.status))?`<option selected>${esc(d.status)}</option>`:''}</select>`;
   const mail=(x)=> x?`<a href="#" onclick="event.preventDefault();mailtoMitLog('${esc(x)}','${d.id}','${esc(d.voller_name)}')" style="color:var(--accent2)">${esc(x)}</a>`:'';
-  const chk=(on,label)=>`<span class="dchk ${on?'on':''}">${on?'🚫':'○'} ${label}</span>`;
+  const chk=(on,feld,label)=>`<span class="dchk ${on?'on':''}" data-id="${d.id}" data-feld="${feld}" data-on="${on?'1':'0'}" data-onic="🚫" data-offic="○" data-label="${label}" onclick="_inlToggle(this)" title="Klicken zum Umschalten">${on?'🚫':'○'} ${label}</span>`;
   const rollen=(d.rollen||'').split(';').map(s=>s.trim()).filter(Boolean).join(', ');
   const heute=heuteISO();
   const wvOffen=aufg.filter(t=>istOffen(t.status));
@@ -2785,18 +2800,18 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
       <div class="dblock">
         <div class="dbh">Status &amp; Sperren</div>
         ${r('rollen', esc(rollen))}
-        ${r('status', d.status?`<span class="pill">${esc(d.status)}</span>`:'')}
-        ${r('int. wertung', esc(d.wertung_intern))}
-        ${r('kontaktstatus', esc(d.kontaktstatus))}
+        <div class="drow"><span class="dk">status</span><span class="dv dv-edit">${statusSel}</span></div>
+        ${ri('int. wertung','wertung_intern', d.wertung_intern)}
+        ${ri('kontaktstatus','kontaktstatus', d.kontaktstatus)}
         ${r('quelle', esc(d.quelle))}
-        ${r('hot', d.ist_hot?'🔥 ja':'nein')}
+        <div class="drow"><span class="dk">hot</span><span class="dv"><span class="inl-act" style="color:inherit" onclick="hotToggle('${d.id}',${d.ist_hot?'true':'false'})" title="Umschalten">${d.ist_hot?'🔥 ja':'nein'}</span></span></div>
         ${r('abwerbeschutz', geschuetzt?(autoSchutz?'🔒 auto (auftraggeber)':'🔒 manuell'):'frei')}
         <div class="dsubh">Kontaktsperren</div>
         <div class="dchecks">
-          ${chk(d.sperre_email,'e-mail')}
-          ${chk(d.sperre_brief,'brief')}
-          ${chk(d.sperre_anruf,'anruf')}
-          ${chk(d.kein_newsletter,'newsletter')}
+          ${chk(d.sperre_email,'sperre_email','e-mail')}
+          ${chk(d.sperre_brief,'sperre_brief','brief')}
+          ${chk(d.sperre_anruf,'sperre_anruf','anruf')}
+          ${chk(d.kein_newsletter,'kein_newsletter','newsletter')}
         </div>
       </div>
 
@@ -2822,7 +2837,12 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
       <div class="dblock">
         <div class="dbh">Kategorisierung</div>
         <div class="dsubh" style="border-top:none;padding-top:0;margin-top:0">Fähigkeiten</div>
-        ${wgTags?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${wgTags}</div>`:'<div class="dempty" style="margin-bottom:6px">keine Fähigkeiten erfasst</div>'}
+        <div class="fae-box" data-id="${d.id}" data-tags="${esc(_tagStore(parseTags(d.tags))).replace(/"/g,'&quot;')}">
+          <span class="fae-chips">${_faeChips(parseTags(d.tags))}</span>
+          <input class="fae-add" list="faeDL" placeholder="+ Fähigkeit" onkeydown="if(event.key==='Enter'){event.preventDefault();_faeAdd(this)}">
+          <span class="fae-saved"></span>
+        </div>
+        <datalist id="faeDL"></datalist>
         ${ri('studiengang','studiengang', d.studiengang)}
         ${ri('qualifikation','qualifikation', d.qualifikation)}
         ${r('fremdsprachen', esc(d.fremdsprachen))}
@@ -2887,6 +2907,7 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
   window.scrollTo(0,0);
   setTimeout(initAbschnitteSortierung, 0);
   setTimeout(()=>{ document.querySelectorAll('#detailPage .inl-ta').forEach(_inlAutogrow); }, 0);
+  setTimeout(_faeVorschlaege, 0);
 }
 
 function zurueckZurListe(){
@@ -2952,6 +2973,30 @@ function _inlSibInput(el){ return el.parentElement.querySelector('input.inl-in')
 function _inlTel(el){ const i=_inlSibInput(el); const v=i?(i.value||'').replace(/[^\d+]/g,''):''; if(v) location.href='tel:'+v; }
 function _inlMail(el,id,name){ const i=_inlSibInput(el); const v=i?(i.value||'').trim():''; if(v) mailtoMitLog(v,id,name); }
 function _inlOpen(el){ const i=_inlSibInput(el); const v=i?(i.value||'').trim():''; if(v) window.open(v,'_blank'); }
+// Schalter (Sperren) — bool umschalten, sofort speichern, ohne Neuaufbau der Seite
+async function _inlToggle(el){
+  const id=el.dataset.id, feld=el.dataset.feld; if(!id||!feld) return;
+  const neu = el.dataset.on!=='1';
+  const patch={}; patch[feld]=neu; patch.geaendert_am=new Date().toISOString();
+  const {error}=await sb.from('kandidaten').update(patch).eq('id', id);
+  if(error){ alert('Fehler: '+error.message); return; }
+  el.dataset.on = neu?'1':'0';
+  el.classList.toggle('on', neu);
+  const onic=el.dataset.onic||'✓', offic=el.dataset.offic||'○', lbl=el.dataset.label||'';
+  el.innerHTML = (neu?onic:offic)+' '+lbl;
+}
+// Fähigkeiten-Chips direkt bearbeiten (schreibt ins tags-Feld)
+function _faeChips(arr){ return arr.map(t=>`<span class="tag fae-chip">${esc(t)} <span class="fae-x" data-tag="${esc(t).replace(/"/g,'&quot;')}" onclick="_faeRemove(this)" title="Entfernen">×</span></span>`).join(''); }
+async function _faeApply(box, arr){
+  box.dataset.tags=_tagStore(arr);
+  const cont=box.querySelector('.fae-chips'); if(cont) cont.innerHTML=_faeChips(arr);
+  const {error}=await sb.from('kandidaten').update({tags: arr.length?_tagStore(arr):null, geaendert_am:new Date().toISOString()}).eq('id', box.dataset.id);
+  const fb=box.querySelector('.fae-saved'); if(fb){ fb.textContent=error?('Fehler: '+error.message):'gespeichert ✓'; fb.style.color=error?'var(--hot)':'#10b981'; if(!error) setTimeout(()=>{ if(fb) fb.textContent=''; },2000); }
+  try{ delete window._alleTagsCache; }catch(e){}
+}
+function _faeRemove(xEl){ const box=xEl.closest('.fae-box'); const tag=(xEl.dataset.tag||'').toLowerCase(); const arr=parseTags(box.dataset.tags).filter(t=>t.toLowerCase()!==tag); _faeApply(box, arr); }
+function _faeAdd(inp){ const box=inp.closest('.fae-box'); const raw=inp.value.trim(); inp.value=''; if(!raw) return; const t=normTag(raw); if(!t) return; const arr=parseTags(box.dataset.tags); if(!arr.map(x=>x.toLowerCase()).includes(t.toLowerCase())){ arr.push(t); _faeApply(box, arr); } }
+async function _faeVorschlaege(){ const dl=document.getElementById('faeDL'); if(!dl) return; const alle=await ladeAlleTags(); dl.innerHTML=(alle||[]).map(t=>'<option value="'+esc(t)+'">').join(''); }
 
 function initAbschnitteSortierung() {
   const page = document.getElementById('detailPage');
