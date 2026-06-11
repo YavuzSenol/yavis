@@ -118,6 +118,37 @@
   .kvr{display:grid;grid-template-columns:auto 1fr;gap:2px 8px;font-size:12px;padding:2px 0;align-items:start;min-width:0}
   .kvr .k{color:var(--muted);white-space:nowrap;font-size:11px}
   .kvr .v{color:var(--ink);word-break:break-word;font-size:12px}
+  /* 8-Blöcke-Detailansicht (4-Spalten-Raster, responsiv) */
+  .dcols{display:flex;flex-wrap:wrap;align-items:flex-start;gap:10px;margin-bottom:10px}
+  .dcol{flex:1 1 300px;min-width:0;display:flex;flex-direction:column;gap:10px}
+  .dblock{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:11px 13px;min-width:0}
+  .dblock.full{margin-bottom:10px}
+  .dblock.key{background:var(--panel2);box-shadow:inset 2px 0 0 var(--accent2)}
+  .dbh{font-size:11px;letter-spacing:.02em;text-transform:none;color:var(--accent2);
+    font-weight:700;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--line)}
+  .drow{display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:2px 0;align-items:baseline}
+  .drow .dk{color:var(--muted);font-size:11px;white-space:nowrap}
+  .drow .dv{color:var(--ink);text-align:right;word-break:break-word;min-width:0}
+  .dsubh{font-size:10px;color:var(--accent2);margin:9px 0 3px;font-weight:600;
+    border-top:1px solid var(--line);padding-top:6px}
+  .dempty{color:var(--muted);font-size:12px}
+  .dchecks{display:flex;flex-wrap:wrap;gap:8px;margin-top:5px}
+  .dchk{font-size:11px;color:var(--muted);display:inline-flex;align-items:center;gap:3px}
+  .dchk.on{color:var(--hot);font-weight:600}
+  .dwg{display:grid;grid-template-columns:1fr 1fr;gap:10px 26px}
+  @media(max-width:640px){.dwg{grid-template-columns:1fr}}
+  .dwg-col{min-width:0}
+  .wvitem{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:6px 8px;margin-bottom:6px}
+  .wvitem.done{opacity:.6}
+  .wvtop{display:flex;justify-content:space-between;align-items:center;gap:6px}
+  .wvdate{font-size:11px;color:var(--accent2)}
+  .wvdate.ueber{color:var(--hot);font-weight:600}
+  .wvact button{background:var(--panel2);border:1px solid var(--line);color:var(--ink);
+    border-radius:3px;cursor:pointer;font-size:11px;padding:1px 6px;margin-left:3px}
+  .wvbet{font-size:12px;font-weight:600;margin-top:3px}
+  .wvbes{font-size:11px;color:var(--muted);margin-top:2px}
+  .wverl{margin:4px 0}
+  .wverl summary{cursor:pointer;color:var(--muted);font-size:11px}
   .timeline-item{border-left:2px solid var(--line);padding:0 0 10px 12px;position:relative}
   .timeline-item:before{content:'';position:absolute;left:-5px;top:4px;width:8px;height:8px;
     border-radius:50%;background:var(--accent)}
@@ -2583,6 +2614,15 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
   const adrPriv=[d.strasse,[d.plz,d.stadt].filter(Boolean).join(' '),d.bundesland,d.land].filter(Boolean).join(', ');
   const adrBerufl=[d.strasse_beruf,[d.plz_beruf,d.stadt_beruf].filter(Boolean).join(' '),d.bundesland_beruf,d.land_beruf].filter(Boolean).join(', ');
   const tags=parseTags(d.tags).map(t=>`<span class="tag">${esc(t)}</span>`).join('');
+  // Helfer für die 8-Blöcke-Ansicht
+  const r=(k,v)=>`<div class="drow"><span class="dk">${k}</span><span class="dv">${(v||v===0)?v:'—'}</span></div>`;
+  const mail=(x)=> x?`<a href="#" onclick="event.preventDefault();mailtoMitLog('${esc(x)}','${d.id}','${esc(d.voller_name)}')" style="color:var(--accent2)">${esc(x)}</a>`:'';
+  const chk=(on,label)=>`<span class="dchk ${on?'on':''}">${on?'🚫':'○'} ${label}</span>`;
+  const rollen=(d.rollen||'').split(';').map(s=>s.trim()).filter(Boolean).join(', ');
+  const heute=heuteISO();
+  const wvOffen=aufg.filter(t=>istOffen(t.status));
+  const wvErl=aufg.filter(t=>!istOffen(t.status));
+  const wgTags=parseTags(d.faehigkeiten||d.tags).map(t=>`<span class="tag">${esc(t)}</span>`).join('');
 
   const fotoHtml=fotoUrl
     ?`<div class="foto-wrap">
@@ -2618,111 +2658,165 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
       🔒 Abwerbeschutz aktiv${autoSchutz?' (automatisch — Arbeitgeber ist Auftraggeber)':' (manuell gesetzt)'} — dieser Kandidat darf <u>nicht</u> kontaktiert oder für Stellen vorgeschlagen werden.
     </div>`:''}
 
-    <div class="dpanels">
+    <div class="dcols">
 
-      <!-- LINKS: Arbeitgeber & Status -->
-      <div class="dpanel">
-        <span class="dcol-h">Arbeitgeber</span>
-        ${zeile('Firma', d.arbeitgeber ? `<a href="#" onclick="event.preventDefault();oeffneFirmaVonKandidat('${esc(d.arbeitgeber)}')" style="color:var(--accent2)" title="Zur Firma springen">${esc(d.arbeitgeber)}</a>` : '')}
-        ${zeile('Bei Firma seit', esc(d.bei_firma_seit))}
-        ${zeile('In Pos. seit', esc(d.in_position_seit))}
-        ${zeile('Adresse berufl.', esc(adrBerufl))}
-        ${zeile('Firma zuvor', esc(d.firma_zuvor))}
-        <div class="dpanel-sub">
-          <span class="dcol-h">Status & Recruiting</span>
-          ${zeile('Status', d.status?`<span class="pill">${esc(d.status)}</span>`:'')}
-          ${zeile('Kontaktstatus', esc(d.kontaktstatus))}
-          ${zeile('Int. Wertung', esc(d.wertung_intern))}
-          ${zeile('Quelle', esc(d.quelle))}
-        </div>
-        <div class="dpanel-sub">
-          <span class="dcol-h">Status & Sperren</span>
-          ${(d.sperre_email||d.sperre_brief||d.sperre_anruf||d.kein_newsletter)
-            ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">
-                ${d.sperre_email?'<span class="tag" style="color:var(--hot);border-color:var(--hot)">🚫 E-Mail</span>':''}
-                ${d.sperre_brief?'<span class="tag" style="color:var(--hot);border-color:var(--hot)">🚫 Brief</span>':''}
-                ${d.sperre_anruf?'<span class="tag" style="color:var(--hot);border-color:var(--hot)">🚫 Anruf</span>':''}
-                ${d.kein_newsletter?'<span class="tag" style="color:var(--hot);border-color:var(--hot)">🚫 Newsletter</span>':''}
-              </div>`
-            : '<div style="font-size:12px;color:var(--muted);margin-top:3px">Keine Kontaktsperren</div>'}
+      <!-- Spalte 1: wer & wo -->
+      <div class="dcol">
+
+      <!-- ident -->
+      <div class="dblock">
+        <div class="dbh">ident</div>
+        ${r('anrede', esc(d.begruessung))}
+        ${r('titel', esc(d.titel))}
+        ${r('vorname', esc(d.vorname))}
+        ${r('nachname', esc(d.nachname))}
+        ${r('position', esc(d.berufsbezeichnung))}
+        ${r('laut cv', esc(d.position_original))}
+        ${r('funktion', esc(d.funktion))}
+        ${r('arbeitgeber', d.arbeitgeber ? `<a href="#" onclick="event.preventDefault();oeffneFirmaVonKandidat('${esc(d.arbeitgeber)}')" style="color:var(--accent2)" title="Zur Firma springen">${esc(d.arbeitgeber)}</a>` : '')}
+        ${r('bei firma seit', esc(d.bei_firma_seit))}
+        ${r('in position seit', esc(d.in_position_seit))}
+        ${r('firma zuvor', esc(d.firma_zuvor))}
+        ${r('position zuvor', esc(d.position_zuvor))}
+        ${istAnsprechpartner?`<div class="dsubh">als ansprechpartner</div>${r('firma', firmaName?`<a href="#" onclick="event.preventDefault();detailKunde('${d.firma_id}')" style="color:var(--accent2)" title="Zur Firma springen">${esc(firmaName)}</a>`:(d.firma_id?esc(d.firma_id):''))}`:''}
+      </div>
+
+      <!-- anschrift -->
+      <div class="dblock">
+        <div class="dbh">anschrift</div>
+        ${r('straße', esc(d.strasse))}
+        ${r('plz / ort', esc([d.plz,d.stadt].filter(Boolean).join(' ')))}
+        ${r('bundesland', esc(d.bundesland))}
+        ${r('land', esc(d.land))}
+        ${r('geburtstag', esc(d.geburtstag))}
+        <div class="dsubh">beruflich</div>
+        ${r('straße', esc(d.strasse_beruf))}
+        ${r('plz / ort', esc([d.plz_beruf,d.stadt_beruf].filter(Boolean).join(' ')))}
+        ${r('bundesland', esc(d.bundesland_beruf))}
+        ${r('land', esc(d.land_beruf))}
+      </div>
+
+      </div>
+
+      <!-- Spalte 2: kontakt & stand -->
+      <div class="dcol">
+
+      <!-- erreichbarkeit -->
+      <div class="dblock">
+        <div class="dbh">erreichbarkeit</div>
+        ${r('mobil', tel(d.mobil))}
+        ${r('telefon', tel(d.telefon))}
+        ${r('fax', esc(d.fax))}
+        ${r('e-mail', mail(d.email))}
+        ${r('e-mail berufl.', mail(d.email_beruflich))}
+        ${r('2. e-mail', mail(d.email_zweit))}
+        ${r('xing', link(d.xing_profil))}
+        ${r('linkedin', link(d.linkedin_profil))}
+        <div class="dsubh">privat</div>
+        ${r('tel. privat', tel(d.telefon_privat))}
+        ${r('mobil privat', tel(d.mobil_privat))}
+      </div>
+
+      <!-- status & sperren -->
+      <div class="dblock">
+        <div class="dbh">status &amp; sperren</div>
+        ${r('rollen', esc(rollen))}
+        ${r('status', d.status?`<span class="pill">${esc(d.status)}</span>`:'')}
+        ${r('int. wertung', esc(d.wertung_intern))}
+        ${r('kontaktstatus', esc(d.kontaktstatus))}
+        ${r('quelle', esc(d.quelle))}
+        ${r('hot', d.ist_hot?'🔥 ja':'nein')}
+        ${r('abwerbeschutz', geschuetzt?(autoSchutz?'🔒 auto (auftraggeber)':'🔒 manuell'):'frei')}
+        <div class="dsubh">kontaktsperren</div>
+        <div class="dchecks">
+          ${chk(d.sperre_email,'e-mail')}
+          ${chk(d.sperre_brief,'brief')}
+          ${chk(d.sperre_anruf,'anruf')}
+          ${chk(d.kein_newsletter,'newsletter')}
         </div>
       </div>
 
-      <!-- MITTE: Kontakt (2 Unterspalten) -->
-      <div class="dpanel">
-        <span class="dcol-h">Kontakt & Adresse</span>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 20px">
-          <div>
-            ${zeile('Anrede', esc(d.begruessung))}
-            ${zeile('E-Mail', d.email?`<a href="#" onclick="event.preventDefault();mailtoMitLog('${esc(d.email)}','${d.id}','${esc(d.voller_name)}')" style="color:var(--accent2)">${esc(d.email)}</a>`:'')}
-            ${zeile('E-Mail berufl.', d.email_beruflich?`<a href="#" onclick="event.preventDefault();mailtoMitLog('${esc(d.email_beruflich)}','${d.id}','${esc(d.voller_name)}')" style="color:var(--accent2)">${esc(d.email_beruflich)}</a>`:'')}
-            ${zeile('2. E-Mail', d.email_zweit?`<a href="#" onclick="event.preventDefault();mailtoMitLog('${esc(d.email_zweit)}','${d.id}','${esc(d.voller_name)}')" style="color:var(--accent2)">${esc(d.email_zweit)}</a>`:'')}
-            ${zeile('Telefon', tel(d.telefon))}
-            ${zeile('Tel. privat', tel(d.telefon_privat))}
-            ${zeile('Mobil', tel(d.mobil))}
-            ${zeile('Mobil privat', tel(d.mobil_privat))}
-          </div>
-          <div>
-            ${zeile('Adresse priv.', esc(adrPriv))}
-            ${zeile('Geburtstag', esc(d.geburtstag))}
-            ${zeile('XING', link(d.xing_profil))}
-            ${zeile('LinkedIn', link(d.linkedin_profil))}
-          </div>
-        </div>
-        ${tags?`<div class="dpanel-sub">
-          <span class="dcol-h">Tags</span>${tags}
-        </div>`:''}
-        ${d.profil_zusammenfassung||d.bemerkung?`<div class="dpanel-sub">
-          ${d.profil_zusammenfassung?`<span class="dcol-h">Profil</span><div style="font-size:12px;color:var(--muted);margin-top:3px;margin-bottom:6px">${esc(d.profil_zusammenfassung)}</div>`:''}
-          ${d.bemerkung?`<span class="dcol-h">Bemerkung</span><div style="font-size:12px;color:var(--muted);margin-top:3px">${esc(d.bemerkung)}</div>`:''}
-        </div>`:''}
       </div>
 
-      <!-- RECHTS: Berufliches -->
-      <div class="dpanel">
-        <span class="dcol-h">Beruflich</span>
-        ${zeile('Tätigkeit', esc(d.berufsbezeichnung))}
-        ${d.position_original?zeile('Pos. laut CV', esc(d.position_original)):''}
-        ${zeile('Erfahrung', d.erfahrung_jahre?esc(d.erfahrung_jahre)+' J.':'')}
-        ${zeile('Qualifikation', esc(d.qualifikation))}
-        ${zeile('Studiengang', esc(d.studiengang))}
-        <div class="dpanel-sub">
-          <span class="dcol-h">Direktansprache</span>
-          ${zeile('Positionswunsch', esc(d.positionswunsch))}
-          ${zeile('Wunschregion', esc(d.wunschregion))}
-          ${zeile('Umzug', esc(d.umzugsbereitschaft))}
-          ${zeile('Gehalt aktuell', esc(d.gehalt_aktuell))}
-          ${zeile('Gehalt Wunsch', esc(d.gehalt_erwartet))}
-          ${zeile('Kündigungsfrist', esc(d.kuendigungsfrist))}
-          ${zeile('Wechselmotiv.', esc(d.wechselmotivation))}
-        </div>
-        ${istAnsprechpartner?`<div class="dpanel-sub">
-          <span class="dcol-h">👔 Als Ansprechpartner</span>
-          ${zeile('Funktion', esc(d.funktion))}
-          ${zeile('Firma', firmaName?`<a href="#" onclick="event.preventDefault();detailKunde('${d.firma_id}')" style="color:var(--accent2)" title="Zur Firma springen">${esc(firmaName)}</a>`:(d.firma_id?esc(d.firma_id):''))}
-        </div>`:''}
+      <!-- Spalte 3: ansprache & nächster schritt -->
+      <div class="dcol">
+
+      <!-- datenanreicherung -->
+      <div class="dblock">
+        <div class="dbh">datenanreicherung</div>
+        ${r('claytel', '')}
+        ${r('lusha 1', '')}
+        ${r('lusha 2', '')}
+      </div>
+
+      <!-- direktansprache -->
+      <div class="dblock key">
+        <div class="dbh">direktansprache</div>
+        ${r('positionswunsch', esc(d.positionswunsch))}
+        ${r('wunschregion', esc(d.wunschregion))}
+        ${r('umzug', esc(d.umzugsbereitschaft))}
+        ${r('reisebereitschaft', esc(d.reisebereitschaft))}
+        ${r('gehalt aktuell', esc(d.gehalt_aktuell))}
+        ${r('gehalt wunsch', esc(d.gehalt_erwartet))}
+        ${r('kündigungsfrist', esc(d.kuendigungsfrist))}
+        ${r('wechselmotivation', esc(d.wechselmotivation))}
+      </div>
+
+      <!-- wiedervorlage -->
+      <div class="dblock key">
+        <div class="dbh">wiedervorlage</div>
+        ${wvOffen.length? wvOffen.map(t=>{
+          const ueber=t.faelligkeitsdatum&&t.faelligkeitsdatum<heute;
+          return `<div class="wvitem">
+            <div class="wvtop">
+              <span class="wvdate ${ueber?'ueber':''}">📅 ${t.faelligkeitsdatum?fmtDatum(t.faelligkeitsdatum):'ohne datum'}${ueber?' · überfällig':''}</span>
+              <span class="wvact">
+                <button title="Erledigt" onclick="aufgabeErledigt('${t.id}','Kandidat','${d.id}')">✓</button>
+                <button title="Bearbeiten" onclick="aufgabeBearbeitenPopup('${t.id}')">✎</button>
+              </span>
+            </div>
+            <div class="wvbet">${esc(t.betreff)||'–'}</div>
+            ${t.beschreibung?`<div class="wvbes">${esc(t.beschreibung)}</div>`:''}
+          </div>`;
+        }).join('') : '<div class="dempty">keine offene wiedervorlage</div>'}
+        ${wvErl.length?`<details class="wverl"><summary>erledigte (${wvErl.length})</summary>${wvErl.slice(0,15).map(t=>`<div class="wvitem done"><div class="wvbet">${esc(t.betreff)||'–'}</div><div class="wvbes">${t.faelligkeitsdatum?fmtDatum(t.faelligkeitsdatum):''}${t.status?' · '+esc(t.status):''}</div></div>`).join('')}</details>`:''}
+        <button class="neuBtn" style="margin-top:8px" onclick="aufgabeNeuPopup()">+ wiedervorlage</button>
+      </div>
+
       </div>
 
     </div>
 
-    ${aufgabenCardHtml(aufg,'Kandidat',d.id)}
+    <!-- werdegang volle Breite -->
+    <div class="dblock full">
+        <div class="dbh">werdegang</div>
+        <div class="dwg">
+          <div class="dwg-col">
+            <div class="dsubh" style="border-top:none;padding-top:0;margin-top:0">berufserfahrung</div>
+            ${erf.length?erf.map(e=>`<div class="timeline-item">
+              <div class="t">${esc(e.titel)||'–'}</div>
+              <div class="m">${esc(e.unternehmen)||''}${(e.von||e.bis)?' · '+esc(e.von||'')+' – '+esc(e.bis||'heute'):''}</div>
+              ${e.uebersicht?`<div style="font-size:11px;color:var(--muted);margin-top:3px">${esc(e.uebersicht)}</div>`:''}</div>`).join(''):'<div class="dempty">—</div>'}
+            <div class="dsubh">ausbildung</div>
+            ${ausb.length?ausb.map(a=>`<div class="timeline-item">
+              <div class="t">${esc(a.institut)||'–'}</div>
+              <div class="m">${esc(a.grad)||''}${a.hauptfach?' · '+esc(a.hauptfach):''}${(a.von||a.bis)?' · '+esc(a.von||'')+' – '+esc(a.bis||''):''}</div></div>`).join(''):'<div class="dempty">—</div>'}
+          </div>
+          <div class="dwg-col">
+            ${r('studiengang', esc(d.studiengang))}
+            ${r('qualifikation', esc(d.qualifikation))}
+            ${r('schulabschluss', esc(d.schulabschluss))}
+            ${r('fremdsprachen', esc(d.fremdsprachen))}
+            ${r('erfahrung', d.erfahrung_jahre?esc(d.erfahrung_jahre)+' jahre':'')}
+            ${wgTags?`<div class="dsubh">fähigkeiten</div><div style="display:flex;flex-wrap:wrap;gap:4px">${wgTags}</div>`:''}
+            ${d.profil_zusammenfassung?`<div class="dsubh">profil</div><div style="font-size:12px;color:var(--muted)">${esc(d.profil_zusammenfassung)}</div>`:''}
+            ${d.bemerkung?`<div class="dsubh">bemerkung</div><div style="font-size:12px;color:var(--muted)">${esc(d.bemerkung)}</div>`:''}
+            <button class="neuBtn" style="margin-top:10px" onclick="cvAuslesen('${d.id}')">📄 aus cv befüllen</button>
+          </div>
+        </div>
+      </div>
 
     <!-- AUFKLAPPBARE FENSTER -->
-    ${erf.length?`<details class="acc">
-      <summary><span>Berufserfahrung<span class="acc-cnt">(${erf.length})</span></span><span class="acc-arr">▶</span></summary>
-      <div class="acc-body">${erf.map(e=>`<div class="timeline-item">
-        <div class="t">${esc(e.titel)||'–'}</div>
-        <div class="m">${esc(e.unternehmen)||''}${(e.von||e.bis)?' · '+esc(e.von||'')+' – '+esc(e.bis||'heute'):''}</div>
-        ${e.uebersicht?`<div style="font-size:11px;color:var(--muted);margin-top:3px">${esc(e.uebersicht)}</div>`:''}</div>`).join('')}</div>
-    </details>`:''}
-
-    ${ausb.length?`<details class="acc">
-      <summary><span>Ausbildung<span class="acc-cnt">(${ausb.length})</span></span><span class="acc-arr">▶</span></summary>
-      <div class="acc-body">${ausb.map(a=>`<div class="timeline-item">
-        <div class="t">${esc(a.institut)||'–'}</div>
-        <div class="m">${esc(a.grad)||''}${a.hauptfach?' · '+esc(a.hauptfach):''}${(a.von||a.bis)?' · '+esc(a.von||'')+' – '+esc(a.bis||''):''}</div></div>`).join('')}</div>
-    </details>`:''}
-
     ${bew.length?`<details class="acc">
       <summary><span>Bewerbungen<span class="acc-cnt">(${bew.length})</span></span><span class="acc-arr">▶</span></summary>
       <div class="acc-body">${bew.map(b=>`<div class="note"><strong>${esc(b.jobtitel)||'–'}</strong>
