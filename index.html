@@ -37,7 +37,7 @@
     border-right:1px solid var(--line);background:var(--panel);position:sticky;top:55px;
     align-self:flex-start;max-height:calc(100vh - 55px);overflow:auto}
   .sidebar .tab{text-align:left;width:100%}
-  .wrap{flex:1;min-width:0;max-width:1280px;padding:22px}
+  .wrap{flex:1;min-width:0;max-width:1680px;padding:22px}
   .kacheln{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px}
   .kachel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px 20px;cursor:pointer;transition:border-color .15s,transform .1s}
   .kachel:hover{border-color:var(--accent)}
@@ -149,6 +149,20 @@
   .wvbes{font-size:11px;color:var(--muted);margin-top:2px}
   .wverl{margin:4px 0}
   .wverl summary{cursor:pointer;color:var(--muted);font-size:11px}
+  .dsep{font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.02em;
+    margin:14px 2px 6px;padding-top:12px;border-top:1px solid var(--line)}
+  .dsysline{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:11px;color:var(--muted);margin:2px 0 12px 2px}
+  .dsysline b{color:var(--ink);font-weight:600}
+  /* Buttons im Detail-Bereich: schlanker, normale Schreibweise, feinere Icons */
+  #detailPage .editbtn, #detailPage .cvbtn, #detailPage .neuBtn{
+    text-transform:none;letter-spacing:0;padding:5px 10px;font-size:12px;font-weight:500;border-radius:5px}
+  .detail-head .editbtn, .detail-head .cvbtn{padding:5px 9px;font-size:11.5px;display:inline-flex;align-items:center;gap:5px}
+  .detail-head .editbtn span.ic, .detail-head .cvbtn span.ic{font-size:13px;opacity:.85}
+  .recnav{display:inline-flex;align-items:center;gap:4px;margin-left:4px}
+  .recnav-btn{background:var(--panel2);border:1px solid var(--line);color:var(--ink);cursor:pointer;
+    border-radius:5px;font-size:15px;line-height:1;padding:4px 9px}
+  .recnav-btn:disabled{opacity:.35;cursor:default}
+  .recnav-pos{font-size:11px;color:var(--muted);min-width:46px;text-align:center}
   .timeline-item{border-left:2px solid var(--line);padding:0 0 10px 12px;position:relative}
   .timeline-item:before{content:'';position:absolute;left:-5px;top:4px;width:8px;height:8px;
     border-radius:50%;background:var(--accent)}
@@ -321,7 +335,7 @@
       <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="kPosUnter" onchange="ladeKandidaten()" style="min-width:auto;width:14px;height:14px;padding:0;margin:0">Position ＋ niedrigere einbeziehen</label>
       <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="kMitProfil" onchange="nachfassToggle()" style="min-width:auto;width:14px;height:14px;padding:0;margin:0">🔗 nur mit XING/LinkedIn-Profil</label>
       <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="kNurHot" onchange="ladeKandidaten()" style="min-width:auto;width:14px;height:14px;padding:0;margin:0">🔥 nur Hot</label>
-      <button class="tab" onclick="toggleTagPanel()">🏷️ Nach Tags filtern <span id="tagFilterCount"></span></button>
+      <button class="tab" onclick="toggleTagPanel()">🏷️ Nach Fähigkeiten filtern <span id="tagFilterCount"></span></button>
       <button class="tab" onclick="toggleSpaltenPanel()">🗂 Spalten</button>
       <button class="tab" onclick="duplikateFinden()" title="Doppelte Kandidaten nach Name oder E-Mail suchen">🔍 Duplikate</button>
       <span id="tagAktiv"></span>
@@ -333,8 +347,8 @@
       <span id="selCount" style="font-weight:600"></span>
       <button onclick="exportiereAuswahl()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">📥 CSV</button>
       <button onclick="serienMailAuswahl()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">✉️ E-Mail</button>
-      <button onclick="selTagsModal('hinzu')" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">🏷️ Tags +</button>
-      <button onclick="selTagsModal('entf')" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">🏷️ Tags −</button>
+      <button onclick="selTagsModal('hinzu')" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">🏷️ Fähigkeiten +</button>
+      <button onclick="selTagsModal('entf')" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">🏷️ Fähigkeiten −</button>
       <button onclick="selMassenupdate()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">✏️ Aktualisieren</button>
       <button onclick="selLoeschen()" style="background:rgba(168,162,158,0.3);color:#fff;border:1px solid rgba(255,255,255,0.4);padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">🗑️ Löschen</button>
       <button onclick="selAufheben()" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.4);padding:5px 10px;border-radius:4px;cursor:pointer;font-size:13px;margin-left:auto">✕ Aufheben</button>
@@ -571,7 +585,7 @@
       <!-- Erweiterte Filter -->
       <details id="rmErweitert" open style="margin-top:4px">
         <summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);padding:8px 0;user-select:none;list-style:none">
-          ⚙️ Weitere Filter (Gehalt · Erfahrung · Alter · Qualifikation · Studiengang · Tags · Quelle …) — klicken zum Ein-/Ausklappen
+          ⚙️ Weitere Filter (Gehalt · Erfahrung · Alter · Qualifikation · Studiengang · Fähigkeiten · Quelle …) — klicken zum Ein-/Ausklappen
         </summary>
         <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;padding:12px 0 4px;border-top:1px solid var(--line);margin-top:4px">
           <div>
@@ -585,7 +599,7 @@
                    style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:150px">
           </div>
           <div>
-            <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Tags enthält</div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Fähigkeiten enthält</div>
             <input id="rmTags" placeholder="z.B. TGA" onkeydown="if(event.key==='Enter')rechercheAusfuehren()"
                    style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:120px">
           </div>
@@ -1109,7 +1123,7 @@
       <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">📋 Datenverwaltung</div>
       <div style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;overflow:hidden">
         <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--line)">
-          <div><b>Cache leeren</b><div style="font-size:12px;color:var(--muted)">Tags und Auftraggeber-Namen neu aus der Datenbank laden</div></div>
+          <div><b>Cache leeren</b><div style="font-size:12px;color:var(--muted)">Fähigkeiten und Auftraggeber-Namen neu aus der Datenbank laden</div></div>
           <button onclick="cacheLeeren()" style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:13px">🔄 Leeren</button>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--line)">
@@ -1400,7 +1414,7 @@ async function exportiereAuswahl(){
   const ids=[...selectedKandIds]; const rows=[];
   for(let i=0;i<ids.length;i+=200){ const {data}=await sb.from('kandidaten').select('voller_name,berufsbezeichnung,arbeitgeber,stadt,plz,email,mobil,telefon,xing_profil,linkedin_profil,tags').in('id',ids.slice(i,i+200)); rows.push(...(data||[])); }
   const cols=['voller_name','berufsbezeichnung','arbeitgeber','stadt','plz','email','mobil','telefon','xing_profil','linkedin_profil','tags'];
-  const header='Name;Berufsbezeichnung;Arbeitgeber;Stadt;PLZ;E-Mail;Mobil;Telefon;XING;LinkedIn;Tags';
+  const header='Name;Berufsbezeichnung;Arbeitgeber;Stadt;PLZ;E-Mail;Mobil;Telefon;XING;LinkedIn;Fähigkeiten';
   const csv=header+'\n'+rows.map(r=>cols.map(c=>`"${(r[c]||'').toString().replace(/"/g,'""')}"`).join(';')).join('\n');
   const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='yavis_export_'+new Date().toISOString().slice(0,10)+'.csv'; a.click();
@@ -1422,8 +1436,8 @@ async function selTagsModal(modus){
   const dlg=document.createElement('dialog');
   dlg.style.cssText='background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:24px;max-width:520px;width:95vw';
   const farbe=modus==='hinzu'?'var(--accent)':'#dc2626';
-  dlg.innerHTML=`<h3 style="margin:0 0 14px">${modus==='hinzu'?'🏷️ Tags hinzufügen':'🏷️ Tags entfernen'} — ${selectedKandIds.size} Kandidaten</h3>
-    <input id="tagEingabe" list="tagVorschlDL" placeholder="Tag eingeben…" autocomplete="off" style="width:100%;padding:8px 10px;font-size:14px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;box-sizing:border-box">
+  dlg.innerHTML=`<h3 style="margin:0 0 14px">${modus==='hinzu'?'🏷️ Fähigkeiten hinzufügen':'🏷️ Fähigkeiten entfernen'} — ${selectedKandIds.size} Kandidaten</h3>
+    <input id="tagEingabe" list="tagVorschlDL" placeholder="Fähigkeit eingeben…" autocomplete="off" style="width:100%;padding:8px 10px;font-size:14px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;box-sizing:border-box">
     <datalist id="tagVorschlDL">${alle.map(t=>`<option value="${esc(t)}">`).join('')}</datalist>
     <div id="tagFehler" style="font-size:12px;color:var(--hot);min-height:18px;margin-top:6px"></div>
     <div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end">
@@ -1435,7 +1449,7 @@ async function selTagsModal(modus){
 }
 async function selTagsAnwenden(modus,dlg){
   const tag=normTag(dlg.querySelector('#tagEingabe').value);
-  if(!tag){dlg.querySelector('#tagFehler').textContent='⚠️ Kein gültiger Tag eingegeben'; return;}
+  if(!tag){dlg.querySelector('#tagFehler').textContent='⚠️ Keine gültige Fähigkeit eingegeben'; return;}
   const ids=[...selectedKandIds];
   const {data:rows}=await sb.from('kandidaten').select('id,tags').in('id',ids);
   let geaendert=0;
@@ -1622,16 +1636,16 @@ function renderTagPanel(){
   const panel=document.getElementById('tagPanel'); const modus=tagModusWert();
   const gruppen={}; (alleTagsCache||[]).forEach(t=>{ const k=kategorieVon(t); (gruppen[k]=gruppen[k]||[]).push(t); });
   let html=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
-    <strong style="font-size:13px">🏷️ Tags filtern</strong>
+    <strong style="font-size:13px">🏷️ Fähigkeiten filtern</strong>
     <label style="font-size:12px;color:var(--muted)">Bedingung
       <select id="tagModus" onchange="renderTagPanel();ladeKandidaten()" style="min-width:auto;padding:4px 8px;margin-left:4px">
         <option value="und"${modus==='und'?' selected':''}>alles einbeziehen (UND)</option>
         <option value="oder"${modus==='oder'?' selected':''}>jegliche einbeziehen (ODER)</option>
         <option value="nicht"${modus==='nicht'?' selected':''}>enthält nicht</option>
-        <option value="nichtleer"${modus==='nichtleer'?' selected':''}>ist nicht leer (hat Tags)</option>
-        <option value="leer"${modus==='leer'?' selected':''}>ist leer (ohne Tags)</option></select></label>
+        <option value="nichtleer"${modus==='nichtleer'?' selected':''}>ist nicht leer (hat Fähigkeiten)</option>
+        <option value="leer"${modus==='leer'?' selected':''}>ist leer (ohne Fähigkeiten)</option></select></label>
     ${tagFilter.size?'<button class="tab" style="padding:4px 10px" onclick="tagFilterLeeren()">✕ Zurücksetzen</button>':''}
-    ${(modus==='leer'||modus==='nichtleer')?'<span style="font-size:12px;color:var(--muted)">(Tag-Auswahl wird hier ignoriert)</span>':''}</div>`;
+    ${(modus==='leer'||modus==='nichtleer')?'<span style="font-size:12px;color:var(--muted)">(Fähigkeiten-Auswahl wird hier ignoriert)</span>':''}</div>`;
   ['Gewerk','Leistungsphase','Branche','Software','Sonstige'].forEach(g=>{
     const tags=(gruppen[g]||[]).sort((a,b)=>a.localeCompare(b,'de')); if(!tags.length) return;
     html+=`<div style="margin-bottom:10px"><div class="dcol-h" style="margin-bottom:5px">${g} <span style="color:var(--muted);font-weight:400">(${tags.length})</span></div>${
@@ -1658,11 +1672,11 @@ function tagsMatchFilter(raw){
 }
 function tagFilterLabel(){
   const m=tagModusWert();
-  if(m==='leer') return ' · ohne Tags';
-  if(m==='nichtleer') return ' · mit Tags';
+  if(m==='leer') return ' · ohne Fähigkeiten';
+  if(m==='nichtleer') return ' · mit Fähigkeiten';
   if(!tagFilter.size) return '';
   const ml={und:'UND',oder:'ODER',nicht:'enthält nicht'}[m]||m;
-  return ' · Tags: '+[...tagFilter].join(', ')+' ('+ml+')';
+  return ' · Fähigkeiten: '+[...tagFilter].join(', ')+' ('+ml+')';
 }
 
 // ===== Positions-Hierarchie (Stufen; höher = senior) =====
@@ -1830,6 +1844,7 @@ function rolleMatch(r){
 }
 function rolleLabel(){ return ({kandidat:' · Rolle: Kandidat',ansprechpartner:' · Rolle: Ansprechpartner',doppel:' · Doppelrolle'})[rolleFilter]||''; }
 
+let _navIds=[]; // Reihenfolge der zuletzt angezeigten Trefferliste (fürs Blättern im Detail)
 async function ladeKandidaten(){
   await ladeAuftraggeberNamen();
   selectedKandIds.clear(); updateSelBar();
@@ -1872,6 +1887,7 @@ async function ladeKandidaten(){
     if(nurHot) rows=rows.filter(r=>r.ist_hot);
     if(rolleFilter!=='alle') rows=rows.filter(rolleMatch);
     document.getElementById('kCount').textContent=rows.length+' Kandidaten im Umkreis von '+radius+' km um '+plz+posLabel+lueckeLabel+profilLabel+hotLabel+tagFilterLabel()+rolleLabel();
+    _navIds=rows.map(r=>r.id);
     rows.forEach(r=>body.appendChild(zeileKandidat(r,true)));
     if(!rows.length) body.innerHTML='<tr><td colspan="'+spaltenAnzahl()+'" class="empty">Keine Treffer.</td></tr>';
     return;
@@ -1900,6 +1916,7 @@ async function ladeKandidaten(){
   const {data,error}=await query;
   if(error){document.getElementById('kCount').textContent='Fehler: '+error.message;return;}
   document.getElementById('kCount').textContent=(data.length)+' Kandidaten'+(data.length>=200?' (erste 200)':'')+posLabel+lueckeLabel+profilLabel+hotLabel+tagFilterLabel()+rolleLabel();
+  _navIds=data.map(r=>r.id);
   data.forEach(r=>body.appendChild(zeileKandidat(r,false)));
   if(!data.length) body.innerHTML='<tr><td colspan="'+spaltenAnzahl()+'" class="empty">Keine Treffer.</td></tr>';
 }
@@ -2043,7 +2060,7 @@ function aufgabeNeuPopup(){
   document.getElementById('tdWho').textContent=(kontextDatensatz.name||'')+' · '+kontextDatensatz.typ;
   document.getElementById('tdBetreff').value='';
   document.getElementById('tdDatum').value=plusTageISO(14);
-  document.getElementById('tdPrio').value='Normal';
+  { const _p=document.getElementById('tdPrio'); if(_p) _p.value='Normal'; }
   document.getElementById('tdText').value='';
   document.getElementById('tdMsg').textContent='';
   if(!dlg.open) dlg.showModal();
@@ -2622,7 +2639,15 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
   const heute=heuteISO();
   const wvOffen=aufg.filter(t=>istOffen(t.status));
   const wvErl=aufg.filter(t=>!istOffen(t.status));
-  const wgTags=parseTags(d.faehigkeiten||d.tags).map(t=>`<span class="tag">${esc(t)}</span>`).join('');
+  const wgTags=parseTags([d.tags,d.faehigkeiten].filter(Boolean).join(';')).map(t=>`<span class="tag">${esc(t)}</span>`).join('');
+  const _ni=_navIds.indexOf(d.id);
+  const navHtml=(_ni>=0 && _navIds.length>1)
+    ? `<div class="recnav">
+        <button class="recnav-btn" ${_ni<=0?'disabled':''} onclick="kandidatBlaettern(-1)" title="Vorheriger (Pfeil ←)">‹</button>
+        <span class="recnav-pos">${_ni+1} / ${_navIds.length}</span>
+        <button class="recnav-btn" ${_ni>=_navIds.length-1?'disabled':''} onclick="kandidatBlaettern(1)" title="Nächster (Pfeil →)">›</button>
+      </div>`
+    : '';
 
   const fotoHtml=fotoUrl
     ?`<div class="foto-wrap">
@@ -2635,6 +2660,7 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
     <input type="file" id="fotoInput" accept="image/*" style="display:none" onchange="fotoSpeichern('${d.id}')">
     <div class="detail-head">
       <button class="back" onclick="zurueckZurListe()">← Zurück</button>
+      ${navHtml}
       ${fotoHtml}
       <div>
         <h2 style="margin:0 0 2px">${geschuetzt?'🔒 ':''}${d.ist_hot?'🔥 ':''}${esc(d.voller_name)||'Kandidat'}</h2>
@@ -2654,6 +2680,14 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
       </div>
     </div>
 
+    <div class="dsysline">
+      <span>id: <b title="${esc(d.id)}">${fmtKandidatId(d.id)}</b></span>
+      <span>erstellt: <b>${d.erstellt_am?fmtDat(d.erstellt_am):'—'}</b></span>
+      <span>geändert: <b>${d.geaendert_am?fmtDat(d.geaendert_am):'—'}</b></span>
+      <span>quelle: <b>${esc(d.quelle)||'—'}</b></span>
+      <span>letzte aktivität: <b>${d.letzte_aktivitaet?fmtDat(d.letzte_aktivitaet):'—'}</b></span>
+    </div>
+
     ${geschuetzt?`<div style="background:var(--panel2);border-left:3px solid var(--hot);border-radius:4px;padding:10px 16px;margin-bottom:14px;font-size:13px;color:var(--ink)">
       🔒 Abwerbeschutz aktiv${autoSchutz?' (automatisch — Arbeitgeber ist Auftraggeber)':' (manuell gesetzt)'} — dieser Kandidat darf <u>nicht</u> kontaktiert oder für Stellen vorgeschlagen werden.
     </div>`:''}
@@ -2665,7 +2699,7 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
 
       <!-- ident -->
       <div class="dblock">
-        <div class="dbh">ident</div>
+        <div class="dbh">Ident</div>
         ${r('anrede', esc(d.begruessung))}
         ${r('titel', esc(d.titel))}
         ${r('vorname', esc(d.vorname))}
@@ -2678,18 +2712,18 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
         ${r('in position seit', esc(d.in_position_seit))}
         ${r('firma zuvor', esc(d.firma_zuvor))}
         ${r('position zuvor', esc(d.position_zuvor))}
-        ${istAnsprechpartner?`<div class="dsubh">als ansprechpartner</div>${r('firma', firmaName?`<a href="#" onclick="event.preventDefault();detailKunde('${d.firma_id}')" style="color:var(--accent2)" title="Zur Firma springen">${esc(firmaName)}</a>`:(d.firma_id?esc(d.firma_id):''))}`:''}
+        ${istAnsprechpartner?`<div class="dsubh">Als Ansprechpartner</div>${r('firma', firmaName?`<a href="#" onclick="event.preventDefault();detailKunde('${d.firma_id}')" style="color:var(--accent2)" title="Zur Firma springen">${esc(firmaName)}</a>`:(d.firma_id?esc(d.firma_id):''))}`:''}
       </div>
 
       <!-- anschrift -->
       <div class="dblock">
-        <div class="dbh">anschrift</div>
+        <div class="dbh">Anschrift</div>
         ${r('straße', esc(d.strasse))}
         ${r('plz / ort', esc([d.plz,d.stadt].filter(Boolean).join(' ')))}
         ${r('bundesland', esc(d.bundesland))}
         ${r('land', esc(d.land))}
         ${r('geburtstag', esc(d.geburtstag))}
-        <div class="dsubh">beruflich</div>
+        <div class="dsubh">Beruflich</div>
         ${r('straße', esc(d.strasse_beruf))}
         ${r('plz / ort', esc([d.plz_beruf,d.stadt_beruf].filter(Boolean).join(' ')))}
         ${r('bundesland', esc(d.bundesland_beruf))}
@@ -2703,7 +2737,7 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
 
       <!-- erreichbarkeit -->
       <div class="dblock">
-        <div class="dbh">erreichbarkeit</div>
+        <div class="dbh">Erreichbarkeit</div>
         ${r('mobil', tel(d.mobil))}
         ${r('telefon', tel(d.telefon))}
         ${r('fax', esc(d.fax))}
@@ -2712,14 +2746,22 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
         ${r('2. e-mail', mail(d.email_zweit))}
         ${r('xing', link(d.xing_profil))}
         ${r('linkedin', link(d.linkedin_profil))}
-        <div class="dsubh">privat</div>
+        <div class="dsubh">Privat</div>
         ${r('tel. privat', tel(d.telefon_privat))}
         ${r('mobil privat', tel(d.mobil_privat))}
       </div>
 
+      <!-- datenanreicherung -->
+      <div class="dblock">
+        <div class="dbh">Datenanreicherung</div>
+        ${r('claytel', '')}
+        ${r('lusha 1', '')}
+        ${r('lusha 2', '')}
+      </div>
+
       <!-- status & sperren -->
       <div class="dblock">
-        <div class="dbh">status &amp; sperren</div>
+        <div class="dbh">Status &amp; Sperren</div>
         ${r('rollen', esc(rollen))}
         ${r('status', d.status?`<span class="pill">${esc(d.status)}</span>`:'')}
         ${r('int. wertung', esc(d.wertung_intern))}
@@ -2727,7 +2769,7 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
         ${r('quelle', esc(d.quelle))}
         ${r('hot', d.ist_hot?'🔥 ja':'nein')}
         ${r('abwerbeschutz', geschuetzt?(autoSchutz?'🔒 auto (auftraggeber)':'🔒 manuell'):'frei')}
-        <div class="dsubh">kontaktsperren</div>
+        <div class="dsubh">Kontaktsperren</div>
         <div class="dchecks">
           ${chk(d.sperre_email,'e-mail')}
           ${chk(d.sperre_brief,'brief')}
@@ -2741,17 +2783,9 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
       <!-- Spalte 3: ansprache & nächster schritt -->
       <div class="dcol">
 
-      <!-- datenanreicherung -->
-      <div class="dblock">
-        <div class="dbh">datenanreicherung</div>
-        ${r('claytel', '')}
-        ${r('lusha 1', '')}
-        ${r('lusha 2', '')}
-      </div>
-
       <!-- direktansprache -->
-      <div class="dblock key">
-        <div class="dbh">direktansprache</div>
+      <div class="dblock">
+        <div class="dbh">Direktansprache</div>
         ${r('positionswunsch', esc(d.positionswunsch))}
         ${r('wunschregion', esc(d.wunschregion))}
         ${r('umzug', esc(d.umzugsbereitschaft))}
@@ -2762,9 +2796,20 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
         ${r('wechselmotivation', esc(d.wechselmotivation))}
       </div>
 
+      <!-- kategorisierung -->
+      <div class="dblock">
+        <div class="dbh">Kategorisierung</div>
+        <div class="dsubh" style="border-top:none;padding-top:0;margin-top:0">Fähigkeiten</div>
+        ${wgTags?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${wgTags}</div>`:'<div class="dempty" style="margin-bottom:6px">keine Fähigkeiten erfasst</div>'}
+        ${r('studiengang', esc(d.studiengang))}
+        ${r('qualifikation', esc(d.qualifikation))}
+        ${r('fremdsprachen', esc(d.fremdsprachen))}
+        ${r('erfahrung', d.erfahrung_jahre?esc(d.erfahrung_jahre)+' jahre':'')}
+      </div>
+
       <!-- wiedervorlage -->
-      <div class="dblock key">
-        <div class="dbh">wiedervorlage</div>
+      <div class="dblock">
+        <div class="dbh">Wiedervorlage</div>
         ${wvOffen.length? wvOffen.map(t=>{
           const ueber=t.faelligkeitsdatum&&t.faelligkeitsdatum<heute;
           return `<div class="wvitem">
@@ -2781,87 +2826,41 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
         }).join('') : '<div class="dempty">keine offene wiedervorlage</div>'}
         ${wvErl.length?`<details class="wverl"><summary>erledigte (${wvErl.length})</summary>${wvErl.slice(0,15).map(t=>`<div class="wvitem done"><div class="wvbet">${esc(t.betreff)||'–'}</div><div class="wvbes">${t.faelligkeitsdatum?fmtDatum(t.faelligkeitsdatum):''}${t.status?' · '+esc(t.status):''}</div></div>`).join('')}</details>`:''}
         <button class="neuBtn" style="margin-top:8px" onclick="aufgabeNeuPopup()">+ wiedervorlage</button>
+        <div class="dsubh">Bemerkung</div>
+        <div style="font-size:12px;color:var(--muted);white-space:pre-wrap">${d.bemerkung?esc(d.bemerkung):'—'}</div>
       </div>
 
       </div>
 
     </div>
 
-    <!-- werdegang volle Breite -->
+    <!-- volltext (Lebenslauf · LinkedIn · Notizen) -->
     <div class="dblock full">
-        <div class="dbh">werdegang</div>
-        <div class="dwg">
-          <div class="dwg-col">
-            <div class="dsubh" style="border-top:none;padding-top:0;margin-top:0">berufserfahrung</div>
-            ${erf.length?erf.map(e=>`<div class="timeline-item">
-              <div class="t">${esc(e.titel)||'–'}</div>
-              <div class="m">${esc(e.unternehmen)||''}${(e.von||e.bis)?' · '+esc(e.von||'')+' – '+esc(e.bis||'heute'):''}</div>
-              ${e.uebersicht?`<div style="font-size:11px;color:var(--muted);margin-top:3px">${esc(e.uebersicht)}</div>`:''}</div>`).join(''):'<div class="dempty">—</div>'}
-            <div class="dsubh">ausbildung</div>
-            ${ausb.length?ausb.map(a=>`<div class="timeline-item">
-              <div class="t">${esc(a.institut)||'–'}</div>
-              <div class="m">${esc(a.grad)||''}${a.hauptfach?' · '+esc(a.hauptfach):''}${(a.von||a.bis)?' · '+esc(a.von||'')+' – '+esc(a.bis||''):''}</div></div>`).join(''):'<div class="dempty">—</div>'}
-          </div>
-          <div class="dwg-col">
-            ${r('studiengang', esc(d.studiengang))}
-            ${r('qualifikation', esc(d.qualifikation))}
-            ${r('schulabschluss', esc(d.schulabschluss))}
-            ${r('fremdsprachen', esc(d.fremdsprachen))}
-            ${r('erfahrung', d.erfahrung_jahre?esc(d.erfahrung_jahre)+' jahre':'')}
-            ${wgTags?`<div class="dsubh">fähigkeiten</div><div style="display:flex;flex-wrap:wrap;gap:4px">${wgTags}</div>`:''}
-            ${d.profil_zusammenfassung?`<div class="dsubh">profil</div><div style="font-size:12px;color:var(--muted)">${esc(d.profil_zusammenfassung)}</div>`:''}
-            ${d.bemerkung?`<div class="dsubh">bemerkung</div><div style="font-size:12px;color:var(--muted)">${esc(d.bemerkung)}</div>`:''}
-            <button class="neuBtn" style="margin-top:10px" onclick="cvAuslesen('${d.id}')">📄 aus cv befüllen</button>
-          </div>
-        </div>
+      <div class="dbh" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <span>Volltext <span style="color:var(--muted);font-weight:400">(Lebenslauf · LinkedIn · Notizen)</span></span>
+        <button class="neuBtn" style="padding:5px 12px" onclick="cvAuslesen('${d.id}')" title="Lebenslauf per KI auslesen und Felder befüllen">📄 aus cv befüllen</button>
       </div>
+      ${d.profil_zusammenfassung?`<div style="font-size:12px;color:var(--ink);white-space:pre-wrap;margin-bottom:10px">${esc(d.profil_zusammenfassung)}</div>`:'<div class="dempty" style="margin-bottom:10px">noch kein profil-text — über „aus cv befüllen" erzeugen.</div>'}
+      ${notiz.length?`<div class="dsubh">Notizen (${notiz.length})</div>${notiz.slice(0,30).map(n=>`<div class="note">${esc(n.inhalt)||'–'}<div class="meta">${n.erstellt_am?fmtDat(n.erstellt_am):''}</div></div>`).join('')}${notiz.length>30?`<div style="color:var(--muted);font-size:11px;padding:4px 0">… und ${notiz.length-30} weitere</div>`:''}`:'<div class="dsubh">Notizen</div><div class="dempty">keine notizen.</div>'}
+    </div>
 
-    <!-- AUFKLAPPBARE FENSTER -->
-    ${bew.length?`<details class="acc">
-      <summary><span>Bewerbungen<span class="acc-cnt">(${bew.length})</span></span><span class="acc-arr">▶</span></summary>
-      <div class="acc-body">${bew.map(b=>`<div class="note"><strong>${esc(b.jobtitel)||'–'}</strong>
-        <div class="meta">Status: ${esc(b.status)||'–'}${b.stufe?' · Stufe: '+esc(b.stufe):''}${b.erstellt_am?' · '+fmtDat(b.erstellt_am):''}</div></div>`).join('')}</div>
-    </details>`:''}
-
-    ${notiz.length?`<details class="acc">
-      <summary><span>Notizen<span class="acc-cnt">(${notiz.length})</span></span><span class="acc-arr">▶</span></summary>
-      <div class="acc-body">${notiz.slice(0,30).map(n=>`<div class="note">${esc(n.inhalt)||'–'}<div class="meta">${n.erstellt_am?fmtDat(n.erstellt_am):''}</div></div>`).join('')}
-      ${notiz.length>30?`<div style="color:var(--muted);font-size:11px;padding:4px 0">… und ${notiz.length-30} weitere</div>`:''}</div>
-    </details>`:''}
-
-    <details class="acc" open>
-      <summary><span>Dokumente<span class="acc-cnt">(${dok.length})</span></span><span class="acc-arr">▶</span></summary>
-      <div class="acc-body">
-        <div id="dokListe">${dokumenteHtml(dok)}</div>
-        <div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-          <input type="file" id="dokFile" style="font-size:12px;color:var(--muted)">
-          <button class="neuBtn" onclick="ladeDokumentHoch('${d.id}')">↑ Hochladen</button>
-          <span id="dokMsg" style="font-size:12px"></span>
-        </div>
-        <div style="color:var(--muted);font-size:11px;margin-top:6px">PDF, Word, Bilder. Max. 25 MB pro Datei.</div>
+    <!-- kontakthistorie (Dokumente + E-Mails) -->
+    <div class="dblock full">
+      <div class="dbh">Kontakthistorie <span style="color:var(--muted);font-weight:400">(Dokumente · E-Mails)</span></div>
+      <div class="dsubh" style="border-top:none;padding-top:0;margin-top:0">Dokumente (${dok.length})</div>
+      <div id="dokListe">${dokumenteHtml(dok)}</div>
+      <div style="margin-top:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <input type="file" id="dokFile" style="font-size:12px;color:var(--muted)">
+        <button class="neuBtn" onclick="ladeDokumentHoch('${d.id}')">↑ Hochladen</button>
+        <span id="dokMsg" style="font-size:12px"></span>
       </div>
-    </details>
-
-    <details class="acc" id="mailAcc">
-      <summary><span>E-Mails<span class="acc-cnt">(${mails.length})</span></span><span class="acc-arr">▶</span></summary>
-      <div class="acc-body">
-        <div id="mailHistorie">${mailHistorieHtml(mails)}</div>
-        <div style="margin-top:10px">
-          <button class="neuBtn" onclick="mailProtokollieren('${d.id}','${esc(d.voller_name)}')">📧 E-Mail protokollieren</button>
-        </div>
+      <div style="color:var(--muted);font-size:11px;margin-top:6px">PDF, Word, Bilder. Max. 25 MB pro Datei.</div>
+      <div class="dsubh">E-Mails (${mails.length})</div>
+      <div id="mailHistorie">${mailHistorieHtml(mails)}</div>
+      <div style="margin-top:8px">
+        <button class="neuBtn" onclick="mailProtokollieren('${d.id}','${esc(d.voller_name)}')">📧 E-Mail protokollieren</button>
       </div>
-    </details>
-
-    <details class="acc">
-      <summary><span>System</span><span class="acc-arr">▶</span></summary>
-      <div class="acc-body" style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px 20px">
-        ${zeile('Kandidat-ID', `<span title="${esc(d.id)}">${fmtKandidatId(d.id)}</span>`)}
-        ${zeile('Erstellt', d.erstellt_am?fmtDat(d.erstellt_am):'')}
-        ${zeile('Geändert', d.geaendert_am?fmtDat(d.geaendert_am):'')}
-        ${zeile('Letzte Aktivität', d.letzte_aktivitaet?fmtDat(d.letzte_aktivitaet):'')}
-        ${zeile('Quelle', esc(d.quelle))}
-      </div>
-    </details>
+    </div>
   `;
   window.scrollTo(0,0);
   setTimeout(initAbschnitteSortierung, 0);
@@ -2879,6 +2878,29 @@ window.addEventListener('popstate', () => {
   if (detail && detail.style.display !== 'none') {
     zurueckZurListe();
   }
+});
+
+// Blättern: vom geöffneten Datensatz direkt zum vorigen/nächsten der zuletzt angezeigten Trefferliste
+function kandidatBlaettern(delta){
+  if(!_navIds||!_navIds.length) return;
+  const cur = kontextDatensatz && kontextDatensatz.id;
+  const idx = _navIds.indexOf(cur);
+  if(idx<0) return;
+  const ni = idx+delta;
+  if(ni<0 || ni>=_navIds.length) return;
+  detailKandidat(_navIds[ni]);
+}
+// Pfeiltasten ←/→ blättern, solange ein Detail offen ist und nicht in einem Eingabefeld/Dialog getippt wird
+document.addEventListener('keydown', (e)=>{
+  if(e.key!=='ArrowRight' && e.key!=='ArrowLeft') return;
+  if(e.altKey||e.ctrlKey||e.metaKey) return;
+  const dp=document.getElementById('detailPage');
+  if(!dp || dp.style.display==='none') return;
+  if(document.querySelector('dialog[open]')) return;
+  const t=e.target;
+  if(t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
+  e.preventDefault();
+  kandidatBlaettern(e.key==='ArrowRight'?1:-1);
 });
 
 function initAbschnitteSortierung() {
@@ -3126,7 +3148,7 @@ function _autoEnter(inp, getOpts, onPick){
 function _tagStore(arr){ return arr.length ? ';'+arr.join(';')+';' : ''; }
 function tagChipForm(t){ return `<span class="tag" style="display:inline-flex;align-items:center;gap:5px">${esc(t)}<span onclick="tagFormRemove('${esc(t)}')" style="cursor:pointer;color:var(--muted);font-weight:700" title="Entfernen">×</span></span>`; }
 function _tagFormArr(){ const el=document.getElementById('ef_tags'); return el?parseTags(el.value):[]; }
-function _tagFormRender(arr){ const h=document.getElementById('ef_tags'); if(h) h.value=_tagStore(arr); const c=document.getElementById('tagChips'); if(c) c.innerHTML=arr.length?arr.map(tagChipForm).join(''):'<span style="color:var(--muted);font-size:13px">Keine Tags</span>'; }
+function _tagFormRender(arr){ const h=document.getElementById('ef_tags'); if(h) h.value=_tagStore(arr); const c=document.getElementById('tagChips'); if(c) c.innerHTML=arr.length?arr.map(tagChipForm).join(''):'<span style="color:var(--muted);font-size:13px">Keine Fähigkeiten</span>'; }
 function tagFormAdd(){ const inp=document.getElementById('tagAddInput'); if(!inp) return; const raw=inp.value.trim(); if(!raw) return; const t=normTag(_prefixMatch(raw,_alleTagsCache)||raw); inp.value=''; if(!t) return; const arr=_tagFormArr(); if(!arr.includes(t)){ arr.push(t); _tagFormRender(arr); } }
 function tagFormRemove(t){ _tagFormRender(_tagFormArr().filter(x=>x!==t)); }
 async function _tagFormVorschlaege(){ const dl=document.getElementById('tagFormDL'); if(!dl) return; const alle=await ladeAlleTags(); _alleTagsCache=alle||[]; dl.innerHTML=_alleTagsCache.map(t=>'<option value="'+esc(t)+'">').join(''); }
@@ -3216,10 +3238,10 @@ function zeigeFormular(d){
       </div>
       <div style="font-size:11px;color:var(--muted);margin-top:10px">Kontaktsperren = Wille der Person / DSGVO (Werbewiderspruch). Unabhängig vom Abwerbeschutz.</div>
     </div>
-    <div class="card"><h3>🏷️ Tags</h3>
-      <div id="tagChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">${parseTags(d.tags).length?parseTags(d.tags).map(tagChipForm).join(''):'<span style="color:var(--muted);font-size:13px">Keine Tags</span>'}</div>
+    <div class="card"><h3>🏷️ Fähigkeiten</h3>
+      <div id="tagChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">${parseTags(d.tags).length?parseTags(d.tags).map(tagChipForm).join(''):'<span style="color:var(--muted);font-size:13px">Keine Fähigkeiten</span>'}</div>
       <div style="display:flex;gap:8px;align-items:center;max-width:460px">
-        <input id="tagAddInput" list="tagFormDL" placeholder="Tag eingeben + Enter…" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();tagFormAdd()}" style="flex:1;padding:8px 10px;font-size:14px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;box-sizing:border-box">
+        <input id="tagAddInput" list="tagFormDL" placeholder="Fähigkeit eingeben + Enter…" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();tagFormAdd()}" style="flex:1;padding:8px 10px;font-size:14px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;box-sizing:border-box">
         <button type="button" class="tab" onclick="tagFormAdd()">+ Hinzufügen</button>
       </div>
       <datalist id="tagFormDL"></datalist>
@@ -4425,7 +4447,7 @@ function renderRecherchePanel(f){
     <!-- TAGS -->
     <div>
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-        <div style="font-size:11px;color:var(--muted);font-weight:600">TAGS</div>
+        <div style="font-size:11px;color:var(--muted);font-weight:600">FÄHIGKEITEN</div>
         <select id="rTagModus" style="font-size:12px;padding:3px 8px">
           <option value="und" ${(f.tagModus||'und')==='und'?'selected':''}>alle (UND)</option>
           <option value="oder" ${f.tagModus==='oder'?'selected':''}>mindestens einer (ODER)</option>
@@ -4435,7 +4457,7 @@ function renderRecherchePanel(f){
       <div id="rTagsBox" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
         ${(f.tags||[]).map(t=>`<span class="tag" style="cursor:pointer;display:flex;align-items:center;gap:4px" onclick="rechercheTagRemove('${esc(t)}')">${esc(t)} <span style="font-size:10px;opacity:.7">✕</span></span>`).join('')}
         <select onchange="rechercheTagAdd(this.value);this.value=''" style="font-size:12px;padding:3px 8px;border-radius:4px">
-          <option value="">+ Tag …</option>
+          <option value="">+ Fähigkeit …</option>
           ${Object.entries(TAG_KATEGORIEN).map(([k,v])=>`<optgroup label="${k}">${v.map(t=>`<option value="${t}">${t}</option>`).join('')}</optgroup>`).join('')}
         </select>
       </div>
@@ -7511,13 +7533,14 @@ function _rmRenderTabelle(){
     html+='<td style="padding:7px 8px">'+(err||'–')+'</td></tr>';
   });
   html+='</tbody></table></div>';
+  _navIds=rows.map(r=>r.id);
   const btn='padding:5px 13px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);font-size:12px;color:var(--ink)';
   const bar='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px;flex-wrap:wrap">'
     +'<span style="font-size:12px;color:var(--muted)">'+e.rows.length+' Treffer</span>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
     +'<button onclick="rmSpaltenPanelToggle()" style="'+btn+'">🗂 Spalten</button>'
     +'<button onclick="rmTrefferMail()" style="'+btn+'">✉️ Serienmail an alle</button>'
-    +'<button onclick="rmTrefferTags()" style="'+btn+'">🏷 Tags an alle</button>'
+    +'<button onclick="rmTrefferTags()" style="'+btn+'">🏷 Fähigkeiten an alle</button>'
     +'<button onclick="rechercheCsvExport()" style="'+btn+'">📥 CSV</button>'
     +'</div></div>';
   const panel='<div id="rmSpaltenPanel" style="display:none;border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:10px;margin-bottom:8px;flex-wrap:wrap;gap:4px 14px">'
@@ -7533,7 +7556,7 @@ function rechercheCsvExport() {
   const {tab, rows, firmaMap} = _rmLetzteErgebnisse;
   let header, getRow;
   if (tab === 'kandidaten') {
-    header = ['Name','Position','PLZ','Ort','Bundesland','E-Mail','Mobil','Telefon','Status','Arbeitgeber','Wertung','Tags'];
+    header = ['Name','Position','PLZ','Ort','Bundesland','E-Mail','Mobil','Telefon','Status','Arbeitgeber','Wertung','Fähigkeiten'];
     getRow = r => [
       r.voller_name||'', r.berufsbezeichnung||'', r.plz||'', r.stadt||'', r.bundesland||'',
       r.email||r.email_beruflich||'', r.mobil||r.mobil_privat||'', r.telefon||r.telefon_privat||'',
