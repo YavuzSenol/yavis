@@ -4385,6 +4385,14 @@ async function cvPdfLaden(kandidatId){
       const hoch=_hoechstePositionAus(_cvFelder.position_original);
       if(hoch && (POSITION_STUFE[hoch]||0) > (POSITION_STUFE[_cvFelder.berufsbezeichnung]||0)) _cvFelder.berufsbezeichnung=hoch;
     }
+    // Regel: nur Fähigkeiten übernehmen, die bereits in der DB erfasst sind (exakter Treffer, Groß/Klein egal)
+    if(_cvFelder && _cvFelder.faehigkeiten){
+      const alle=(await ladeAlleTags())||[];
+      const map=new Map(alle.map(t=>[String(t).toLowerCase(), t]));
+      const matched=[...new Set(String(_cvFelder.faehigkeiten).split(/[,;]/).map(s=>s.trim()).filter(Boolean)
+        .map(s=>map.get(s.toLowerCase())).filter(Boolean))];
+      _cvFelder.faehigkeiten = matched.length ? matched.join(', ') : null;
+    }
     _cvDbDaten=dbDaten||{};
 
     cvZeigeVorschau();
@@ -4457,6 +4465,14 @@ async function cvUebernehmen(){
       const dbVal=db[k];
       if(!dbVal||String(dbVal).trim()==='') update[k]=v; // nur wenn leer
     }
+  }
+
+  // Gefilterte CV-Fähigkeiten zusätzlich ins sichtbare Fähigkeiten-Feld (tags) mergen
+  if(felder.faehigkeiten){
+    const merged=parseTags(db.tags);
+    String(felder.faehigkeiten).split(/[,;]/).map(s=>s.trim()).filter(Boolean)
+      .forEach(t=>{ if(!merged.some(x=>x.toLowerCase()===t.toLowerCase())) merged.push(t); });
+    update.tags = merged.length ? _tagStore(merged) : (db.tags||null);
   }
 
   const {error}=await sb.from('kandidaten').update(update).eq('id',id);
