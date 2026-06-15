@@ -1194,6 +1194,10 @@
           <button onclick="cacheLeeren()" style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:13px">🔄 Leeren</button>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--line)">
+          <div><b>E-Mail-Datum nachtragen</b><div style="font-size:12px;color:var(--muted)">Einmalig: Datum der importierten Outlook-Mails aus Outlook ergänzen (mit Trockenlauf)</div></div>
+          <button onclick="emailDatumNachtragen()" style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:13px">🕐 Nachtragen</button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--line)">
           <div><b>Duplikate finden</b><div style="font-size:12px;color:var(--muted)">Doppelte Kandidaten nach Name oder E-Mail suchen</div></div>
           <button onclick="document.getElementById('einstellungenDlg').close();duplikateFinden()" style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:13px">🔍 Suchen</button>
         </div>
@@ -6158,6 +6162,79 @@ async function msSyncOutlook(){
     }
     msSyncDialog(treffer,messages.length);
   }catch(e){zeigeMeldung('Fehler: '+e.message,'err');}
+}
+
+// ===== Einmalig: Datum der importierten Outlook-Mails aus Graph nachtragen =====
+function _normBetreff(s){ return String(s||'').replace(/^(\s*(re|aw|wg|fwd|fw|antw|antwort)\s*:\s*)+/i,'').toLowerCase().replace(/\s+/g,' ').trim(); }
+function _normText(s){ return String(s||'').toLowerCase().replace(/\s+/g,' ').trim(); }
+async function _graphAllMessages(token, folder, dateField){
+  let url='https://graph.microsoft.com/v1.0/me/mailFolders/'+folder+'/messages?$top=100&$select=subject,from,toRecipients,ccRecipients,bccRecipients,'+dateField+',bodyPreview';
+  const out=[];
+  while(url){
+    const resp=await fetch(url,{headers:{'Authorization':'Bearer '+token}});
+    if(!resp.ok) throw new Error(folder+' '+resp.status);
+    const data=await resp.json();
+    out.push(...(data.value||[]));
+    url=data['@odata.nextLink']||null;
+    if(out.length>30000) break;
+  }
+  return out;
+}
+async function emailDatumNachtragen(){
+  if(!confirm('Datum der importierten Outlook-Mails aus Outlook nachtragen?\n\nEs wird NUR das Datum gesetzt (Text/Betreff/Person bleiben unangetastet). Zuerst ein Trockenlauf.')) return;
+  const token=await msGetToken();
+  if(!token){ alert('Nicht mit Outlook verbunden.\n\nBitte zuerst in den Einstellungen mit Outlook verbinden.'); return; }
+  try{
+    zeigeMeldung('Lade Kandidaten-Adressen …','ok');
+    // 1) Adresse -> Kandidaten-ID
+    const addr2id={};
+    for(let off=0;;off+=1000){
+      const {data}=await sb.from('kandidaten').select('id,email,email_beruflich,email_zweit').range(off,off+999);
+      (data||[]).forEach(k=>['email','email_beruflich','email_zweit'].forEach(f=>{const v=(k[f]||'').trim().toLowerCase(); if(v&&v.includes('@')&&!addr2id[v]) addr2id[v]=k.id;}));
+      if(!data||data.length<1000) break;
+    }
+    // 2) Importierte Mails -> Index (entity_id|richtung|normBetreff) -> [{id, prefix}]
+    zeigeMeldung('Lade importierte E-Mails …','ok');
+    const idx=new Map(); let importCount=0;
+    for(let off=0;;off+=1000){
+      const {data}=await sb.from('emails').select('id,entity_id,betreff,richtung,nachricht').eq('quelle','outlook').range(off,off+999);
+      (data||[]).forEach(m=>{ importCount++;
+        const key=m.entity_id+'|'+m.richtung+'|'+_normBetreff(m.betreff);
+        if(!idx.has(key)) idx.set(key,[]);
+        idx.get(key).push({id:m.id, prefix:_normText(m.nachricht).slice(0,60)});
+      });
+      if(!data||data.length<1000) break;
+    }
+    // 3) Nachrichten aus Outlook (nur Kopfdaten + Vorschau)
+    zeigeMeldung('Lade Nachrichten aus Outlook (kann 1–2 Min dauern) …','ok');
+    const inbox=await _graphAllMessages(token,'Inbox','receivedDateTime');
+    const sent =await _graphAllMessages(token,'SentItems','sentDateTime');
+    // 4) Genaues Matching (Person + Betreff + Textanfang)
+    const updates=new Map();
+    function tryMatch(eid,richtung,betreff,datum,preview){
+      if(!eid||!datum) return;
+      const arr=idx.get(eid+'|'+richtung+'|'+_normBetreff(betreff)); if(!arr) return;
+      const pv=_normText(preview).slice(0,60); if(!pv) return;
+      const cand=arr.find(x=>!x.used && x.prefix && (x.prefix.startsWith(pv.slice(0,30))||pv.startsWith(x.prefix.slice(0,30))));
+      if(cand){ cand.used=true; updates.set(cand.id, datum); }
+    }
+    inbox.forEach(m=>{ const from=(m.from&&m.from.emailAddress&&m.from.emailAddress.address||'').toLowerCase(); tryMatch(addr2id[from],'rein',m.subject,m.receivedDateTime,m.bodyPreview); });
+    sent.forEach(m=>{ const rec=[...(m.toRecipients||[]),...(m.ccRecipients||[]),...(m.bccRecipients||[])].map(r=>(r.emailAddress&&r.emailAddress.address||'').toLowerCase()); let eid=null; for(const a of rec){ if(addr2id[a]){eid=addr2id[a];break;} } tryMatch(eid,'raus',m.subject,m.sentDateTime,m.bodyPreview); });
+    // 5) Trockenlauf
+    const n=updates.size;
+    if(!n){ alert('Kein Datum eindeutig zugeordnet.\n\nGeprüft: '+inbox.length+' empfangene + '+sent.length+' gesendete Outlook-Nachrichten.\nImportierte Mails: '+importCount+'.'); return; }
+    if(!confirm('TROCKENLAUF\n\n'+n+' von '+importCount+' importierten E-Mails bekommen ein Datum.\nGeprüft: '+(inbox.length+sent.length)+' Outlook-Nachrichten.\n\nJetzt wirklich schreiben?')){ zeigeMeldung('Abgebrochen','warn'); return; }
+    // 6) Schreiben (nur erstellt_am), in parallelen Häppchen
+    const entries=[...updates.entries()]; let ok=0;
+    for(let i=0;i<entries.length;i+=25){
+      const chunk=entries.slice(i,i+25);
+      const res=await Promise.all(chunk.map(([eid,dt])=>sb.from('emails').update({erstellt_am:dt}).eq('id',eid)));
+      ok+=res.filter(r=>!r.error).length;
+      zeigeMeldung('Schreibe Datum … '+Math.min(i+25,entries.length)+'/'+entries.length,'ok');
+    }
+    alert('Fertig! 🎉\n\n'+ok+' E-Mails wurden datiert.\n'+(importCount-ok)+' ohne Datum (nicht eindeutig zugeordnet — z.B. Mail im Outlook nicht mehr vorhanden).');
+    zeigeMeldung('E-Mail-Datum nachgetragen ✓','ok');
+  }catch(e){ alert('Fehler: '+(e.message||e)); }
 }
 
 function msSyncDialog(treffer,totalMessages){
