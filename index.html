@@ -1740,6 +1740,37 @@ const POSITION_STUFE = {
   'Ingenieur':2,'Vertriebsingenieur':2,'Fachplanung':2,'Bauleitung':2,'Objektüberwachung':2,'Kalkulator':2,'Arbeitssicherheit':2,
   'technische Systemplanung':1,'BIM Konstrukteur':1,'Techniker':1,
 };
+// Erkennungsmuster je Position (für „immer die ranghöchste im CV-Titel"-Regel)
+const POSITION_STEMS=[
+  ['Geschäftsführung', /gesch[aä]ftsf[uü]hr|\bgf\b/i],
+  ['COO', /\bcoo\b/i],
+  ['Niederlassungsleitung', /niederlassungsleit/i],
+  ['Kaufmännische Leitung', /kaufm[aä]nnische\s+leit/i],
+  ['Technische Leitung', /technische\s+leit/i],
+  ['Bereichsleitung', /bereichsleit/i],
+  ['Abteilungsleitung', /abteilungsleit/i],
+  ['Teamleitung', /teamleit|gruppenleit/i],
+  ['Gesamtprojektleitung', /gesamtprojektleit|gesamtleit/i],
+  ['Projektleitung', /projektleit/i],
+  ['Projektingenieur', /projektingenieur/i],
+  ['Vertriebsingenieur', /vertriebsingenieur/i],
+  ['Ingenieur', /ingenieur/i],
+  ['Fachplanung', /fachplan/i],
+  ['Bauleitung', /bauleit/i],
+  ['Objektüberwachung', /objekt[uü]berwach/i],
+  ['Kalkulator', /kalkulat/i],
+  ['Arbeitssicherheit', /arbeitssicherheit|fachkraft f[uü]r arbeitssicherheit|\bsifa\b/i],
+  ['technische Systemplanung', /systemplan/i],
+  ['BIM Konstrukteur', /\bbim\b/i],
+  ['Techniker', /techniker/i],
+];
+// Höchstrangige Position, die im (CV-)Text vorkommt
+function _hoechstePositionAus(text){
+  if(!text) return null;
+  let best=null, bestLvl=-1;
+  for(const [pos,re] of POSITION_STEMS){ if(re.test(text)){ const lvl=POSITION_STUFE[pos]||0; if(lvl>bestLvl){ bestLvl=lvl; best=pos; } } }
+  return best;
+}
 function positionenUndDarunter(pos){
   const lvl=POSITION_STUFE[pos]; if(lvl==null) return [pos];
   return Object.keys(POSITION_STUFE).filter(p=>POSITION_STUFE[p]<=lvl);
@@ -4349,6 +4380,11 @@ async function cvPdfLaden(kandidatId){
     // Aktuelle DB-Daten laden für Vergleich
     const {data:dbDaten} = await sb.from('kandidaten').select('*').eq('id',kandidatId).single();
     _cvFelder=result.fields;
+    // Regel: immer die ranghöchste im CV-Titel genannte Position (z.B. „Fachplaner und Projektleiter" → Projektleitung)
+    if(_cvFelder && _cvFelder.position_original){
+      const hoch=_hoechstePositionAus(_cvFelder.position_original);
+      if(hoch && (POSITION_STUFE[hoch]||0) > (POSITION_STUFE[_cvFelder.berufsbezeichnung]||0)) _cvFelder.berufsbezeichnung=hoch;
+    }
     _cvDbDaten=dbDaten||{};
 
     cvZeigeVorschau();
