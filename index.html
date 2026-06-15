@@ -5851,10 +5851,20 @@ Viele Grüße
 //  E-MAIL PROTOKOLLIEREN
 // ================================================================
 
+let _mailAlle=[]; let _mailFilter='';
+function _mailDir(m){ if(m.richtung==='raus'||(m.betreff&&m.betreff.startsWith('📤 '))) return 'raus'; if(m.richtung==='rein'||(m.betreff&&m.betreff.startsWith('📥 '))) return 'rein'; return ''; }
+function setMailFilter(v){ _mailFilter=(_mailFilter===v?'':v); const h=document.getElementById('mailHistorie'); if(h) h.innerHTML=mailHistorieHtml(_mailAlle); }
 function mailHistorieHtml(mails){
-  if(!mails||!mails.length) return '<div style="color:var(--muted);font-size:13px">Noch keine E-Mails protokolliert.</div>';
+  if(Array.isArray(mails)) _mailAlle=mails;
+  const alle=_mailAlle||[];
+  if(!alle.length) return '<div style="color:var(--muted);font-size:13px">Noch keine E-Mails protokolliert.</div>';
+  const cntS=alle.filter(m=>_mailDir(m)==='raus').length, cntR=alle.filter(m=>_mailDir(m)==='rein').length;
+  const fbtn=(val,label)=>{ const on=_mailFilter===val; return `<button type="button" onclick="setMailFilter('${val}')" style="padding:3px 10px;font-size:12px;border-radius:5px;cursor:pointer;border:1px solid var(--line);background:${on?'var(--accent2)':'var(--panel2)'};color:${on?'#fff':'var(--ink)'}">${label}</button>`; };
+  const bar=`<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">${fbtn('','Alle ('+alle.length+')')}${fbtn('raus','📤 Gesendet ('+cntS+')')}${fbtn('rein','📥 Empfangen ('+cntR+')')}</div>`;
+  const liste=_mailFilter?alle.filter(m=>_mailDir(m)===_mailFilter):alle;
+  if(!liste.length) return bar+'<div style="color:var(--muted);font-size:13px">Keine E-Mails in dieser Kategorie.</div>';
   const LIMIT=5;
-  const rows=mails.map(m=>{
+  const rows=liste.map(m=>{
     // Richtung: neue Mails ueber Feld 'richtung', alte ueber Betreff-Prefix
     const rRaus=m.richtung==='raus'||(m.betreff&&m.betreff.startsWith('📤 '));
     const rRein=m.richtung==='rein'||(m.betreff&&m.betreff.startsWith('📥 '));
@@ -5884,10 +5894,10 @@ function mailHistorieHtml(mails){
       </div>`:''}
     </div>`;
   });
-  if(rows.length<=LIMIT) return rows.join('');
-  return rows.slice(0,LIMIT).join('')
+  if(rows.length<=LIMIT) return bar+rows.join('');
+  return bar+rows.slice(0,LIMIT).join('')
     + `<div id="mailMore" style="display:none">${rows.slice(LIMIT).join('')}</div>`
-    + `<button type="button" class="neuBtn" id="mailMoreBtn" onclick="mailMoreToggle()" style="margin-top:8px">▾ Alle ${mails.length} E-Mails anzeigen (${rows.length-LIMIT} weitere)</button>`;
+    + `<button type="button" class="neuBtn" id="mailMoreBtn" onclick="mailMoreToggle()" style="margin-top:8px">▾ Alle ${liste.length} E-Mails anzeigen (${rows.length-LIMIT} weitere)</button>`;
 }
 function mailToggle(bid){ const el=document.getElementById(bid); if(el) el.style.display=(el.style.display==='none'?'block':'none'); }
 function mailMoreToggle(){
