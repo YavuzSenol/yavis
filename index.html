@@ -1094,7 +1094,11 @@
       <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">📧 Outlook-Verbindung</div>
       <div style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:12px 16px">
         <div id="msVerbindungBox"></div>
-        <div style="margin-top:10px;font-size:12px;color:var(--muted)">Nach dem Verbinden: ⚙️ → <b>🔄 Sync</b> drücken — YAVIS liest die letzten 50 gesendeten Outlook-Mails ein und ordnet sie automatisch den richtigen Kandidaten zu.</div>
+        <label style="margin-top:12px;display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+          <input type="checkbox" id="autosyncChk" onchange="localStorage.setItem('yavis_autosync', this.checked?'1':'0')" style="width:16px;height:16px">
+          <span>Beim Öffnen automatisch <b>neue Mails</b> synchronisieren (empfohlen)</span>
+        </label>
+        <div style="margin-top:8px;font-size:12px;color:var(--muted)">YAVIS ergänzt beim Start nur neue Mails und ordnet sie den Kandidaten zu — vorhandene werden nie gelöscht. So bleibt YAVIS dein dauerhaftes Archiv, und du kannst Outlook gefahrlos aufräumen.</div>
       </div>
     </div>
 
@@ -1194,8 +1198,11 @@
           <button onclick="cacheLeeren()" style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:13px">🔄 Leeren</button>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--line)">
-          <div><b>Outlook-Vollsync</b><div style="font-size:12px;color:var(--muted)">Alle Mails (Posteingang, Gesendet, Archiv) inkl. Datum direkt aus Outlook holen, zuordnen und den Outlook-Import ersetzen (mit Trockenlauf)</div></div>
-          <button onclick="outlookVollsync()" style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:13px">🔄 Vollsync</button>
+          <div><b>Outlook-Sync</b><div style="font-size:12px;color:var(--muted)">„Aktualisieren" holt nur neue Mails (schnell, ergänzt nur). „Vollsync" baut den ganzen Verlauf neu auf (alle Ordner, ersetzt).</div></div>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            <button onclick="outlookIncSync(false)" style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--accent2);border:1px solid var(--accent2);color:#fff;font-size:13px;font-weight:600">⟳ Aktualisieren</button>
+            <button onclick="outlookVollsync()" style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:13px">🔄 Vollsync</button>
+          </div>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--line)">
           <div><b>Duplikate finden</b><div style="font-size:12px;color:var(--muted)">Doppelte Kandidaten nach Name oder E-Mail suchen</div></div>
@@ -1402,6 +1409,11 @@ function zeigeApp(){
     const kt=document.querySelector('.tab[data-view="kandidaten"]'); if(kt) kt.classList.add('active');
     pruefeAnruf(anruf);
   } else { pruefeSoftDelete(); zeigeStart(); }
+
+  // AutoSync: beim Öffnen leise neue Outlook-Mails nachziehen (nur wenn aktiviert + verbunden)
+  if(localStorage.getItem('yavis_autosync')!=='0'){
+    setTimeout(()=>{ try{ outlookIncSync(true); }catch(e){} }, 5000);
+  }
 }
 
 async function login(){
@@ -4959,6 +4971,7 @@ function oeffneEinstellungen(){
   const kb=document.getElementById('kompaktBtn');
   if(kb) kb.textContent=document.body.classList.contains('kompakt')?'✅ An':'⬜ Aus';
   document.getElementById('einstellungenDlg').showModal(); renderStatusVerwaltung(); renderBranchenVerwaltung(); renderAnredeVerwaltung(); renderDatenanreicherungVerwaltung(); einsZoomAnwenden();
+  { const _as=document.getElementById('autosyncChk'); if(_as) _as.checked=(localStorage.getItem('yavis_autosync')!=='0'); }
   setEinsTab(localStorage.getItem('yavis_eins_tab')||'darstellung');
   msEinstellungenUI();
 }
@@ -6248,27 +6261,53 @@ async function emailDatumNachtragen(){
 }
 
 // ===== Outlook-Vollsync: alle Mails inkl. Datum direkt aus Graph, ersetzt den Outlook-Import =====
+// Kontext für jeden Sync: eigene Adressen + Adresse->Kandidaten-ID
+async function _syncKontext(token){
+  const meR=await fetch('https://graph.microsoft.com/v1.0/me?$select=mail,userPrincipalName,proxyAddresses',{headers:{'Authorization':'Bearer '+token}});
+  const me=await meR.json();
+  const myAddrs=new Set(['senol@senolconsulting.de','senolation@gmail.com','senolation@googlemail.com']);
+  [me.mail, me.userPrincipalName].forEach(a=>{ if(a) myAddrs.add(String(a).toLowerCase()); });
+  (me.proxyAddresses||[]).forEach(p=>{ const a=String(p).replace(/^smtp:/i,'').toLowerCase(); if(a.includes('@')) myAddrs.add(a); });
+  const addr2id={};
+  for(let off=0;;off+=1000){
+    const {data}=await sb.from('kandidaten').select('id,email,email_beruflich,email_zweit').range(off,off+999);
+    (data||[]).forEach(k=>['email','email_beruflich','email_zweit'].forEach(f=>{const v=(k[f]||'').trim().toLowerCase(); if(v&&v.includes('@')&&!myAddrs.has(v)&&!addr2id[v]) addr2id[v]=k.id;}));
+    if(!data||data.length<1000) break;
+  }
+  return {addr2id, myAddrs};
+}
+// Eine Graph-Nachricht -> DB-Zeile (oder null, wenn keinem Kandidaten zuordenbar)
+function _msgZuRow(m, addr2id, myAddrs){
+  const from=(m.from&&m.from.emailAddress&&m.from.emailAddress.address||'').toLowerCase();
+  const richtung = myAddrs.has(from) ? 'raus' : 'rein';
+  let eid=null, an='', von='';
+  if(richtung==='raus'){
+    const rec=[...(m.toRecipients||[]),...(m.ccRecipients||[]),...(m.bccRecipients||[])].map(r=>(r.emailAddress&&r.emailAddress.address||'').toLowerCase()).filter(Boolean);
+    an=rec.join(', '); von=from||[...myAddrs][0]||'';
+    for(const a of rec){ if(a&&!myAddrs.has(a)&&addr2id[a]){ eid=addr2id[a]; break; } }
+  } else {
+    von=from;
+    if(from && !myAddrs.has(from)) eid=addr2id[from];
+    an=(m.toRecipients||[]).map(r=>(r.emailAddress&&r.emailAddress.address||'')).filter(Boolean).join(', ');
+  }
+  if(!eid) return null;
+  const betreff=(m.subject||'').trim();
+  const text=(m.body&&m.body.content||'').trim();
+  const uid=(self.crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now()+'_'+Math.round(Math.random()*1e9));
+  return { id:'ol_'+uid, entity_id:eid, richtung, betreff:betreff.slice(0,500), nachricht:text,
+    von:von.slice(0,300), an:an.slice(0,300), quelle:'outlook', internet_id:(m.internetMessageId||null),
+    erstellt_am:(richtung==='raus'?(m.sentDateTime||m.receivedDateTime):(m.receivedDateTime||m.sentDateTime)) };
+}
+const _SYNC_SELECT='subject,from,toRecipients,ccRecipients,bccRecipients,receivedDateTime,sentDateTime,body,internetMessageId';
+
+// VOLLSYNC = Neuaufbau: alle Ordner, ersetzt den Outlook-Verlauf komplett (jede Mail bekommt ihre Kennung)
 async function outlookVollsync(){
-  if(!confirm('Outlook-Vollsync starten?\n\nLiest ALLE Mails (Posteingang, Gesendet, Archiv) inkl. DATUM direkt aus Outlook, ordnet sie den Kandidaten zu und ERSETZT den bisherigen Outlook-Import.\n\nAlte Zoho-Einträge bleiben unangetastet. Zuerst eine Trockenlauf-Zählung, dann Bestätigung.')) return;
+  if(!confirm('Outlook-Vollsync (kompletter Neuaufbau)?\n\nLiest ALLE Mails aus allen Ordnern und baut den Outlook-Verlauf NEU auf (ersetzt den bisherigen). Jede Mail bekommt ihre eindeutige Kennung.\n\nFür den Alltag reicht danach „Aktualisieren (neue Mails)". Alte Zoho-Einträge bleiben unangetastet.')) return;
   const token=await msGetToken();
   if(!token){ alert('Nicht mit Outlook verbunden.\n\nBitte zuerst in Einstellungen → Konto auf „🔗 Mit Outlook verbinden".'); return; }
   try{
     zeigeMeldung('Verbinde mit Outlook …','ok');
-    const meR=await fetch('https://graph.microsoft.com/v1.0/me?$select=mail,userPrincipalName,proxyAddresses',{headers:{'Authorization':'Bearer '+token}});
-    const me=await meR.json();
-    // Eigene Adressen (werden NIE als Kandidat gematcht; bestimmen Richtung im Archiv)
-    const myAddrs=new Set(['senol@senolconsulting.de','senolation@gmail.com','senolation@googlemail.com']);
-    [me.mail, me.userPrincipalName].forEach(a=>{ if(a) myAddrs.add(String(a).toLowerCase()); });
-    (me.proxyAddresses||[]).forEach(p=>{ const a=String(p).replace(/^smtp:/i,'').toLowerCase(); if(a.includes('@')) myAddrs.add(a); });
-    // Kandidaten-Adressen -> ID (eigene Adressen ausgeschlossen)
-    zeigeMeldung('Lade Kandidaten-Adressen …','ok');
-    const addr2id={};
-    for(let off=0;;off+=1000){
-      const {data}=await sb.from('kandidaten').select('id,email,email_beruflich,email_zweit').range(off,off+999);
-      (data||[]).forEach(k=>['email','email_beruflich','email_zweit'].forEach(f=>{const v=(k[f]||'').trim().toLowerCase(); if(v&&v.includes('@')&&!myAddrs.has(v)&&!addr2id[v]) addr2id[v]=k.id;}));
-      if(!data||data.length<1000) break;
-    }
-    // ALLE Ordner des Postfachs rekursiv sammeln (inkl. Unterordner), Junk/Gelöschte/Entwürfe ausschließen
+    const {addr2id, myAddrs}=await _syncKontext(token);
     zeigeMeldung('Lese Ordnerstruktur …','ok');
     const EXCLUDE=/(gel[öo]schte|deleted|junk|spam|entw[üu]rfe|drafts|postausgang|outbox|rss|sync[- ]?(issues|fehler)|konflikte|conflicts)/i;
     const folderIds=[];
@@ -6285,36 +6324,19 @@ async function outlookVollsync(){
       }
     }
     await walkFolders('https://graph.microsoft.com/v1.0/me/mailFolders?$top=100&$select=id,displayName,childFolderCount');
-    // Jeden Ordner scannen; Richtung über die eigene Adresse (Absender = ich -> gesendet, sonst empfangen)
     const rows=[]; const seen=new Set(); let geprueft=0;
     async function scanFolder(fid){
-      let url='https://graph.microsoft.com/v1.0/me/mailFolders/'+fid+'/messages?$top=50&$select=subject,from,toRecipients,ccRecipients,bccRecipients,receivedDateTime,sentDateTime,body';
+      let url='https://graph.microsoft.com/v1.0/me/mailFolders/'+fid+'/messages?$top=50&$select='+_SYNC_SELECT;
       while(url){
         const resp=await fetch(url,{headers:{'Authorization':'Bearer '+token,'Prefer':'outlook.body-content-type="text"'}});
         if(!resp.ok){ if(resp.status===404) return; throw new Error('msgs '+resp.status); }
         const data=await resp.json();
         for(const m of (data.value||[])){
           geprueft++;
-          const from=(m.from&&m.from.emailAddress&&m.from.emailAddress.address||'').toLowerCase();
-          const richtung = myAddrs.has(from) ? 'raus' : 'rein';
-          let eid=null, an='', von='';
-          if(richtung==='raus'){
-            const rec=[...(m.toRecipients||[]),...(m.ccRecipients||[]),...(m.bccRecipients||[])].map(r=>(r.emailAddress&&r.emailAddress.address||'').toLowerCase()).filter(Boolean);
-            an=rec.join(', '); von=from||[...myAddrs][0]||'';
-            for(const a of rec){ if(a&&!myAddrs.has(a)&&addr2id[a]){ eid=addr2id[a]; break; } }
-          } else {
-            von=from;
-            if(from && !myAddrs.has(from)) eid=addr2id[from];
-            an=(m.toRecipients||[]).map(r=>(r.emailAddress&&r.emailAddress.address||'')).filter(Boolean).join(', ');
-          }
-          if(!eid) continue;
-          const betreff=(m.subject||'').trim();
-          const text=(m.body&&m.body.content||'').trim();
-          const ckey=eid+'|'+richtung+'|'+betreff+'|'+text.slice(0,150);
+          const r=_msgZuRow(m, addr2id, myAddrs); if(!r) continue;
+          const ckey=r.internet_id || (r.entity_id+'|'+r.richtung+'|'+r.betreff+'|'+r.nachricht.slice(0,150));
           if(seen.has(ckey)) continue; seen.add(ckey);
-          rows.push({ entity_id:eid, richtung, betreff:betreff.slice(0,500), nachricht:text,
-            von:von.slice(0,300), an:an.slice(0,300), quelle:'outlook',
-            erstellt_am:(richtung==='raus'?(m.sentDateTime||m.receivedDateTime):(m.receivedDateTime||m.sentDateTime)) });
+          rows.push(r);
         }
         url=data['@odata.nextLink']||null;
         zeigeMeldung('Lese Outlook … '+geprueft+' geprüft, '+rows.length+' zugeordnet','ok');
@@ -6323,22 +6345,67 @@ async function outlookVollsync(){
     }
     for(const fid of folderIds){ await scanFolder(fid); if(geprueft>200000) break; }
     if(!rows.length){ alert('Keine zuordenbaren Mails gefunden. (Geprüft: '+geprueft+')'); return; }
-    if(!confirm('TROCKENLAUF\n\n'+rows.length+' Mails (inkl. Datum) werden importiert und ERSETZEN den bisherigen Outlook-Import.\nGeprüft: '+geprueft+' Outlook-Nachrichten.\n\nJetzt wirklich ausführen?')){ zeigeMeldung('Abgebrochen','warn'); return; }
-    // IDs vergeben, alten Outlook-Import löschen, neu einfügen
-    rows.forEach((r,i)=>{ r.id='ol_'+i; });
+    if(!confirm('TROCKENLAUF\n\n'+rows.length+' Mails (inkl. Datum + Kennung) werden importiert und ERSETZEN den bisherigen Outlook-Verlauf.\nGeprüft: '+geprueft+' Outlook-Nachrichten.\n\nJetzt wirklich ausführen?')){ zeigeMeldung('Abgebrochen','warn'); return; }
     zeigeMeldung('Ersetze alten Outlook-Import …','ok');
     const del=await sb.from('emails').delete().eq('quelle','outlook');
     if(del.error){ alert('Fehler beim Löschen des alten Imports: '+del.error.message); return; }
     let ok=0;
     for(let i=0;i<rows.length;i+=200){
-      const batch=rows.slice(i,i+200);
-      const {error}=await sb.from('emails').insert(batch);
-      if(!error) ok+=batch.length; else console.error('insert',error);
+      const {error}=await sb.from('emails').insert(rows.slice(i,i+200));
+      if(!error) ok+=Math.min(200,rows.length-i); else console.error('insert',error);
       zeigeMeldung('Speichere … '+Math.min(i+200,rows.length)+'/'+rows.length,'ok');
     }
-    alert('Outlook-Vollsync fertig! 🎉\n\n'+ok+' Mails importiert — alle mit Datum.\nGeprüft: '+geprueft+' Outlook-Nachrichten.\n\nDie alten Zoho-Einträge sind unverändert.');
+    alert('Outlook-Vollsync fertig! 🎉\n\n'+ok+' Mails importiert — mit Datum und Kennung.\nGeprüft: '+geprueft+' Outlook-Nachrichten.\n\nAb jetzt kannst du in Outlook gefahrlos aufräumen — YAVIS behält seine Kopien.');
     zeigeMeldung('Outlook-Vollsync abgeschlossen ✓','ok');
   }catch(e){ alert('Fehler: '+(e.message||e)); }
+}
+
+// INKREMENTELLER SYNC = nur neue Mails ergänzen, NIE löschen (YAVIS bleibt dauerhaftes Archiv)
+let _incSyncLaeuft=false;
+async function outlookIncSync(silent){
+  if(_incSyncLaeuft) return; _incSyncLaeuft=true;
+  try{
+    const token=await msGetToken();
+    if(!token){ if(!silent) alert('Nicht mit Outlook verbunden.\n\nBitte zuerst in Einstellungen → Konto verbinden.'); return; }
+    if(!silent) zeigeMeldung('Suche neue Mails …','ok');
+    const {addr2id, myAddrs}=await _syncKontext(token);
+    // bekannte Kennungen laden
+    const known=new Set();
+    for(let off=0;;off+=1000){
+      const {data,error}=await sb.from('emails').select('internet_id').eq('quelle','outlook').not('internet_id','is',null).range(off,off+999);
+      if(error){ if(!silent) alert('Hinweis: Bitte zuerst das SQL für die Spalte „internet_id" ausführen.\n\n'+error.message); return; }
+      (data||[]).forEach(r=>{ if(r.internet_id) known.add(r.internet_id); });
+      if(!data||data.length<1000) break;
+    }
+    const rows=[]; const seen=new Set();
+    async function scanRecent(folder, dateField){
+      let url='https://graph.microsoft.com/v1.0/me/mailFolders/'+folder+'/messages?$top=50&$orderby='+dateField+'%20desc&$select='+_SYNC_SELECT;
+      let stop=false, pages=0;
+      while(url && !stop && pages<60){
+        pages++;
+        const resp=await fetch(url,{headers:{'Authorization':'Bearer '+token,'Prefer':'outlook.body-content-type="text"'}});
+        if(!resp.ok){ if(resp.status===404) return; throw new Error('msgs '+resp.status); }
+        const data=await resp.json();
+        for(const m of (data.value||[])){
+          const iid=m.internetMessageId;
+          if(iid && known.has(iid)){ stop=true; break; }   // ab hier alles bereits synchronisiert
+          if(iid && seen.has(iid)) continue;
+          const r=_msgZuRow(m, addr2id, myAddrs);
+          if(r){ if(iid) seen.add(iid); rows.push(r); }
+        }
+        url=data['@odata.nextLink']||null;
+      }
+    }
+    await scanRecent('inbox','receivedDateTime');
+    await scanRecent('sentitems','sentDateTime');
+    if(!rows.length){ if(!silent){ alert('Keine neuen Mails gefunden — alles aktuell. ✓'); } zeigeMeldung('Aktuell — keine neuen Mails ✓','ok'); return; }
+    let ok=0;
+    for(let i=0;i<rows.length;i+=200){ const {error}=await sb.from('emails').insert(rows.slice(i,i+200)); if(!error) ok+=Math.min(200,rows.length-i); }
+    if(!silent) alert(ok+' neue Mail(s) synchronisiert ✓'); else zeigeMeldung(ok+' neue Mail(s) synchronisiert ✓','ok');
+    // offene Detailansicht aktualisieren
+    try{ if(kontextDatensatz&&kontextDatensatz.id&&document.getElementById('detailPage')&&document.getElementById('detailPage').style.display!=='none'){ detailKandidat(kontextDatensatz.id); } }catch(e){}
+  }catch(e){ if(!silent) alert('Fehler: '+(e.message||e)); else console.error('autosync',e); }
+  finally{ _incSyncLaeuft=false; }
 }
 
 function msSyncDialog(treffer,totalMessages){
