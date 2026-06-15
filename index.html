@@ -578,6 +578,13 @@
           </select>
         </div>
         <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Anrede</div>
+          <select id="rmAnrede" style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
+            <option value="">alle</option>
+            <option value="__ohne__">— ohne Anrede —</option>
+          </select>
+        </div>
+        <div>
           <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Umzugsbereitschaft</div>
           <input id="rmUmzug" placeholder="z.B. bundesweit" onkeydown="if(event.key==='Enter')rechercheAusfuehren()"
                  style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:150px">
@@ -1125,6 +1132,22 @@
           <button onclick="statusHinzufuegen()"
                   style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--accent2);color:#fff;border:none;font-size:13px;font-weight:600">+ Hinzufügen</button>
           <button onclick="statusAufStandardReset()" title="Auf Standard-Werte zurücksetzen"
+                  style="padding:6px 12px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);font-size:13px;color:var(--muted)">↺</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Anreden -->
+    <div class="setSec" data-cat="listen" style="margin-bottom:20px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">🙋 Anreden</div>
+      <div style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;overflow:hidden">
+        <div id="anredeVerwaltungCont"></div>
+        <div style="padding:11px 16px;display:flex;gap:8px;align-items:center;border-top:1px solid var(--line)">
+          <input id="anredeNeuInp" placeholder="Neue Anrede …" onkeydown="if(event.key==='Enter')anredeHinzufuegen()"
+                 style="flex:1;padding:6px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
+          <button onclick="anredeHinzufuegen()"
+                  style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--accent2);color:#fff;border:none;font-size:13px;font-weight:600">+ Hinzufügen</button>
+          <button onclick="anredeAufStandardReset()" title="Auf Standard-Werte zurücksetzen"
                   style="padding:6px 12px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);font-size:13px;color:var(--muted)">↺</button>
         </div>
       </div>
@@ -2677,6 +2700,7 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
   const actMail=`<span class="inl-act" title="E-Mail schreiben" onclick="_inlMail(this,'${d.id}','${esc(d.voller_name)}')">✉</span>`;
   const actOpen=`<span class="inl-act" title="Profil öffnen" onclick="_inlOpen(this)">↗</span>`;
   const _statusOpts=(typeof statusListe==='function'?statusListe():['Aktiv suchend','Offen für Angebote','Nicht verfügbar','Platziert','Gesperrt']);
+  const _anredeOpts=(typeof anredeListe==='function'?anredeListe():ANREDE_OPTS);
   const statusSel=`<select class="inl-sel" data-id="${d.id}" data-feld="status" data-orig="${esc(d.status||'')}" onchange="_inlSave(this)"><option value="">—</option>${_statusOpts.map(o=>`<option ${o===d.status?'selected':''}>${esc(o)}</option>`).join('')}${(d.status&&!_statusOpts.includes(d.status))?`<option selected>${esc(d.status)}</option>`:''}</select>`;
   const _posSelHtml=`<select class="inl-sel" data-id="${d.id}" data-feld="berufsbezeichnung" data-orig="${esc(d.berufsbezeichnung||'')}" onchange="_inlSave(this)"><option value="">—</option>${Object.keys(POSITION_STUFE).map(o=>`<option ${o===d.berufsbezeichnung?'selected':''}>${esc(o)}</option>`).join('')}${(d.berufsbezeichnung&&!Object.keys(POSITION_STUFE).includes(d.berufsbezeichnung))?`<option selected>${esc(d.berufsbezeichnung)}</option>`:''}</select>`;
   const mail=(x)=> x?`<a href="#" onclick="event.preventDefault();mailtoMitLog('${esc(x)}','${d.id}','${esc(d.voller_name)}')" style="color:var(--accent2)">${esc(x)}</a>`:'';
@@ -2770,7 +2794,7 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
       <!-- ident -->
       <div class="dblock">
         <div class="dbh">Ident</div>
-        <div class="drow"><span class="dk">Anrede</span><span class="dv dv-edit"><select class="inl-sel" data-id="${d.id}" data-feld="begruessung" data-orig="${esc(d.begruessung||'')}" onchange="_inlSave(this)"><option value="">—</option>${ANREDE_OPTS.map(o=>`<option ${o===d.begruessung?'selected':''}>${esc(o)}</option>`).join('')}${(d.begruessung&&!ANREDE_OPTS.includes(d.begruessung))?`<option selected>${esc(d.begruessung)}</option>`:''}</select></span></div>
+        <div class="drow"><span class="dk">Anrede</span><span class="dv dv-edit"><select class="inl-sel" data-id="${d.id}" data-feld="begruessung" data-orig="${esc(d.begruessung||'')}" onchange="_inlSave(this)"><option value="">—</option>${_anredeOpts.map(o=>`<option ${o===d.begruessung?'selected':''}>${esc(o)}</option>`).join('')}${(d.begruessung&&!_anredeOpts.includes(d.begruessung))?`<option selected>${esc(d.begruessung)}</option>`:''}</select></span></div>
         ${ri('Titel','titel', d.titel)}
         ${ri('Vorname','vorname', d.vorname)}
         ${ri('Nachname','nachname', d.nachname)}
@@ -3257,6 +3281,10 @@ function branchenListe(){
   try{ const s=localStorage.getItem('yavis_branchen'); if(s){ const a=JSON.parse(s); if(a&&a.length) return a; } }catch(e){}
   return [...BRANCHEN_STANDARD];
 }
+function anredeListe(){
+  try{ const s=localStorage.getItem('yavis_anreden'); if(s){ const a=JSON.parse(s); if(a&&a.length) return a; } }catch(e){}
+  return [...ANREDE_OPTS];
+}
 
 function ef(label,id,val,type='text'){
   return `<div class="edit-field"><label>${label}</label><input id="ef_${id}" type="${type}" value="${val?String(val).replace(/"/g,'&quot;'):''}"></div>`;
@@ -3271,7 +3299,7 @@ function esel(label,id,val,opts){
 // Anrede als Dropdown; unbekannten Bestandswert erhalten, leer => "Keine"
 function anredeSelect(val){
   const v=val||'';
-  const opts=[...ANREDE_OPTS];
+  const opts=[...anredeListe()];
   if(v && !opts.includes(v)) opts.push(v);
   const sel=v||'Keine';
   return `<div class="edit-field"><label>Anrede / Begrüßung</label><select id="ef_begruessung">`+
@@ -4861,7 +4889,7 @@ function oeffneEinstellungen(){
   // Kompakt-Button-Label
   const kb=document.getElementById('kompaktBtn');
   if(kb) kb.textContent=document.body.classList.contains('kompakt')?'✅ An':'⬜ Aus';
-  document.getElementById('einstellungenDlg').showModal(); renderStatusVerwaltung(); renderBranchenVerwaltung(); einsZoomAnwenden();
+  document.getElementById('einstellungenDlg').showModal(); renderStatusVerwaltung(); renderBranchenVerwaltung(); renderAnredeVerwaltung(); einsZoomAnwenden();
   setEinsTab(localStorage.getItem('yavis_eins_tab')||'darstellung');
   msEinstellungenUI();
 }
@@ -7404,6 +7432,11 @@ function zeigeRechercheMaske() {
       rmSel.appendChild(o);
     });
   }
+  // rmAnrede-Dropdown befüllen (alle + "ohne Anrede" + konfigurierte Werte)
+  const rmAn = document.getElementById('rmAnrede');
+  if (rmAn && rmAn.options.length <= 2) {
+    anredeListe().forEach(a => { if(a==='Keine') return; const o=document.createElement('option'); o.value=a; o.textContent=a; rmAn.appendChild(o); });
+  }
   _rmExWertFuellen();
   _rmFuelleAusFeld('rmBundeslandDD','bundesland','alle Bundesländer');
   _rmFuelleAusFeld('rmQuelleDD','quelle','alle Quellen');
@@ -7480,7 +7513,8 @@ function rmFilterLesen(){
     qualifikation:g('rmQualifikation')?.value||'', studiengang:g('rmStudiengang')?.value||'',
     abw:g('rmAbwerbeschutz')?.value||'', quelle:msddSel('rmQuelleDD'),
     istHot:!!g('rmIstHot')?.checked, hatProfil:!!g('rmHatProfil')?.checked,
-    rolle:g('rmRolle')?.value||'', hatDok:!!g('rmHatDok')?.checked
+    rolle:g('rmRolle')?.value||'', hatDok:!!g('rmHatDok')?.checked,
+    anrede:g('rmAnrede')?.value||''
   };
 }
 function _msddSetSel(id, vals){ document.querySelectorAll('#'+id+'-panel input').forEach(c=>{ c.checked=(vals||[]).includes(c.value); }); msddUpdateLabel(id); }
@@ -7495,7 +7529,7 @@ function rmFilterSetzen(f){
   sv('rmGehaltVon',f.gehaltVon); sv('rmGehaltBis',f.gehaltBis); sv('rmErfVon',f.erfVon); sv('rmErfBis',f.erfBis);
   sv('rmAlterVon',f.alterVon); sv('rmAlterBis',f.alterBis); sv('rmQualifikation',f.qualifikation); sv('rmStudiengang',f.studiengang);
   sv('rmAbwerbeschutz',f.abw); ck('rmIstHot',f.istHot); ck('rmHatProfil',f.hatProfil);
-  sv('rmRolle',f.rolle); ck('rmHatDok',f.hatDok);
+  sv('rmRolle',f.rolle); ck('rmHatDok',f.hatDok); sv('rmAnrede',f.anrede);
   _msddSetSel('rmExWertDD', f.ausschluss); _msddSetSel('rmBundeslandDD', f.bundesland); _msddSetSel('rmQuelleDD', f.quelle);
   const det=document.getElementById('rmErweitert'); if(det) det.open=true;
 }
@@ -7555,6 +7589,7 @@ async function rechercheMaskeAusfuehren() {
   const quelle      = msddSel('rmQuelleDD');
   const rolle       = document.getElementById('rmRolle')?.value||'';
   const hatDok      = !!(document.getElementById('rmHatDok')?.checked);
+  const anredeVal   = document.getElementById('rmAnrede')?.value||'';
 
   let rows = [];
 
@@ -7565,7 +7600,7 @@ async function rechercheMaskeAusfuehren() {
     if (error) { anzEl.textContent = 'Fehler: ' + error.message; return; }
     const rpcRows = data || [];
     // Volle Datensätze nachladen wenn Client-Filter nötig
-    const brauchtVoll = _rmGewaehltePos.size || statusVal || mailMode || telMode || ausschluss.length || umzugVal || bundesland.length || quelle.length || gehaltVon!=null || gehaltBis!=null || erfVon!=null || erfBis!=null || alterVon!=null || alterBis!=null || qualifikation || studiengang || rolle || hatDok;
+    const brauchtVoll = _rmGewaehltePos.size || statusVal || mailMode || telMode || ausschluss.length || umzugVal || bundesland.length || quelle.length || gehaltVon!=null || gehaltBis!=null || erfVon!=null || erfBis!=null || alterVon!=null || alterBis!=null || qualifikation || studiengang || rolle || hatDok || anredeVal;
     if (rpcRows.length && brauchtVoll) {
       const ids = rpcRows.map(r => r.id);
       const map = {};
@@ -7597,6 +7632,8 @@ async function rechercheMaskeAusfuehren() {
     if (rolle==='kandidat')        q = q.ilike('rollen','%;Kandidat;%');
     else if (rolle==='ansprechpartner') q = q.ilike('rollen','%;Ansprechpartner;%');
     else if (rolle==='doppel')     q = q.ilike('rollen','%;Kandidat;%').ilike('rollen','%;Ansprechpartner;%');
+    if (anredeVal==='__ohne__')    q = q.or('begruessung.is.null,begruessung.eq.,begruessung.eq.Keine');
+    else if (anredeVal)            q = q.eq('begruessung', anredeVal);
     if (hatDok)       q = q.in('id', [...await _ladeDokIds()]);
     if (mailMode==='privat')        q = q.not('email','is',null).neq('email','');
     else if (mailMode==='beruflich') q = q.not('email_beruflich','is',null).neq('email_beruflich','');
@@ -7648,6 +7685,8 @@ async function rechercheMaskeAusfuehren() {
   if (rolle==='kandidat')        rows=rows.filter(r=>(r.rollen||'').includes(';Kandidat;'));
   else if (rolle==='ansprechpartner') rows=rows.filter(r=>(r.rollen||'').includes(';Ansprechpartner;'));
   else if (rolle==='doppel')     rows=rows.filter(r=>(r.rollen||'').includes(';Kandidat;')&&(r.rollen||'').includes(';Ansprechpartner;'));
+  if (anredeVal==='__ohne__')    rows=rows.filter(r=>!r.begruessung||r.begruessung==='Keine');
+  else if (anredeVal)            rows=rows.filter(r=>r.begruessung===anredeVal);
   if (hatDok){ const dokSet=await _ladeDokIds(); rows=rows.filter(r=>dokSet.has(r.id)); }
   if (keinKontakt) { const cutoff=new Date(); cutoff.setDate(cutoff.getDate()-keinKontakt); rows=rows.filter(r=>!r.letzte_aktivitaet||new Date(r.letzte_aktivitaet)<cutoff); }
 
@@ -7672,6 +7711,101 @@ async function rechercheMaskeAusfuehren() {
 function _rmTrefferIds(){ const e=_rmLetzteErgebnisse; if(!e||e.tab!=='kandidaten'||!(e.rows&&e.rows.length)){ zeigeMeldung('Keine Treffer.','warn'); return null; } return e.rows.map(r=>r.id); }
 function rmTrefferMail(){ const ids=_rmTrefferIds(); if(!ids) return; selectedKandIds=new Set(ids); serienMailAuswahl(); }
 function rmTrefferTags(){ const ids=_rmTrefferIds(); if(!ids) return; selectedKandIds=new Set(ids); selTagsModal('hinzu'); }
+
+// Geschlecht aus Vorname schätzen (für Auto-Anrede). 'm' | 'w' | null (unklar -> überspringen)
+const _VN_M=new Set('alexander andreas andre achim adrian albert alexandr alfred ali andlater anton armin arne arno axel baris ben benedikt benjamin benno bernd bernhard bjoern boris burkhard carl carsten christian christoph claus clemens daniel david denis dennis dieter dirk dominik dominic eberhard edgar edwin elias emil enrico erik ernst eugen fabian felix ferdinand florian frank franz frederik fritz gabriel georg gerald gerd gerhard gregor guido guenter guenther hagen hans harald hartmut heiko heinrich heinz helmut hendrik henning henry herbert holger horst hubert ingo jakob jan jannik jens joachim jochen johannes john jonas jonathan joerg josef juergen julian justus kai karl karsten kevin klaus konrad kurt lars lennart leon leonard lothar louis luca lucas ludwig lukas maik manfred manuel marc marcel marco marcus mario mark markus martin marvin mathias matthias max maximilian michael mike mirco mirko moritz nico niklas nikolas norbert oliver olaf otto patrick paul peter philipp rafael raik rainer ralf ralph raphael reinhard rene richard robert robin roland rolf ronald rouven rudolf ruediger sascha sebastian sefer selim sven simon stefan steffen stephan sven sönke thomas thorsten tim timo tobias tom torben torsten udo ulf ulrich uwe valentin viktor vincent volker waldemar walter werner wilfried wilhelm willi wolfgang yannick yusuf'.split(' '));
+const _VN_W=new Set('alexandra alina andrea anett anette angela angelika anita anja anke anna annett annette annika anastasia antje astrid barbara beate bettina birgit brigitte britta carina carmen carola caroline catharina charlotte christa christel christiane christin christina claudia cornelia dagmar daniela diana doreen doris dorothea elena elisabeth elke ella emilia emma erika esther eva franziska gabriele gisela hannah hanna heide heidi heike helena helga henriette ilona ines inga ingeborg ingrid irene iris isabel isabell isabella jana janina janine jasmin jana jennifer jessica johanna josephine judith julia juliane jutta karin karina karola katharina kathrin katja katrin kerstin klara kristin lara laura lea lena lieselotte lina linda lisa luisa luise mandy manuela margarete maria marianne marie marion marlene martina melanie melina meike michaela miriam monika nadine nadja natalie nele nicole nina patricia paula petra pia ramona regina renate rita romy rosa ruth sabine sabrina sandra sara sarah saskia silke silvia simone sina sofia sonja sophia sophie stefanie steffi susanne svenja sybille tanja theresa thea ulrike ursula ute vanessa vera veronika viktoria wiebke yvonne'.split(' '));
+function _geschlechtAusVorname(name){
+  if(!name) return null;
+  let v=String(name).trim().toLowerCase().split(/[\s-]+/)[0].replace(/[^a-zäöüß]/g,'');
+  if(!v) return null;
+  if(_VN_M.has(v)) return 'm';
+  if(_VN_W.has(v)) return 'w';
+  // konservativer Fallback: klar weibliche Endungen
+  if(/(?:a|ine|ina|elle|ette|ique)$/.test(v) && v.length>3) return 'w';
+  return null;
+}
+
+// Massenaktualisierung auf ALLE aktuellen Treffer
+function rmTrefferMassenupdate(){
+  const ids=_rmTrefferIds(); if(!ids) return;
+  const dlg=document.createElement('dialog');
+  dlg.style.cssText='background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:0;max-width:480px;width:95vw';
+  dlg.innerHTML=`
+    <div style="padding:22px 26px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid var(--line);padding-bottom:12px">
+        <h3 style="margin:0;font-size:16px;font-weight:700">✏️ Massenaktualisierung</h3>
+        <button onclick="this.closest('dialog').close();this.closest('dialog').remove()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--muted)">×</button>
+      </div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:14px">Wirkt auf <b>${ids.length}</b> Treffer.</div>
+      <label style="font-size:12px;font-weight:600;color:var(--muted)">FELD</label>
+      <select id="rmMuFeld" onchange="rmMuFeldWechsel()" style="width:100%;padding:8px;font-size:14px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:5px;margin:6px 0 14px">
+        <option value="begruessung">Anrede</option>
+        <option value="status">Status</option>
+        <option value="berufsbezeichnung">Position</option>
+      </select>
+      <div id="rmMuWertBox"></div>
+      <div id="rmMuMsg" style="font-size:12px;margin-top:10px"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+        <button onclick="this.closest('dialog').close();this.closest('dialog').remove()" style="padding:8px 16px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);color:var(--ink);font-size:13px">Abbrechen</button>
+        <button id="rmMuGo" onclick="rmMuAnwenden(this)" style="padding:8px 16px;border-radius:5px;cursor:pointer;background:var(--accent2);color:#fff;border:none;font-size:13px;font-weight:600">Anwenden</button>
+      </div>
+    </div>`;
+  document.body.appendChild(dlg);
+  dlg._ids=ids;
+  dlg.showModal();
+  rmMuFeldWechsel();
+}
+function rmMuFeldWechsel(){
+  const feld=document.getElementById('rmMuFeld')?.value; const box=document.getElementById('rmMuWertBox'); if(!box) return;
+  const selStyle='width:100%;padding:8px;font-size:14px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:5px;margin:6px 0 0';
+  const sopts=arr=>arr.map(o=>`<option value="${esc(o)}">${esc(o)}</option>`).join('');
+  if(feld==='begruessung'){
+    box.innerHTML=`<label style="font-size:12px;font-weight:600;color:var(--muted)">WERT</label>
+      <select id="rmMuWert" style="${selStyle}"><option value="__auto__">🤖 Automatisch aus Vorname (Herr/Frau)</option>${sopts(anredeListe())}</select>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">Bei „Automatisch" wird das Geschlecht aus dem Vornamen geschätzt; unklare Fälle werden übersprungen (nichts gesetzt).</div>`;
+  } else if(feld==='status'){
+    box.innerHTML=`<label style="font-size:12px;font-weight:600;color:var(--muted)">WERT</label><select id="rmMuWert" style="${selStyle}">${sopts(statusListe())}</select>`;
+  } else {
+    box.innerHTML=`<label style="font-size:12px;font-weight:600;color:var(--muted)">WERT</label><select id="rmMuWert" style="${selStyle}">${sopts(Object.keys(POSITION_STUFE))}</select>`;
+  }
+}
+async function rmMuAnwenden(btn){
+  const dlg=btn.closest('dialog'); const ids=(dlg&&dlg._ids)||[];
+  const feld=document.getElementById('rmMuFeld').value;
+  const wert=document.getElementById('rmMuWert').value;
+  const msg=document.getElementById('rmMuMsg');
+  if(!ids.length){ if(msg){msg.textContent='Keine Treffer.';msg.style.color='var(--hot)';} return; }
+  const istAuto=(feld==='begruessung'&&wert==='__auto__');
+  if(!confirm(`Wirklich ${ids.length} Datensätze aktualisieren${istAuto?' (Anrede automatisch aus Vorname)':' → '+feld+' = '+wert}?`)) return;
+  btn.disabled=true; if(msg){ msg.style.color='var(--muted)'; msg.textContent='Speichere …'; }
+  let ok=0;
+  if(istAuto){
+    // Vornamen frisch laden (unabhängig von der Trefferquelle)
+    const vn={};
+    for(let i=0;i<ids.length;i+=300){ const {data}=await sb.from('kandidaten').select('id,vorname,voller_name').in('id',ids.slice(i,i+300)); (data||[]).forEach(r=>vn[r.id]=r); }
+    let herr=0,frau=0,skip=0;
+    for(const id of ids){
+      const r=vn[id]; const g=_geschlechtAusVorname(r&&(r.vorname||r.voller_name));
+      if(!g){ skip++; continue; }
+      const v=g==='m'?'Herr':'Frau';
+      const {error}=await sb.from('kandidaten').update({begruessung:v,geaendert_am:new Date().toISOString()}).eq('id',id);
+      if(!error){ ok++; if(g==='m')herr++; else frau++; }
+    }
+    if(msg){ msg.style.color='#10b981'; msg.textContent=`✓ ${ok} gesetzt (${herr}× Herr, ${frau}× Frau), ${skip} übersprungen (unklar).`; }
+  } else {
+    for(let i=0;i<ids.length;i+=200){
+      const batch=ids.slice(i,i+200);
+      const patch={}; patch[feld]=wert; patch.geaendert_am=new Date().toISOString();
+      const {error}=await sb.from('kandidaten').update(patch).in('id',batch);
+      if(!error) ok+=batch.length;
+    }
+    if(msg){ msg.style.color='#10b981'; msg.textContent=`✓ ${ok} Datensätze aktualisiert.`; }
+  }
+  btn.disabled=false;
+  zeigeMeldung('Massenaktualisierung fertig ✓','ok');
+  setTimeout(()=>{ try{dlg.close();dlg.remove();}catch(e){} rechercheAusfuehren(); }, 1400);
+}
 
 // ===== Trefferliste: konfigurierbare + sortierbare Spalten =====
 const RM_COLS=[
@@ -7728,6 +7862,7 @@ function _rmRenderTabelle(){
     +'<button onclick="rmSpaltenPanelToggle()" style="'+btn+'">🗂 Spalten</button>'
     +'<button onclick="rmTrefferMail()" style="'+btn+'">✉️ Serienmail an alle</button>'
     +'<button onclick="rmTrefferTags()" style="'+btn+'">🏷 Fähigkeiten an alle</button>'
+    +'<button onclick="rmTrefferMassenupdate()" style="'+btn+'">✏️ Massenaktualisierung</button>'
     +'<button onclick="rechercheCsvExport()" style="'+btn+'">📥 CSV</button>'
     +'</div></div>';
   const panel='<div id="rmSpaltenPanel" style="display:none;border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:10px;margin-bottom:8px;flex-wrap:wrap;gap:4px 14px">'
@@ -7911,6 +8046,35 @@ function statusAufStandardReset() {
     });
   }
   zeigeMeldung('Standard-Werte wiederhergestellt ✓', 'ok');
+}
+
+// ===== Anrede-Verwaltung (Einstellungen → Listen) =====
+function renderAnredeVerwaltung(){
+  const cont=document.getElementById('anredeVerwaltungCont'); if(!cont) return;
+  const liste=anredeListe();
+  if(!liste.length){ cont.innerHTML='<div style="padding:10px 16px;font-size:13px;color:var(--muted)">Keine Werte — Standard wird verwendet.</div>'; return; }
+  cont.innerHTML=liste.map((v,i)=>
+    '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 16px;'+
+    (i<liste.length-1?'border-bottom:1px solid var(--line)':'')+'">'+
+    '<span style="font-size:13px">'+esc(v)+'</span>'+
+    '<button onclick="anredeLoeschen('+i+')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;line-height:1;padding:0 2px" title="Entfernen">×</button>'+
+    '</div>').join('');
+}
+function anredeHinzufuegen(){
+  const inp=document.getElementById('anredeNeuInp'); const val=(inp.value||'').trim(); if(!val) return;
+  const liste=anredeListe();
+  if(liste.some(s=>s.toLowerCase()===val.toLowerCase())){ zeigeMeldung('Wert existiert bereits','err'); return; }
+  liste.push(val); localStorage.setItem('yavis_anreden', JSON.stringify(liste)); inp.value='';
+  renderAnredeVerwaltung(); zeigeMeldung('"'+val+'" hinzugefügt ✓','ok');
+}
+function anredeLoeschen(idx){
+  const liste=anredeListe();
+  if(liste.length<=1){ zeigeMeldung('Mindestens ein Wert muss vorhanden sein','err'); return; }
+  liste.splice(idx,1); localStorage.setItem('yavis_anreden', JSON.stringify(liste)); renderAnredeVerwaltung();
+}
+function anredeAufStandardReset(){
+  if(!confirm('Anrede-Liste auf die Standard-Werte zurücksetzen?\n\n'+ANREDE_OPTS.join(', '))) return;
+  localStorage.removeItem('yavis_anreden'); renderAnredeVerwaltung(); zeigeMeldung('Standard-Werte wiederhergestellt ✓','ok');
 }
 
 
