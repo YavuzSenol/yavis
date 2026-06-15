@@ -2749,7 +2749,8 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
         ${ri('In Position seit','in_position_seit', d.in_position_seit)}
         ${ri('Firma zuvor','firma_zuvor', d.firma_zuvor)}
         ${ri('Position zuvor','position_zuvor', d.position_zuvor)}
-        ${istAnsprechpartner?`<div class="dsubh">Als Ansprechpartner</div>${r('Firma', firmaName?`<a href="#" onclick="event.preventDefault();detailKunde('${d.firma_id}')" style="color:var(--accent2)" title="Zur Firma springen">${esc(firmaName)}</a>`:(d.firma_id?esc(d.firma_id):''))}`:''}
+        <div class="dsubh">Als Ansprechpartner</div>
+        <div class="drow"><span class="dk">Firma</span><span class="dv dv-edit"><input class="inl-in inl-firma" list="firmaDLinl" data-id="${d.id}" data-orig="${esc(firmaName||'')}" placeholder="Firma tippen…" value="${esc(firmaName||'')}" autocomplete="off" onchange="_inlFirma(this)"><datalist id="firmaDLinl"></datalist>${(d.firma_id&&firmaName)?` <a href="#" onclick="event.preventDefault();detailKunde('${d.firma_id}')" style="color:var(--accent2);font-size:12px;text-decoration:none" title="Zur Firma springen">↗</a>`:''}<span class="inl-firma-fb" style="font-size:11px;margin-left:6px"></span></span></div>
       </div>
 
       <!-- anschrift -->
@@ -2801,7 +2802,7 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
       <!-- status & sperren -->
       <div class="dblock">
         <div class="dbh">Status &amp; Sperren</div>
-        ${r('Rollen', esc(rollen))}
+        <div class="drow"><span class="dk">Rollen</span><span class="dv dv-edit"><label style="margin-right:16px;cursor:pointer"><input type="checkbox" class="inl-rolle" data-rolle="Kandidat" ${(d.rollen||'').includes(';Kandidat;')?'checked':''} onchange="_inlRollen(this,'${d.id}')"> 👤 Kandidat</label><label style="cursor:pointer"><input type="checkbox" class="inl-rolle" data-rolle="Ansprechpartner" ${(d.rollen||'').includes(';Ansprechpartner;')?'checked':''} onchange="_inlRollen(this,'${d.id}')"> 👔 Ansprechpartner</label><span class="inl-rolle-fb" style="font-size:11px;margin-left:8px"></span></span></div>
         <div class="drow"><span class="dk">Status</span><span class="dv dv-edit">${statusSel}</span></div>
         ${ri('Interne Wertung','wertung_intern', d.wertung_intern)}
         ${ri('Kontaktstatus','kontaktstatus', d.kontaktstatus)}
@@ -2914,6 +2915,7 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
   setTimeout(initAbschnitteSortierung, 0);
   setTimeout(()=>{ document.querySelectorAll('#detailPage .inl-ta').forEach(_inlAutogrow); }, 0);
   setTimeout(_faeVorschlaege, 0);
+  setTimeout(_inlFirmaInit, 0);
 }
 
 function zurueckZurListe(){
@@ -3003,6 +3005,33 @@ async function _faeApply(box, arr){
 function _faeRemove(xEl){ const box=xEl.closest('.fae-box'); const tag=(xEl.dataset.tag||'').toLowerCase(); const arr=parseTags(box.dataset.tags).filter(t=>t.toLowerCase()!==tag); _faeApply(box, arr); }
 function _faeAdd(inp){ const box=inp.closest('.fae-box'); const raw=inp.value.trim(); inp.value=''; if(!raw) return; const t=normTag(raw); if(!t) return; const arr=parseTags(box.dataset.tags); if(!arr.map(x=>x.toLowerCase()).includes(t.toLowerCase())){ arr.push(t); _faeApply(box, arr); } }
 async function _faeVorschlaege(){ const dl=document.getElementById('faeDL'); if(!dl) return; const alle=await ladeAlleTags(); dl.innerHTML=(alle||[]).map(t=>'<option value="'+esc(t)+'">').join(''); }
+
+// Rollen inline umschalten (Kandidat / Ansprechpartner) — mind. eine Rolle
+async function _inlRollen(el, id){
+  const row=el.closest('.dv-edit'); const fb=row.querySelector('.inl-rolle-fb');
+  let arr=[]; row.querySelectorAll('.inl-rolle').forEach(b=>{ if(b.checked) arr.push(b.dataset.rolle); });
+  if(!arr.length){ el.checked=true; arr=[el.dataset.rolle]; if(fb){ fb.textContent='mind. 1 Rolle nötig'; fb.style.color='var(--hot)'; } }
+  const rollen=';'+arr.join(';')+';';
+  const {error}=await sb.from('kandidaten').update({rollen, geaendert_am:new Date().toISOString()}).eq('id', id);
+  if(fb){ fb.textContent=error?('Fehler: '+error.message):'gespeichert ✓'; fb.style.color=error?'var(--hot)':'#10b981'; if(!error) setTimeout(()=>{ if(fb) fb.textContent=''; },2000); }
+}
+// Firma-Zuordnung inline: Name -> firma_id auflösen und speichern
+async function _inlFirma(el){
+  const id=el.dataset.id, name=(el.value||'').trim();
+  const fb=el.parentElement.querySelector('.inl-firma-fb');
+  let firmaId=null;
+  if(name){ const m=_prefixMatch(name,_firmaNamen); if(m){ el.value=m; firmaId=_firmaNameToId[m.toLowerCase()]||null; } }
+  if(name && !firmaId){ if(fb){ fb.textContent='Firma nicht gefunden'; fb.style.color='var(--hot)'; } return; }
+  const {error}=await sb.from('kandidaten').update({firma_id:firmaId, geaendert_am:new Date().toISOString()}).eq('id', id);
+  el.dataset.orig=el.value;
+  if(fb){ fb.textContent=error?('Fehler: '+error.message):'gespeichert ✓'; fb.style.color=error?'var(--hot)':'#10b981'; if(!error) setTimeout(()=>{ if(fb) fb.textContent=''; },2000); }
+}
+// Firma-Datalist für die Inline-Maske füllen (nutzt die Editor-Caches _firmaNamen/_firmaNameToId)
+async function _inlFirmaInit(){
+  const dl=document.getElementById('firmaDLinl'); if(!dl) return;
+  if(!_firmaNamen.length){ const {data}=await sb.from('kunden').select('id,name').order('name'); _firmaNamen=[]; _firmaNameToId={}; (data||[]).forEach(k=>{ if(!k.name) return; _firmaNamen.push(k.name); _firmaNameToId[k.name.toLowerCase()]=k.id; }); }
+  dl.innerHTML=_firmaNamen.map(n=>'<option value="'+esc(n)+'">').join('');
+}
 
 function initAbschnitteSortierung() {
   const page = document.getElementById('detailPage');
