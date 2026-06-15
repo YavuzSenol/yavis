@@ -2737,7 +2737,7 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
       <!-- ident -->
       <div class="dblock">
         <div class="dbh">Ident</div>
-        ${ri('Anrede','begruessung', d.begruessung)}
+        <div class="drow"><span class="dk">Anrede</span><span class="dv dv-edit"><select class="inl-sel" data-id="${d.id}" data-feld="begruessung" data-orig="${esc(d.begruessung||'')}" onchange="_inlSave(this)"><option value="">—</option>${ANREDE_OPTS.map(o=>`<option ${o===d.begruessung?'selected':''}>${esc(o)}</option>`).join('')}${(d.begruessung&&!ANREDE_OPTS.includes(d.begruessung))?`<option selected>${esc(d.begruessung)}</option>`:''}</select></span></div>
         ${ri('Titel','titel', d.titel)}
         ${ri('Vorname','vorname', d.vorname)}
         ${ri('Nachname','nachname', d.nachname)}
