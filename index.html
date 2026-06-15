@@ -466,7 +466,7 @@
       <button onclick="wvAuswahlAufheben()" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.4);padding:5px 10px;border-radius:4px;cursor:pointer;font-size:13px;margin-left:auto">✕ Aufheben</button>
     </div>
     <div class="count" id="wvCount"></div>
-    <table><thead><tr>
+    <table style="width:100%"><thead><tr>
       <th style="width:1%;white-space:nowrap;text-align:center;padding-left:10px;padding-right:0"><input type="checkbox" id="wvSelAll" title="Alle" onchange="wvAlleToggle(this.checked)" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)"></th>
       <th>Fällig am</th><th>Betreff</th><th>Wer</th><th>Aktionen</th>
     </tr></thead><tbody id="wvBody"></tbody></table>
@@ -1410,9 +1410,13 @@ function zeigeApp(){
     pruefeAnruf(anruf);
   } else { pruefeSoftDelete(); zeigeStart(); }
 
-  // AutoSync: beim Öffnen leise neue Outlook-Mails nachziehen (nur wenn aktiviert + verbunden)
+  // AutoSync: beim Öffnen leise neue Outlook-Mails nachziehen (nur wenn aktiviert + verbunden).
+  // Gedrosselt: höchstens alle 10 Min (verhindert schwere Syncs bei jedem Reload).
   if(localStorage.getItem('yavis_autosync')!=='0'){
-    setTimeout(()=>{ try{ outlookIncSync(true); }catch(e){} }, 5000);
+    const last=parseInt(localStorage.getItem('yavis_last_autosync')||'0',10);
+    if(Date.now()-last > 10*60*1000){
+      setTimeout(()=>{ try{ outlookIncSync(true); }catch(e){} }, 6000);
+    }
   }
 }
 
@@ -6422,6 +6426,7 @@ async function outlookIncSync(silent){
   try{
     const token=await msGetToken();
     if(!token){ if(!silent) alert('Nicht mit Outlook verbunden.\n\nBitte zuerst in Einstellungen → Konto verbinden.'); return; }
+    try{ localStorage.setItem('yavis_last_autosync', String(Date.now())); }catch(e){}
     if(!silent) zeigeMeldung('Suche neue Mails …','ok');
     const {addr2id, myAddrs}=await _syncKontext(token);
     // bekannte Kennungen laden
