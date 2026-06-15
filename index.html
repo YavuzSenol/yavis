@@ -5689,27 +5689,37 @@ Viele Grüße
 function mailHistorieHtml(mails){
   if(!mails||!mails.length) return '<div style="color:var(--muted);font-size:13px">Noch keine E-Mails protokolliert.</div>';
   return mails.map(m=>{
-    const ist_gesendet=m.betreff&&m.betreff.startsWith('📤 ');
-    const ist_empfangen=m.betreff&&m.betreff.startsWith('📥 ');
-    const richtPfeil=ist_gesendet?'<span style="color:var(--accent2);font-size:11px;font-weight:700">→ Gesendet</span>':
-                     ist_empfangen?'<span style="color:var(--ok);font-size:11px;font-weight:700">← Empfangen</span>':'';
+    // Richtung: neue Mails ueber Feld 'richtung', alte ueber Betreff-Prefix
+    const rRaus=m.richtung==='raus'||(m.betreff&&m.betreff.startsWith('📤 '));
+    const rRein=m.richtung==='rein'||(m.betreff&&m.betreff.startsWith('📥 '));
+    const richtPfeil=rRaus?'<span style="color:var(--accent2);font-size:11px;font-weight:700">→ Gesendet</span>':
+                     rRein?'<span style="color:var(--ok);font-size:11px;font-weight:700">← Empfangen</span>':'';
     const betreff=m.betreff?m.betreff.replace(/^[📤📥]\s*/,''):'(kein Betreff)';
     // Notiz aus Betreff extrahieren (Format: "Betreff\n\nNotiz: xyz")
     const parts=betreff.split('\n\nNotiz: ');
     const hauptBetreff=parts[0];
     const notiz=parts[1]||'';
-    return `<div class="note" style="cursor:default">
+    const body=(m.nachricht||'').trim();
+    const hasBody=!!body;
+    const meta=[m.von?('Von: '+m.von):'', m.an?('An: '+m.an):''].filter(Boolean).join('   ·   ');
+    const bid='mb_'+String(m.id||Math.random()).replace(/[^a-zA-Z0-9_]/g,'');
+    return `<div class="note" style="cursor:${hasBody?'pointer':'default'}"${hasBody?` onclick="mailToggle('${bid}')"`:''}>
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
         <div style="flex:1;min-width:0">
-          ${richtPfeil?`<div style="margin-bottom:3px">${richtPfeil}</div>`:''}
+          ${richtPfeil?`<div style="margin-bottom:3px">${richtPfeil}${hasBody?' <span style="color:var(--muted);font-size:11px" title="Text vorhanden – klicken zum Lesen">📄</span>':''}</div>`:''}
           <div style="font-weight:600;font-size:13px">${esc(hauptBetreff)}</div>
           ${notiz?`<div style="font-size:12px;color:var(--muted);margin-top:2px">${esc(notiz)}</div>`:''}
         </div>
         <div style="font-size:11px;color:var(--muted);white-space:nowrap;flex-shrink:0">${m.erstellt_am?fmtDat(m.erstellt_am):''}</div>
       </div>
+      ${hasBody?`<div id="${bid}" onclick="event.stopPropagation()" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--line);cursor:auto">
+        ${meta?`<div style="font-size:11px;color:var(--muted);margin-bottom:6px;word-break:break-all">${esc(meta)}</div>`:''}
+        <div style="font-size:12.5px;white-space:pre-wrap;word-break:break-word;max-height:360px;overflow:auto;line-height:1.5">${esc(body)}</div>
+      </div>`:''}
     </div>`;
   }).join('');
 }
+function mailToggle(bid){ const el=document.getElementById(bid); if(el) el.style.display=(el.style.display==='none'?'block':'none'); }
 
 function mailProtokollieren(kandidatId, kandidatName){
   const heute=new Date().toISOString().slice(0,10);
