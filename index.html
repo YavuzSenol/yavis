@@ -6244,19 +6244,23 @@ async function outlookVollsync(){
   if(!token){ alert('Nicht mit Outlook verbunden.\n\nBitte zuerst in Einstellungen → Konto auf „🔗 Mit Outlook verbinden".'); return; }
   try{
     zeigeMeldung('Verbinde mit Outlook …','ok');
-    const meR=await fetch('https://graph.microsoft.com/v1.0/me?$select=mail,userPrincipalName',{headers:{'Authorization':'Bearer '+token}});
-    const me=await meR.json(); const myAddr=(me.mail||me.userPrincipalName||'').toLowerCase();
-    // Kandidaten-Adressen -> ID
+    const meR=await fetch('https://graph.microsoft.com/v1.0/me?$select=mail,userPrincipalName,proxyAddresses',{headers:{'Authorization':'Bearer '+token}});
+    const me=await meR.json();
+    // Eigene Adressen (werden NIE als Kandidat gematcht; bestimmen Richtung im Archiv)
+    const myAddrs=new Set(['senol@senolconsulting.de','senolation@gmail.com','senolation@googlemail.com']);
+    [me.mail, me.userPrincipalName].forEach(a=>{ if(a) myAddrs.add(String(a).toLowerCase()); });
+    (me.proxyAddresses||[]).forEach(p=>{ const a=String(p).replace(/^smtp:/i,'').toLowerCase(); if(a.includes('@')) myAddrs.add(a); });
+    // Kandidaten-Adressen -> ID (eigene Adressen ausgeschlossen)
     zeigeMeldung('Lade Kandidaten-Adressen …','ok');
     const addr2id={};
     for(let off=0;;off+=1000){
       const {data}=await sb.from('kandidaten').select('id,email,email_beruflich,email_zweit').range(off,off+999);
-      (data||[]).forEach(k=>['email','email_beruflich','email_zweit'].forEach(f=>{const v=(k[f]||'').trim().toLowerCase(); if(v&&v.includes('@')&&!addr2id[v]) addr2id[v]=k.id;}));
+      (data||[]).forEach(k=>['email','email_beruflich','email_zweit'].forEach(f=>{const v=(k[f]||'').trim().toLowerCase(); if(v&&v.includes('@')&&!myAddrs.has(v)&&!addr2id[v]) addr2id[v]=k.id;}));
       if(!data||data.length<1000) break;
     }
-    // Graph durchgehen (Posteingang, Gesendet, Archiv) — nur zugeordnete Mails behalten
+    // Graph durchgehen — Richtung über den ORDNER (inbox=rein, sentitems=raus, archive=automatisch)
     const rows=[]; const seen=new Set(); let geprueft=0;
-    async function scanFolder(folder){
+    async function scanFolder(folder, richtungHint){
       let url='https://graph.microsoft.com/v1.0/me/mailFolders/'+folder+'/messages?$top=50&$select=subject,from,toRecipients,ccRecipients,bccRecipients,receivedDateTime,sentDateTime,body';
       while(url){
         const resp=await fetch(url,{headers:{'Authorization':'Bearer '+token,'Prefer':'outlook.body-content-type="text"'}});
@@ -6265,32 +6269,33 @@ async function outlookVollsync(){
         for(const m of (data.value||[])){
           geprueft++;
           const from=(m.from&&m.from.emailAddress&&m.from.emailAddress.address||'').toLowerCase();
-          const istRaus = !!myAddr && from===myAddr;
-          let eid=null, an='';
-          if(istRaus){
+          let richtung=richtungHint;
+          if(richtung==='auto') richtung = myAddrs.has(from) ? 'raus' : 'rein';
+          let eid=null, an='', von='';
+          if(richtung==='raus'){
             const rec=[...(m.toRecipients||[]),...(m.ccRecipients||[]),...(m.bccRecipients||[])].map(r=>(r.emailAddress&&r.emailAddress.address||'').toLowerCase()).filter(Boolean);
-            an=rec.join(', ');
-            for(const a of rec){ if(addr2id[a]){ eid=addr2id[a]; break; } }
+            an=rec.join(', '); von=from||[...myAddrs][0]||'';
+            for(const a of rec){ if(a&&!myAddrs.has(a)&&addr2id[a]){ eid=addr2id[a]; break; } }
           } else {
-            eid=addr2id[from];
+            von=from;
+            if(from && !myAddrs.has(from)) eid=addr2id[from];
             an=(m.toRecipients||[]).map(r=>(r.emailAddress&&r.emailAddress.address||'')).filter(Boolean).join(', ');
           }
           if(!eid) continue;
-          const richtung=istRaus?'raus':'rein';
           const betreff=(m.subject||'').trim();
           const text=(m.body&&m.body.content||'').trim();
           const ckey=eid+'|'+richtung+'|'+betreff+'|'+text.slice(0,150);
           if(seen.has(ckey)) continue; seen.add(ckey);
           rows.push({ entity_id:eid, richtung, betreff:betreff.slice(0,500), nachricht:text,
-            von:(istRaus?myAddr:from).slice(0,300), an:an.slice(0,300), quelle:'outlook',
-            erstellt_am:(istRaus?(m.sentDateTime||m.receivedDateTime):(m.receivedDateTime||m.sentDateTime)) });
+            von:von.slice(0,300), an:an.slice(0,300), quelle:'outlook',
+            erstellt_am:(richtung==='raus'?(m.sentDateTime||m.receivedDateTime):(m.receivedDateTime||m.sentDateTime)) });
         }
         url=data['@odata.nextLink']||null;
         zeigeMeldung('Lese Outlook … '+geprueft+' geprüft, '+rows.length+' zugeordnet','ok');
         if(geprueft>80000) break;
       }
     }
-    await scanFolder('inbox'); await scanFolder('sentitems'); await scanFolder('archive');
+    await scanFolder('inbox','rein'); await scanFolder('sentitems','raus'); await scanFolder('archive','auto');
     if(!rows.length){ alert('Keine zuordenbaren Mails gefunden. (Geprüft: '+geprueft+')'); return; }
     if(!confirm('TROCKENLAUF\n\n'+rows.length+' Mails (inkl. Datum) werden importiert und ERSETZEN den bisherigen Outlook-Import.\nGeprüft: '+geprueft+' Outlook-Nachrichten.\n\nJetzt wirklich ausführen?')){ zeigeMeldung('Abgebrochen','warn'); return; }
     // IDs vergeben, alten Outlook-Import löschen, neu einfügen
