@@ -2620,12 +2620,21 @@ async function detailKandidat(id){
   // Firma (Ansprechpartner-Rolle) auflösen, falls verknüpft
   let firmaName=null;
   if(d.firma_id){ const fr=await sb.from('kunden').select('name').eq('id',d.firma_id).single(); firmaName=fr.data?.name||null; }
+  // Arbeitgeber-Firma für die Kopfkarte auflösen: 1) Arbeitgeber-Name -> Kunde, 2) sonst firma_id
+  let arbeitgeberFirma=null;
+  if(d.arbeitgeber){
+    const ag=d.arbeitgeber.trim();
+    let fr=await sb.from('kunden').select('*').ilike('name',ag).limit(1);
+    if(!fr.data||!fr.data.length){ fr=await sb.from('kunden').select('*').ilike('name',ag+'%').limit(1); }
+    if(fr.data&&fr.data.length) arbeitgeberFirma=fr.data[0];
+  }
+  if(!arbeitgeberFirma && d.firma_id){ const fr=await sb.from('kunden').select('*').eq('id',d.firma_id).single(); if(fr.data) arbeitgeberFirma=fr.data; }
   // Foto laden (signierte URL, 2h gültig)
   let fotoUrl=null;
   const fotoPfad=`kandidat/${id}/foto.jpg`;
   const {data:fotoData}=await sb.storage.from('dokumente').createSignedUrl(fotoPfad,7200);
   if(fotoData?.signedUrl) fotoUrl=fotoData.signedUrl;
-  zeigeKandidatSeite(d, ausb.data||[], erf.data||[], notiz.data||[], bew.data||[], aufg.data||[], dok.data||[], fotoUrl, mailRes.data||[], firmaName);
+  zeigeKandidatSeite(d, ausb.data||[], erf.data||[], notiz.data||[], bew.data||[], aufg.data||[], dok.data||[], fotoUrl, mailRes.data||[], firmaName, arbeitgeberFirma);
   zeigeDublettenHinweis('Kandidat', d.voller_name);
 }
 
@@ -2646,7 +2655,7 @@ async function zeigeDublettenHinweis(eigenerTyp, name){
   if(head && head.nextSibling) page.insertBefore(banner, head.nextSibling); else page.appendChild(banner);
 }
 
-function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails, firmaName){
+function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails, firmaName, arbeitgeberFirma){
   mails=mails||[];
   const istAnsprechpartner=(d.rollen||'').includes(';Ansprechpartner;');
   dok = dok || [];
@@ -2677,6 +2686,28 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
   const wvOffen=aufg.filter(t=>istOffen(t.status));
   const wvErl=aufg.filter(t=>!istOffen(t.status));
   const wgTags=parseTags([d.tags,d.faehigkeiten].filter(Boolean).join(';')).map(t=>`<span class="tag">${esc(t)}</span>`).join('');
+  // Arbeitgeber-/Firmen-Karte (oben links). Quelle: verknüpfter/aufgelöster Kunden-Datensatz.
+  const _af=arbeitgeberFirma;
+  const _afWeb=_af&&_af.webseite?(String(_af.webseite).match(/^https?:\/\//)?_af.webseite:'https://'+_af.webseite):'';
+  const firmaKarte = _af ? `
+      <div class="dblock" style="border-left:3px solid var(--accent2)">
+        <div class="dbh">🏢 Arbeitgeber<a href="#" onclick="event.preventDefault();detailKunde('${_af.id}')" style="float:right;color:var(--accent2);font-size:12px;font-weight:500;text-decoration:none" title="Firma öffnen">↗ Firma</a></div>
+        <div class="drow"><span class="dk">Firma</span><span class="dv" style="font-weight:600">${esc(_af.name)||'—'}</span></div>
+        ${r('Adress-Typ', esc(_af.typ))}
+        ${r('Branche', esc(_af.branche))}
+        ${r('Adresse', esc([_af.strasse,[_af.plz,_af.stadt].filter(Boolean).join(' '),_af.bundesland].filter(Boolean).join(', ')))}
+        ${r('Land', esc(_af.land))}
+        ${r('Telefon', _af.telefon?`<a href="tel:${esc(String(_af.telefon).replace(/[^\d+]/g,''))}" style="color:var(--accent2)">${esc(_af.telefon)}</a>`:'')}
+        ${r('Webseite', _afWeb?`<a href="${esc(_afWeb)}" target="_blank" style="color:var(--accent2)">${esc(_af.webseite)} ↗</a>`:'')}
+        ${r('Kundennr.', esc(_af.kundennummer))}
+      </div>`
+    : (d.arbeitgeber ? `
+      <div class="dblock" style="border-left:3px solid var(--line)">
+        <div class="dbh">🏢 Arbeitgeber</div>
+        <div class="drow"><span class="dk">Firma</span><span class="dv" style="font-weight:600">${esc(d.arbeitgeber)}</span></div>
+        <div style="font-size:12px;color:var(--muted);margin:6px 0 9px">Noch nicht als Firmen-Datensatz erfasst.</div>
+        <button class="neuBtn" data-name="${esc(d.arbeitgeber)}" onclick="firmaAnlegenAusName(this.dataset.name)">🔗 Als Firma anlegen</button>
+      </div>` : '');
   const _ni=_navIds.indexOf(d.id);
   const navHtml=(_ni>=0 && _navIds.length>1)
     ? `<div class="recnav">
@@ -2733,6 +2764,8 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
 
       <!-- Spalte 1: wer & wo -->
       <div class="dcol">
+
+      ${firmaKarte}
 
       <!-- ident -->
       <div class="dblock">
@@ -3026,6 +3059,8 @@ async function _inlFirma(el){
   el.dataset.orig=el.value;
   if(fb){ fb.textContent=error?('Fehler: '+error.message):'gespeichert ✓'; fb.style.color=error?'var(--hot)':'#10b981'; if(!error) setTimeout(()=>{ if(fb) fb.textContent=''; },2000); }
 }
+// Aus Arbeitgeber-Freitext eine neue Firma anlegen (Name vorbefüllt)
+function firmaAnlegenAusName(name){ try{ zeigeKundeFormular({id:null,name:name}); }catch(e){ alert('Firmen-Formular nicht verfügbar'); } }
 // Firma-Datalist für die Inline-Maske füllen (nutzt die Editor-Caches _firmaNamen/_firmaNameToId)
 async function _inlFirmaInit(){
   const dl=document.getElementById('firmaDLinl'); if(!dl) return;
