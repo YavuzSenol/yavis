@@ -2899,11 +2899,15 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
         <span id="dokMsg" style="font-size:12px"></span>
       </div>
       <div style="color:var(--muted);font-size:11px;margin-top:6px">PDF, Word, Bilder. Max. 25 MB pro Datei.</div>
-      <div class="dsubh">E-Mails (${mails.length})</div>
-      <div id="mailHistorie">${mailHistorieHtml(mails)}</div>
-      <div style="margin-top:8px">
-        <button class="neuBtn" onclick="mailProtokollieren('${d.id}','${esc(d.voller_name)}')">📧 E-Mail protokollieren</button>
-      </div>
+      <details class="acc" id="mailAcc" style="margin-top:12px">
+        <summary><span>E-Mails<span class="acc-cnt"> (${mails.length})</span></span><span class="acc-arr">▶</span></summary>
+        <div class="acc-body">
+          <div id="mailHistorie">${mailHistorieHtml(mails)}</div>
+          <div style="margin-top:8px">
+            <button class="neuBtn" onclick="mailProtokollieren('${d.id}','${esc(d.voller_name)}')">📧 E-Mail protokollieren</button>
+          </div>
+        </div>
+      </details>
     </div>
   `;
   window.scrollTo(0,0);
