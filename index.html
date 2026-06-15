@@ -6258,14 +6258,30 @@ async function outlookVollsync(){
       (data||[]).forEach(k=>['email','email_beruflich','email_zweit'].forEach(f=>{const v=(k[f]||'').trim().toLowerCase(); if(v&&v.includes('@')&&!myAddrs.has(v)&&!addr2id[v]) addr2id[v]=k.id;}));
       if(!data||data.length<1000) break;
     }
-    // Graph: GANZES Postfach (alle Ordner inkl. Unterordner) in einem Durchgang.
-    // Richtung über die eigene Adresse (Absender = ich -> gesendet, sonst empfangen).
+    // ALLE Ordner des Postfachs rekursiv sammeln (inkl. Unterordner), Junk/Gelöschte/Entwürfe ausschließen
+    zeigeMeldung('Lese Ordnerstruktur …','ok');
+    const EXCLUDE=/(gel[öo]schte|deleted|junk|spam|entw[üu]rfe|drafts|postausgang|outbox|rss|sync[- ]?(issues|fehler)|konflikte|conflicts)/i;
+    const folderIds=[];
+    async function walkFolders(url){
+      while(url){
+        const resp=await fetch(url,{headers:{'Authorization':'Bearer '+token}});
+        if(!resp.ok) break;
+        const data=await resp.json();
+        for(const f of (data.value||[])){
+          if(!EXCLUDE.test(f.displayName||'')) folderIds.push(f.id);
+          if(f.childFolderCount>0) await walkFolders('https://graph.microsoft.com/v1.0/me/mailFolders/'+f.id+'/childFolders?$top=100&$select=id,displayName,childFolderCount');
+        }
+        url=data['@odata.nextLink']||null;
+      }
+    }
+    await walkFolders('https://graph.microsoft.com/v1.0/me/mailFolders?$top=100&$select=id,displayName,childFolderCount');
+    // Jeden Ordner scannen; Richtung über die eigene Adresse (Absender = ich -> gesendet, sonst empfangen)
     const rows=[]; const seen=new Set(); let geprueft=0;
-    {
-      let url='https://graph.microsoft.com/v1.0/me/messages?$top=50&$select=subject,from,toRecipients,ccRecipients,bccRecipients,receivedDateTime,sentDateTime,body';
+    async function scanFolder(fid){
+      let url='https://graph.microsoft.com/v1.0/me/mailFolders/'+fid+'/messages?$top=50&$select=subject,from,toRecipients,ccRecipients,bccRecipients,receivedDateTime,sentDateTime,body';
       while(url){
         const resp=await fetch(url,{headers:{'Authorization':'Bearer '+token,'Prefer':'outlook.body-content-type="text"'}});
-        if(!resp.ok) throw new Error('messages '+resp.status);
+        if(!resp.ok){ if(resp.status===404) return; throw new Error('msgs '+resp.status); }
         const data=await resp.json();
         for(const m of (data.value||[])){
           geprueft++;
@@ -6291,10 +6307,11 @@ async function outlookVollsync(){
             erstellt_am:(richtung==='raus'?(m.sentDateTime||m.receivedDateTime):(m.receivedDateTime||m.sentDateTime)) });
         }
         url=data['@odata.nextLink']||null;
-        zeigeMeldung('Lese ganzes Postfach … '+geprueft+' geprüft, '+rows.length+' zugeordnet','ok');
-        if(geprueft>150000) break;
+        zeigeMeldung('Lese Outlook … '+geprueft+' geprüft, '+rows.length+' zugeordnet','ok');
+        if(geprueft>200000) break;
       }
     }
+    for(const fid of folderIds){ await scanFolder(fid); if(geprueft>200000) break; }
     if(!rows.length){ alert('Keine zuordenbaren Mails gefunden. (Geprüft: '+geprueft+')'); return; }
     if(!confirm('TROCKENLAUF\n\n'+rows.length+' Mails (inkl. Datum) werden importiert und ERSETZEN den bisherigen Outlook-Import.\nGeprüft: '+geprueft+' Outlook-Nachrichten.\n\nJetzt wirklich ausführen?')){ zeigeMeldung('Abgebrochen','warn'); return; }
     // IDs vergeben, alten Outlook-Import löschen, neu einfügen
