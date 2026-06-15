@@ -2819,12 +2819,6 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
         ${ri('Bundesland','bundesland', d.bundesland)}
         ${ri('Land','land', d.land)}
         ${ri('Geburtstag','geburtstag', d.geburtstag)}
-        <div class="dsubh">Beruflich</div>
-        ${ri('Straße','strasse_beruf', d.strasse_beruf)}
-        ${ri('PLZ','plz_beruf', d.plz_beruf)}
-        ${ri('Ort','stadt_beruf', d.stadt_beruf)}
-        ${ri('Bundesland','bundesland_beruf', d.bundesland_beruf)}
-        ${ri('Land','land_beruf', d.land_beruf)}
       </div>
 
       </div>
@@ -7705,12 +7699,13 @@ async function rechercheMaskeAusfuehren() {
   // ----------- Tabelle rendern (konfigurierbare + sortierbare Spalten) -----------
   _rmLetzteErgebnisse = {tab:'kandidaten', rows, plz: plz||null, radius};
   _rmSort = {key:null, dir:1};
+  _rmSel.clear();
   _rmRenderTabelle();
 }
 // Mit allen Treffern arbeiten (nutzt die erprobten Auswahl-Funktionen über selectedKandIds)
 function _rmTrefferIds(){ const e=_rmLetzteErgebnisse; if(!e||e.tab!=='kandidaten'||!(e.rows&&e.rows.length)){ zeigeMeldung('Keine Treffer.','warn'); return null; } return e.rows.map(r=>r.id); }
-function rmTrefferMail(){ const ids=_rmTrefferIds(); if(!ids) return; selectedKandIds=new Set(ids); serienMailAuswahl(); }
-function rmTrefferTags(){ const ids=_rmTrefferIds(); if(!ids) return; selectedKandIds=new Set(ids); selTagsModal('hinzu'); }
+function rmTrefferMail(){ const ids=_rmZielIds(); if(!ids) return; selectedKandIds=new Set(ids); serienMailAuswahl(); }
+function rmTrefferTags(){ const ids=_rmZielIds(); if(!ids) return; selectedKandIds=new Set(ids); selTagsModal('hinzu'); }
 
 // Geschlecht aus Vorname schätzen (für Auto-Anrede). 'm' | 'w' | null (unklar -> überspringen)
 const _VN_M=new Set('alexander andreas andre achim adrian albert alexandr alfred ali andlater anton armin arne arno axel baris ben benedikt benjamin benno bernd bernhard bjoern boris burkhard carl carsten christian christoph claus clemens daniel david denis dennis dieter dirk dominik dominic eberhard edgar edwin elias emil enrico erik ernst eugen fabian felix ferdinand florian frank franz frederik fritz gabriel georg gerald gerd gerhard gregor guido guenter guenther hagen hans harald hartmut heiko heinrich heinz helmut hendrik henning henry herbert holger horst hubert ingo jakob jan jannik jens joachim jochen johannes john jonas jonathan joerg josef juergen julian justus kai karl karsten kevin klaus konrad kurt lars lennart leon leonard lothar louis luca lucas ludwig lukas maik manfred manuel marc marcel marco marcus mario mark markus martin marvin mathias matthias max maximilian michael mike mirco mirko moritz nico niklas nikolas norbert oliver olaf otto patrick paul peter philipp rafael raik rainer ralf ralph raphael reinhard rene richard robert robin roland rolf ronald rouven rudolf ruediger sascha sebastian sefer selim sven simon stefan steffen stephan sven sönke thomas thorsten tim timo tobias tom torben torsten udo ulf ulrich uwe valentin viktor vincent volker waldemar walter werner wilfried wilhelm willi wolfgang yannick yusuf'.split(' '));
@@ -7728,7 +7723,7 @@ function _geschlechtAusVorname(name){
 
 // Massenaktualisierung auf ALLE aktuellen Treffer
 function rmTrefferMassenupdate(){
-  const ids=_rmTrefferIds(); if(!ids) return;
+  const ids=_rmZielIds(); if(!ids) return;
   const dlg=document.createElement('dialog');
   dlg.style.cssText='background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:0;max-width:480px;width:95vw';
   dlg.innerHTML=`
@@ -7779,7 +7774,7 @@ async function rmMuAnwenden(btn){
   const istAuto=(feld==='begruessung'&&wert==='__auto__');
   if(!confirm(`Wirklich ${ids.length} Datensätze aktualisieren${istAuto?' (Anrede automatisch aus Vorname)':' → '+feld+' = '+wert}?`)) return;
   btn.disabled=true; if(msg){ msg.style.color='var(--muted)'; msg.textContent='Speichere …'; }
-  let ok=0;
+  let ok=0, summary='';
   if(istAuto){
     // Vornamen frisch laden (unabhängig von der Trefferquelle)
     const vn={};
@@ -7792,7 +7787,8 @@ async function rmMuAnwenden(btn){
       const {error}=await sb.from('kandidaten').update({begruessung:v,geaendert_am:new Date().toISOString()}).eq('id',id);
       if(!error){ ok++; if(g==='m')herr++; else frau++; }
     }
-    if(msg){ msg.style.color='#10b981'; msg.textContent=`✓ ${ok} gesetzt (${herr}× Herr, ${frau}× Frau), ${skip} übersprungen (unklar).`; }
+    summary=`Anrede automatisch gesetzt:\n\n✓ ${ok} geändert (${herr}× Herr, ${frau}× Frau)\n• ${skip} übersprungen (Vorname unklar)`;
+    if(msg){ msg.style.color='#10b981'; msg.textContent=`✓ ${ok} gesetzt (${herr}× Herr, ${frau}× Frau), ${skip} übersprungen.`; }
   } else {
     for(let i=0;i<ids.length;i+=200){
       const batch=ids.slice(i,i+200);
@@ -7800,11 +7796,14 @@ async function rmMuAnwenden(btn){
       const {error}=await sb.from('kandidaten').update(patch).in('id',batch);
       if(!error) ok+=batch.length;
     }
+    const feldName={begruessung:'Anrede',status:'Status',berufsbezeichnung:'Position'}[feld]||feld;
+    summary=`✓ ${ok} Datensätze aktualisiert\n\n${feldName} = ${wert}`;
     if(msg){ msg.style.color='#10b981'; msg.textContent=`✓ ${ok} Datensätze aktualisiert.`; }
   }
   btn.disabled=false;
-  zeigeMeldung('Massenaktualisierung fertig ✓','ok');
-  setTimeout(()=>{ try{dlg.close();dlg.remove();}catch(e){} rechercheAusfuehren(); }, 1400);
+  try{ dlg.close(); dlg.remove(); }catch(e){}
+  alert(summary);          // explizites Pop-up mit dem Ergebnis
+  rechercheAusfuehren();   // Trefferliste neu laden
 }
 
 // ===== Trefferliste: konfigurierbare + sortierbare Spalten =====
@@ -7824,10 +7823,30 @@ const RM_COLS=[
  {key:'qualifikation',label:'Qualifikation',get:r=>r.qualifikation||'',render:r=>esc(r.qualifikation||'–')},
  {key:'studiengang',label:'Studiengang',get:r=>r.studiengang||'',render:r=>esc(r.studiengang||'–')},
  {key:'rollen',label:'Rolle',get:r=>r.rollen||'',render:r=>{const ro=r.rollen||'';const t=[];if(ro.includes(';Kandidat;'))t.push('Kand.');if(ro.includes(';Ansprechpartner;'))t.push('AP');return t.join('+')||'–';}},
+ {key:'begruessung',label:'Anrede',get:r=>r.begruessung||'',render:r=>esc(r.begruessung||'–')},
+ {key:'titel',label:'Titel',get:r=>r.titel||'',render:r=>esc(r.titel||'–')},
+ {key:'bundesland',label:'Bundesland',get:r=>r.bundesland||'',render:r=>esc(r.bundesland||'–')},
+ {key:'mobil',label:'Mobil',get:r=>r.mobil||r.mobil_privat||'',render:r=>esc(r.mobil||r.mobil_privat||'–')},
+ {key:'email_beruflich',label:'E-Mail berufl.',get:r=>r.email_beruflich||'',render:r=>esc(r.email_beruflich||'–')},
+ {key:'geburtstag',label:'Geburtstag',get:r=>r.geburtstag||'',render:r=>esc(r.geburtstag||'–')},
+ {key:'gehalt_aktuell',label:'Gehalt akt.',get:r=>{const n=parseFloat(String(r.gehalt_aktuell||'').replace(',','.'));return isNaN(n)?-1:n;},render:r=>esc(r.gehalt_aktuell||'–')},
+ {key:'kuendigungsfrist',label:'Kündigungsfrist',get:r=>r.kuendigungsfrist||'',render:r=>esc(r.kuendigungsfrist||'–')},
+ {key:'umzugsbereitschaft',label:'Umzug',get:r=>r.umzugsbereitschaft||'',render:r=>esc(r.umzugsbereitschaft||'–')},
+ {key:'wunschregion',label:'Wunschregion',get:r=>r.wunschregion||'',render:r=>esc(r.wunschregion||'–')},
+ {key:'kontaktstatus',label:'Kontaktstatus',get:r=>r.kontaktstatus||'',render:r=>esc(r.kontaktstatus||'–')},
+ {key:'quelle',label:'Quelle',get:r=>r.quelle||'',render:r=>esc(r.quelle||'–')},
+ {key:'tags',label:'Fähigkeiten',get:r=>r.tags||'',render:r=>esc((r.tags||'').replace(/^;|;$/g,'').replace(/;/g,', ')||'–')},
+ {key:'letzte_aktivitaet',label:'Letzte Aktivität',get:r=>r.letzte_aktivitaet||'',render:r=>r.letzte_aktivitaet?fmtDat(r.letzte_aktivitaet):'–'},
 ];
 const RM_COLS_MAP=Object.fromEntries(RM_COLS.map(c=>[c.key,c]));
 let rmSpalten=(()=>{try{const s=JSON.parse(localStorage.getItem('rm_spalten'));if(Array.isArray(s)&&s.length)return s.filter(k=>RM_COLS_MAP[k]);}catch(e){}return ['voller_name','berufsbezeichnung','stadt','telefon'];})();
 let _rmSort={key:null,dir:1};
+let _rmSel=new Set();
+function _rmSelToggle(id,el){ if(el.checked)_rmSel.add(id); else _rmSel.delete(id); _rmSelCountUpdate(); }
+function _rmSelAll(on){ const e=_rmLetzteErgebnisse; if(!e||!e.rows)return; if(on) e.rows.forEach(r=>_rmSel.add(r.id)); else _rmSel.clear(); _rmRenderTabelle(); }
+function _rmSelCountUpdate(){ const el=document.getElementById('rmSelCount'); if(el) el.textContent=_rmSel.size?(' · '+_rmSel.size+' ausgewählt'):''; }
+// Zielmenge für Aktionen: ausgewählte Treffer, sonst alle
+function _rmZielIds(){ if(_rmSel.size) return [..._rmSel]; const e=_rmLetzteErgebnisse; if(!e||e.tab!=='kandidaten'||!(e.rows&&e.rows.length)){ zeigeMeldung('Keine Treffer.','warn'); return null; } return e.rows.map(r=>r.id); }
 function rmSort(key){ if(_rmSort.key===key) _rmSort.dir*=-1; else {_rmSort.key=key;_rmSort.dir=1;} _rmRenderTabelle(); }
 function rmSpaltenPanelToggle(){ const p=document.getElementById('rmSpaltenPanel'); if(p) p.style.display=(p.style.display==='none'?'flex':'none'); }
 function rmSpalteSet(key,on){ if(on){ if(!rmSpalten.includes(key)) rmSpalten.push(key); } else { rmSpalten=rmSpalten.filter(k=>k!==key); if(!rmSpalten.length) rmSpalten=['voller_name']; } localStorage.setItem('rm_spalten',JSON.stringify(rmSpalten)); _rmRenderTabelle(); }
@@ -7841,7 +7860,9 @@ function _rmRenderTabelle(){
   }
   const cols=rmSpalten.map(k=>RM_COLS_MAP[k]).filter(Boolean);
   const arr=k=>_rmSort.key===k?(_rmSort.dir>0?' ▲':' ▼'):'';
+  const allSel = rows.length && rows.every(r=>_rmSel.has(r.id));
   let html='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="border-bottom:2px solid var(--line);text-align:left">';
+  html+='<th style="padding:7px 8px;width:30px"><input type="checkbox" '+(allSel?'checked':'')+' onclick="_rmSelAll(this.checked)" title="Alle auswählen" style="cursor:pointer;width:15px;height:15px;accent-color:var(--accent)"></th>';
   cols.forEach(c=>{ html+='<th onclick="rmSort(\''+c.key+'\')" style="padding:7px 10px 8px;color:var(--muted);font-weight:600;cursor:pointer;user-select:none;white-space:nowrap">'+esc(c.label)+arr(c.key)+'</th>'; });
   if(hatKm) html+='<th onclick="rmSort(\'__km\')" style="padding:7px 10px 8px;color:var(--muted);font-weight:600;cursor:pointer;user-select:none">Entfernung'+arr('__km')+'</th>';
   html+='<th style="padding:7px 8px 8px;color:var(--muted);font-weight:600" title="Erreichbarkeit">✉&nbsp;☎</th></tr></thead><tbody>';
@@ -7849,6 +7870,7 @@ function _rmRenderTabelle(){
     const hatM=!!(r.email||r.email_beruflich||r.email_zweit), hatT=!!(r.mobil||r.mobil_privat||r.telefon||r.telefon_privat);
     const err=[hatM?'<span title="E-Mail vorhanden" style="color:var(--accent2)">✉</span>':'',hatT?'<span title="Telefon/Mobil vorhanden" style="color:#10b981">☎</span>':''].filter(Boolean).join('&nbsp;');
     html+='<tr onclick="detailKandidat(\''+r.id+'\')" style="cursor:pointer;border-bottom:1px solid var(--line)" onmouseover="this.style.background=\'var(--panel2)\'" onmouseout="this.style.background=\'\'">';
+    html+='<td onclick="event.stopPropagation()" style="padding:7px 8px;text-align:center"><input type="checkbox" '+(_rmSel.has(r.id)?'checked':'')+' onclick="_rmSelToggle(\''+r.id+'\',this)" style="cursor:pointer;width:15px;height:15px;accent-color:var(--accent)"></td>';
     cols.forEach(c=>{ html+='<td style="padding:7px 10px;color:var(--ink);font-size:12px">'+c.render(r)+'</td>'; });
     if(hatKm) html+='<td style="padding:7px 10px;color:var(--muted);font-size:12px">'+(r.entfernung_km!=null?Math.round(r.entfernung_km)+' km':'')+'</td>';
     html+='<td style="padding:7px 8px">'+(err||'–')+'</td></tr>';
@@ -7857,11 +7879,11 @@ function _rmRenderTabelle(){
   _navIds=rows.map(r=>r.id);
   const btn='padding:5px 13px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);font-size:12px;color:var(--ink)';
   const bar='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px;flex-wrap:wrap">'
-    +'<span style="font-size:12px;color:var(--muted)">'+e.rows.length+' Treffer</span>'
+    +'<span style="font-size:12px;color:var(--muted)">'+e.rows.length+' Treffer<span id="rmSelCount"></span></span>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
     +'<button onclick="rmSpaltenPanelToggle()" style="'+btn+'">🗂 Spalten</button>'
-    +'<button onclick="rmTrefferMail()" style="'+btn+'">✉️ Serienmail an alle</button>'
-    +'<button onclick="rmTrefferTags()" style="'+btn+'">🏷 Fähigkeiten an alle</button>'
+    +'<button onclick="rmTrefferMail()" style="'+btn+'">✉️ Serienmail</button>'
+    +'<button onclick="rmTrefferTags()" style="'+btn+'">🏷 Fähigkeiten</button>'
     +'<button onclick="rmTrefferMassenupdate()" style="'+btn+'">✏️ Massenaktualisierung</button>'
     +'<button onclick="rechercheCsvExport()" style="'+btn+'">📥 CSV</button>'
     +'</div></div>';
@@ -7869,6 +7891,7 @@ function _rmRenderTabelle(){
     +RM_COLS.map(c=>'<label class="msdd-opt" style="display:inline-flex"><input type="checkbox" '+(rmSpalten.includes(c.key)?'checked':'')+' onchange="rmSpalteSet(\''+c.key+'\',this.checked)">'+esc(c.label)+'</label>').join('')
     +'</div>';
   bodyEl.innerHTML=bar+panel+html;
+  _rmSelCountUpdate();
 }
 
 function rechercheCsvExport() {
