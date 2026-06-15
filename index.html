@@ -2800,7 +2800,6 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
         ${ri('Nachname','nachname', d.nachname)}
         <div class="drow"><span class="dk">Position</span><span class="dv dv-edit">${_posSelHtml}</span></div>
         ${ri('Position laut CV','position_original', d.position_original)}
-        ${ri('Funktion','funktion', d.funktion)}
         ${r('Arbeitgeber', d.arbeitgeber ? `<a href="#" onclick="event.preventDefault();oeffneFirmaVonKandidat('${esc(d.arbeitgeber)}')" style="color:var(--accent2)" title="Zur Firma springen">${esc(d.arbeitgeber)}</a>` : '')}
         ${ri('Bei Firma seit','bei_firma_seit', d.bei_firma_seit)}
         ${ri('In Position seit','in_position_seit', d.in_position_seit)}
@@ -2842,13 +2841,6 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
         ${ri('Mobil privat','mobil_privat', d.mobil_privat, actTel)}
       </div>
 
-      <!-- datenanreicherung -->
-      <div class="dblock">
-        <div class="dbh">Datenanreicherung</div>
-        ${r('Claytel', '')}
-        ${r('Lusha 1', '')}
-        ${r('Lusha 2', '')}
-      </div>
 
       <!-- status & sperren -->
       <div class="dblock">
