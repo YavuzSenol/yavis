@@ -2899,7 +2899,7 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
         <span id="dokMsg" style="font-size:12px"></span>
       </div>
       <div style="color:var(--muted);font-size:11px;margin-top:6px">PDF, Word, Bilder. Max. 25 MB pro Datei.</div>
-      <details class="acc" id="mailAcc" style="margin-top:12px">
+      <details class="acc" id="mailAcc" open style="margin-top:12px">
         <summary><span>E-Mails<span class="acc-cnt"> (${mails.length})</span></span><span class="acc-arr">▶</span></summary>
         <div class="acc-body">
           <div id="mailHistorie">${mailHistorieHtml(mails)}</div>
@@ -5692,7 +5692,8 @@ Viele Grüße
 
 function mailHistorieHtml(mails){
   if(!mails||!mails.length) return '<div style="color:var(--muted);font-size:13px">Noch keine E-Mails protokolliert.</div>';
-  return mails.map(m=>{
+  const LIMIT=5;
+  const rows=mails.map(m=>{
     // Richtung: neue Mails ueber Feld 'richtung', alte ueber Betreff-Prefix
     const rRaus=m.richtung==='raus'||(m.betreff&&m.betreff.startsWith('📤 '));
     const rRein=m.richtung==='rein'||(m.betreff&&m.betreff.startsWith('📥 '));
@@ -5721,9 +5722,20 @@ function mailHistorieHtml(mails){
         <div style="font-size:12.5px;white-space:pre-wrap;word-break:break-word;max-height:360px;overflow:auto;line-height:1.5">${esc(body)}</div>
       </div>`:''}
     </div>`;
-  }).join('');
+  });
+  if(rows.length<=LIMIT) return rows.join('');
+  return rows.slice(0,LIMIT).join('')
+    + `<div id="mailMore" style="display:none">${rows.slice(LIMIT).join('')}</div>`
+    + `<button type="button" class="neuBtn" id="mailMoreBtn" onclick="mailMoreToggle()" style="margin-top:8px">▾ Alle ${mails.length} E-Mails anzeigen (${rows.length-LIMIT} weitere)</button>`;
 }
 function mailToggle(bid){ const el=document.getElementById(bid); if(el) el.style.display=(el.style.display==='none'?'block':'none'); }
+function mailMoreToggle(){
+  const m=document.getElementById('mailMore'), b=document.getElementById('mailMoreBtn');
+  if(!m) return;
+  const auf=m.style.display==='none';
+  m.style.display=auf?'block':'none';
+  if(b) b.textContent=auf?'▴ Weniger anzeigen':('▾ Alle anzeigen ('+m.children.length+' weitere)');
+}
 
 function mailProtokollieren(kandidatId, kandidatName){
   const heute=new Date().toISOString().slice(0,10);
