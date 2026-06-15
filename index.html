@@ -467,7 +467,7 @@
     </div>
     <div class="count" id="wvCount"></div>
     <table><thead><tr>
-      <th style="width:32px;text-align:center"><input type="checkbox" id="wvSelAll" title="Alle" onchange="wvAlleToggle(this.checked)" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)"></th>
+      <th style="width:1%;white-space:nowrap;text-align:center;padding-left:10px;padding-right:0"><input type="checkbox" id="wvSelAll" title="Alle" onchange="wvAlleToggle(this.checked)" style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)"></th>
       <th>Fällig am</th><th>Betreff</th><th>Wer</th><th>Aktionen</th>
     </tr></thead><tbody id="wvBody"></tbody></table>
   </div>
@@ -2337,7 +2337,7 @@ async function ladeWiedervorlagen(){
     const ueber=istOffen(t.status)&&t.faelligkeitsdatum&&t.faelligkeitsdatum<heute;
     const tr=document.createElement('tr'); tr.className='row-click';
     tr.innerHTML=`
-      <td onclick="event.stopPropagation()" style="width:32px;text-align:center">
+      <td onclick="event.stopPropagation()" style="width:1%;white-space:nowrap;text-align:center;padding-left:10px;padding-right:0">
         <input type="checkbox" class="wv-cb" data-id="${t.id}"
                onchange="wvToggle('${t.id}',this.checked)"
                style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)">
@@ -2376,9 +2376,33 @@ const SPALTEN_DEF=[
     return l.length?l.join(' · '):'–';
   }},
   {key:'status', label:'Status', render:r=>`<span class="pill">${esc(r.status)||'–'}</span>`},
+  {key:'begruessung', label:'Anrede', render:r=>esc(r.begruessung)||'–'},
+  {key:'titel', label:'Titel', render:r=>esc(r.titel)||'–'},
+  {key:'funktion', label:'Funktion', render:r=>esc(r.funktion)||'–'},
+  {key:'rollen', label:'Rolle', render:r=>{const ro=r.rollen||'';const t=[];if(ro.includes(';Kandidat;'))t.push('Kand.');if(ro.includes(';Ansprechpartner;'))t.push('AP');return t.join('+')||'–';}},
+  {key:'email_beruflich', label:'E-Mail berufl.', render:r=>r.email_beruflich?`<a class="calllink" href="mailto:${esc(r.email_beruflich)}" onclick="event.stopPropagation()">${esc(r.email_beruflich)}</a>`:'–'},
+  {key:'bundesland', label:'Bundesland', render:r=>esc(r.bundesland||r.bundesland_beruf)||'–'},
+  {key:'geburtstag', label:'Geburtstag', render:r=>esc(r.geburtstag)||'–'},
+  {key:'erfahrung_jahre', label:'Erf. (J)', render:r=>esc(r.erfahrung_jahre)||'–'},
+  {key:'qualifikation', label:'Qualifikation', render:r=>esc(r.qualifikation)||'–'},
+  {key:'studiengang', label:'Studiengang', render:r=>esc(r.studiengang)||'–'},
+  {key:'gehalt_aktuell', label:'Gehalt akt.', render:r=>esc(r.gehalt_aktuell)||'–'},
+  {key:'gehalt_erwartet', label:'Gehalt erw.', render:r=>esc(r.gehalt_erwartet)||'–'},
+  {key:'kuendigungsfrist', label:'Kündigungsfrist', render:r=>esc(r.kuendigungsfrist)||'–'},
+  {key:'umzugsbereitschaft', label:'Umzug', render:r=>esc(r.umzugsbereitschaft)||'–'},
+  {key:'wunschregion', label:'Wunschregion', render:r=>esc(r.wunschregion)||'–'},
+  {key:'kontaktstatus', label:'Kontaktstatus', render:r=>esc(r.kontaktstatus)||'–'},
+  {key:'wertung_intern', label:'Interne Wertung', render:r=>esc(r.wertung_intern)||'–'},
+  {key:'quelle', label:'Quelle', render:r=>esc(r.quelle)||'–'},
+  {key:'tags', label:'Fähigkeiten', render:r=>esc((r.tags||'').replace(/^;|;$/g,'').replace(/;/g,', '))||'–'},
+  {key:'bemerkung', label:'Bemerkung (frei)', render:r=>esc((r.bemerkung||'').slice(0,80))||'–'},
+  {key:'letzte_aktivitaet', label:'Letzte Aktivität', render:r=>r.letzte_aktivitaet?fmtDat(r.letzte_aktivitaet):'–'},
 ];
 // Spalten, die NICHT in der PLZ-Umkreis-Funktion enthalten sind (Nachladen nötig)
-const SPALTEN_VOLL=['nachname','vorname','arbeitgeber','email','telefon','mobil','profil'];
+const SPALTEN_VOLL=['nachname','vorname','arbeitgeber','email','telefon','mobil','profil',
+  'begruessung','titel','funktion','rollen','email_beruflich','bundesland','geburtstag','erfahrung_jahre',
+  'qualifikation','studiengang','gehalt_aktuell','gehalt_erwartet','kuendigungsfrist','umzugsbereitschaft',
+  'wunschregion','kontaktstatus','wertung_intern','quelle','tags','bemerkung','letzte_aktivitaet'];
 const SPALTEN_MAP=Object.fromEntries(SPALTEN_DEF.map(c=>[c.key,c]));
 let sichtbareSpalten = (()=>{ try{ const s=JSON.parse(localStorage.getItem('kand_spalten')); if(Array.isArray(s)&&s.length) return s.filter(k=>SPALTEN_MAP[k]); }catch(e){} return ['voller_name','berufsbezeichnung','stadt','telefon']; })();
 function spaltenSpeichern(){ localStorage.setItem('kand_spalten', JSON.stringify(sichtbareSpalten)); }
@@ -2387,7 +2411,7 @@ function spaltenAnzahl(){ return spaltenListe().length+1; }
 function brauchtVolleDaten(){ return sichtbareSpalten.some(k=>SPALTEN_VOLL.includes(k)); }
 function spaltenHeaderRender(plz){
   const head=document.getElementById('kHead'); if(!head) return;
-  head.innerHTML = `<th style="width:32px;text-align:center" onclick="event.stopPropagation()"><input type="checkbox" id="selAll" title="Alle auswählen" onchange="kandSelAll(this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></th>`
+  head.innerHTML = `<th style="width:1%;white-space:nowrap;text-align:center;padding-left:10px;padding-right:0" onclick="event.stopPropagation()"><input type="checkbox" id="selAll" title="Alle auswählen" onchange="kandSelAll(this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></th>`
     + spaltenListe().map(c=>`<th>${c.label}</th>`).join('')
     + `<th class="kmcol" style="display:${plz?'table-cell':'none'}">Entfernung</th>`;
 }
@@ -2426,7 +2450,7 @@ function moveSpalte(key,dir){
 }
 function zeileKandidat(r,mitKm){
   const tr=document.createElement('tr'); tr.className='row-click';
-  const cbTd=`<td onclick="event.stopPropagation()" style="width:32px;text-align:center"><input type="checkbox" class="kand-cb" data-id="${r.id}" ${selectedKandIds.has(r.id)?'checked':''} onchange="kandSelToggle('${r.id}',this)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></td>`;
+  const cbTd=`<td onclick="event.stopPropagation()" style="width:1%;white-space:nowrap;text-align:center;padding-left:10px;padding-right:0"><input type="checkbox" class="kand-cb" data-id="${r.id}" ${selectedKandIds.has(r.id)?'checked':''} onchange="kandSelToggle('${r.id}',this)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></td>`;
   let tds = cbTd + spaltenListe().map(c=>`<td>${c.render(r)}</td>`).join('');
   tds += mitKm?`<td class="km">${r.entfernung_km} km</td>`:'<td class="kmcol" style="display:none"></td>';
   tr.innerHTML=tds;
@@ -3643,9 +3667,17 @@ async function detailKunde(id){
   const page=document.getElementById('detailPage'); page.style.display='block';
   const adresse=[d.strasse,[d.plz,d.stadt].filter(Boolean).join(' '),d.bundesland,d.land].filter(Boolean).join(', ');
   const kont_=kont.data||[], stel_=stel.data||[], notiz_=notiz.data||[], aufg_=aufg.data||[], mails_=mails.data||[];
+  const _kni=_kNavIds.indexOf(d.id);
+  const kNavHtml=(_kni>=0 && _kNavIds.length>1)
+    ? `<div class="recnav">
+        <button class="recnav-btn" ${_kni<=0?'disabled':''} onclick="kundeBlaettern(-1)" title="Vorherige Firma">‹</button>
+        <span class="recnav-pos">${_kni+1} / ${_kNavIds.length}</span>
+        <button class="recnav-btn" ${_kni>=_kNavIds.length-1?'disabled':''} onclick="kundeBlaettern(1)" title="Nächste Firma">›</button>
+      </div>` : '';
   page.innerHTML=`
     <div class="detail-head">
       <button class="back" onclick="zurueckZurListe()">← Zurück</button>
+      ${kNavHtml}
       <h2>${esc(d.name)||'Kunde'}</h2>
       <button class="editbtn" onclick="bearbeiteKunde('${d.id}')">✎ Bearbeiten</button>
       <button class="editbtn" style="color:var(--muted)" onclick="kundeLoeschen('${d.id}','${esc(d.name)}')">🗑️ Löschen</button>
@@ -4108,11 +4140,21 @@ const KUNDEN_SPALTEN_DEF=[
 const KUNDEN_SPALTEN_MAP=Object.fromEntries(KUNDEN_SPALTEN_DEF.map(c=>[c.key,c]));
 let kSichtbareSpalten=(()=>{ try{ const s=JSON.parse(localStorage.getItem('kunden_spalten')); if(Array.isArray(s)&&s.length) return s.filter(k=>KUNDEN_SPALTEN_MAP[k]); }catch(e){} return ['name','typ','branche','plz','stadt','telefon']; })();
 let kSortKey=null, kSortDir=1, _kundenMitKm=false;
+let _kNavIds=[]; // Reihenfolge der Firmenliste fürs Blättern im Detail
+function kundeBlaettern(delta){
+  if(!_kNavIds||!_kNavIds.length) return;
+  const cur=kontextDatensatz&&kontextDatensatz.id;
+  const idx=_kNavIds.indexOf(cur);
+  if(idx<0) return;
+  const ni=idx+delta;
+  if(ni<0||ni>=_kNavIds.length) return;
+  detailKunde(_kNavIds[ni]);
+}
 function kSpaltenSpeichern(){ localStorage.setItem('kunden_spalten', JSON.stringify(kSichtbareSpalten)); }
 function kSpaltenListe(){ return kSichtbareSpalten.map(k=>KUNDEN_SPALTEN_MAP[k]).filter(Boolean); }
 function kSpaltenHeaderRender(mitKm){
   const head=document.getElementById('cHead'); if(!head) return;
-  head.innerHTML = `<th style="width:32px;text-align:center" onclick="event.stopPropagation()"><input type="checkbox" id="cSelAll" title="Alle auswählen" onchange="kundeSelAll(this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></th>`
+  head.innerHTML = `<th style="width:1%;white-space:nowrap;text-align:center;padding-left:10px;padding-right:0" onclick="event.stopPropagation()"><input type="checkbox" id="cSelAll" title="Alle auswählen" onchange="kundeSelAll(this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></th>`
     + kSpaltenListe().map(c=>{ const pf=kSortKey===c.key?(kSortDir===1?' ▲':' ▼'):''; return `<th style="cursor:pointer;user-select:none;white-space:nowrap" onclick="kSortBy('${c.key}')" title="Auf-/absteigend sortieren">${c.label}${pf}</th>`; }).join('')
     + (mitKm?`<th>Entfernung</th>`:'');
 }
@@ -4124,11 +4166,12 @@ function renderKundenTabelle(mitKm){
   let rows=[..._kundenGeladen];
   if(kSortKey){ const c=KUNDEN_SPALTEN_MAP[kSortKey]; rows.sort((a,b)=>String(c?c.get(a):'').localeCompare(String(c?c.get(b):''),'de',{numeric:true,sensitivity:'base'})*kSortDir); }
   else if(mitKm){ rows.sort((a,b)=>(a._km||0)-(b._km||0)); }
+  _kNavIds=rows.map(r=>r.id);
   body.innerHTML='';
   if(!rows.length){ body.innerHTML=`<tr><td colspan="${kSpaltenListe().length+(mitKm?2:1)}" class="empty">Keine Treffer.</td></tr>`; updateKundeSelBar(); return; }
   rows.forEach(r=>{
     const tr=document.createElement('tr'); tr.className='row-click';
-    const cb=`<td onclick="event.stopPropagation()" style="width:32px;text-align:center"><input type="checkbox" class="kunde-cb" data-id="${r.id}" ${selectedKundenIds.has(r.id)?'checked':''} onchange="kundeSelToggle('${r.id}',this)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></td>`;
+    const cb=`<td onclick="event.stopPropagation()" style="width:1%;white-space:nowrap;text-align:center;padding-left:10px;padding-right:0"><input type="checkbox" class="kunde-cb" data-id="${r.id}" ${selectedKundenIds.has(r.id)?'checked':''} onchange="kundeSelToggle('${r.id}',this)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></td>`;
     let tds=cb+kSpaltenListe().map(c=>`<td>${c.render(r)}</td>`).join('');
     if(mitKm) tds+=`<td class="km">${r._km} km</td>`;
     tr.innerHTML=tds;
@@ -4276,7 +4319,7 @@ function ktSpaltenSpeichern(){ localStorage.setItem('kontakte_spalten', JSON.str
 function ktSpaltenListe(){ return ktSichtbareSpalten.map(k=>KONTAKTE_SPALTEN_MAP[k]).filter(Boolean); }
 function ktSpaltenHeaderRender(){
   const head=document.getElementById('ktHead'); if(!head) return;
-  head.innerHTML = `<th style="width:32px;text-align:center" onclick="event.stopPropagation()"><input type="checkbox" id="ktSelAll" title="Alle auswählen" onchange="kontaktSelAll(this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></th>`
+  head.innerHTML = `<th style="width:1%;white-space:nowrap;text-align:center;padding-left:10px;padding-right:0" onclick="event.stopPropagation()"><input type="checkbox" id="ktSelAll" title="Alle auswählen" onchange="kontaktSelAll(this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></th>`
     + ktSpaltenListe().map(c=>{ const pf=ktSortKey===c.key?(ktSortDir===1?' ▲':' ▼'):''; return `<th style="cursor:pointer;user-select:none;white-space:nowrap" onclick="ktSortBy('${c.key}')" title="Auf-/absteigend sortieren">${c.label}${pf}</th>`; }).join('');
 }
 function ktSortBy(key){ if(ktSortKey===key) ktSortDir=-ktSortDir; else { ktSortKey=key; ktSortDir=1; } renderKontakteTabelle(); }
@@ -4289,7 +4332,7 @@ function renderKontakteTabelle(){
   if(!rows.length){ body.innerHTML=`<tr><td colspan="${ktSpaltenListe().length+1}" class="empty">Keine Treffer.</td></tr>`; updateKontaktSelBar(); return; }
   rows.forEach(r=>{
     const tr=document.createElement('tr'); tr.className='row-click';
-    const cb=`<td onclick="event.stopPropagation()" style="width:32px;text-align:center"><input type="checkbox" class="kontakt-cb" data-id="${r.id}" ${selectedKontaktIds.has(r.id)?'checked':''} onchange="kontaktSelToggle('${r.id}',this)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></td>`;
+    const cb=`<td onclick="event.stopPropagation()" style="width:1%;white-space:nowrap;text-align:center;padding-left:10px;padding-right:0"><input type="checkbox" class="kontakt-cb" data-id="${r.id}" ${selectedKontaktIds.has(r.id)?'checked':''} onchange="kontaktSelToggle('${r.id}',this)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></td>`;
     tr.innerHTML=cb+ktSpaltenListe().map(c=>`<td>${c.render(r)}</td>`).join('');
     tr.onclick=()=>detailKontakt(r.id);
     body.appendChild(tr);
@@ -8193,7 +8236,7 @@ function _rmRenderTabelle(){
   const arr=k=>_rmSort.key===k?(_rmSort.dir>0?' ▲':' ▼'):'';
   const allSel = rows.length && rows.every(r=>_rmSel.has(r.id));
   let html='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="border-bottom:2px solid var(--line);text-align:left">';
-  html+='<th style="padding:7px 8px;width:30px"><input type="checkbox" '+(allSel?'checked':'')+' onclick="_rmSelAll(this.checked)" title="Alle auswählen" style="cursor:pointer;width:15px;height:15px;accent-color:var(--accent)"></th>';
+  html+='<th style="width:1%;white-space:nowrap;padding-left:10px;padding-right:0;text-align:center"><input type="checkbox" '+(allSel?'checked':'')+' onclick="_rmSelAll(this.checked)" title="Alle auswählen" style="cursor:pointer;width:15px;height:15px;accent-color:var(--accent)"></th>';
   cols.forEach(c=>{ html+='<th onclick="rmSort(\''+c.key+'\')" style="padding:7px 10px 8px;color:var(--muted);font-weight:600;cursor:pointer;user-select:none;white-space:nowrap">'+esc(c.label)+arr(c.key)+'</th>'; });
   if(hatKm) html+='<th onclick="rmSort(\'__km\')" style="padding:7px 10px 8px;color:var(--muted);font-weight:600;cursor:pointer;user-select:none">Entfernung'+arr('__km')+'</th>';
   html+='<th style="padding:7px 8px 8px;color:var(--muted);font-weight:600" title="Erreichbarkeit">✉&nbsp;☎</th></tr></thead><tbody>';
@@ -8201,7 +8244,7 @@ function _rmRenderTabelle(){
     const hatM=!!(r.email||r.email_beruflich||r.email_zweit), hatT=!!(r.mobil||r.mobil_privat||r.telefon||r.telefon_privat);
     const err=[hatM?'<span title="E-Mail vorhanden" style="color:var(--accent2)">✉</span>':'',hatT?'<span title="Telefon/Mobil vorhanden" style="color:#10b981">☎</span>':''].filter(Boolean).join('&nbsp;');
     html+='<tr onclick="detailKandidat(\''+r.id+'\')" style="cursor:pointer;border-bottom:1px solid var(--line)" onmouseover="this.style.background=\'var(--panel2)\'" onmouseout="this.style.background=\'\'">';
-    html+='<td onclick="event.stopPropagation()" style="padding:7px 8px;text-align:center"><input type="checkbox" '+(_rmSel.has(r.id)?'checked':'')+' onclick="_rmSelToggle(\''+r.id+'\',this)" style="cursor:pointer;width:15px;height:15px;accent-color:var(--accent)"></td>';
+    html+='<td onclick="event.stopPropagation()" style="width:1%;white-space:nowrap;padding-left:10px;padding-right:0;text-align:center"><input type="checkbox" '+(_rmSel.has(r.id)?'checked':'')+' onclick="_rmSelToggle(\''+r.id+'\',this)" style="cursor:pointer;width:15px;height:15px;accent-color:var(--accent)"></td>';
     cols.forEach(c=>{ html+='<td style="padding:7px 10px;color:var(--ink);font-size:12px">'+c.render(r)+'</td>'; });
     if(hatKm) html+='<td style="padding:7px 10px;color:var(--muted);font-size:12px">'+(r.entfernung_km!=null?Math.round(r.entfernung_km)+' km':'')+'</td>';
     html+='<td style="padding:7px 8px">'+(err||'–')+'</td></tr>';
