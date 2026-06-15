@@ -5864,18 +5864,30 @@ Viele Grüße
 //  E-MAIL PROTOKOLLIEREN
 // ================================================================
 
-let _mailAlle=[]; let _mailFilter='';
+let _mailAlle=[]; let _mailFilter=''; let _mailSuche=''; let _mailSort='desc';
 function _mailDir(m){ if(m.richtung==='raus'||(m.betreff&&m.betreff.startsWith('📤 '))) return 'raus'; if(m.richtung==='rein'||(m.betreff&&m.betreff.startsWith('📥 '))) return 'rein'; return ''; }
-function setMailFilter(v){ _mailFilter=(_mailFilter===v?'':v); const h=document.getElementById('mailHistorie'); if(h) h.innerHTML=mailHistorieHtml(_mailAlle); }
+function _mailRerender(){ const h=document.getElementById('mailHistorie'); if(!h) return; h.innerHTML=mailHistorieHtml(_mailAlle); const si=document.getElementById('mailSucheInp'); if(si){ si.focus(); try{ si.setSelectionRange(si.value.length, si.value.length); }catch(e){} } }
+function setMailFilter(v){ _mailFilter=(_mailFilter===v?'':v); _mailRerender(); }
+function setMailSuche(v){ _mailSuche=v; _mailRerender(); }
+function toggleMailSort(){ _mailSort=(_mailSort==='desc'?'asc':'desc'); _mailRerender(); }
 function mailHistorieHtml(mails){
   if(Array.isArray(mails)) _mailAlle=mails;
   const alle=_mailAlle||[];
   if(!alle.length) return '<div style="color:var(--muted);font-size:13px">Noch keine E-Mails protokolliert.</div>';
   const cntS=alle.filter(m=>_mailDir(m)==='raus').length, cntR=alle.filter(m=>_mailDir(m)==='rein').length;
   const fbtn=(val,label)=>{ const on=_mailFilter===val; return `<button type="button" onclick="setMailFilter('${val}')" style="padding:3px 10px;font-size:12px;border-radius:5px;cursor:pointer;border:1px solid var(--line);background:${on?'var(--accent2)':'var(--panel2)'};color:${on?'#fff':'var(--ink)'}">${label}</button>`; };
-  const bar=`<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">${fbtn('','Alle ('+alle.length+')')}${fbtn('raus','📤 Gesendet ('+cntS+')')}${fbtn('rein','📥 Empfangen ('+cntR+')')}</div>`;
-  const liste=_mailFilter?alle.filter(m=>_mailDir(m)===_mailFilter):alle;
-  if(!liste.length) return bar+'<div style="color:var(--muted);font-size:13px">Keine E-Mails in dieser Kategorie.</div>';
+  const sortLabel=_mailSort==='desc'?'📅 Neueste zuerst':'📅 Älteste zuerst';
+  const inStyle='padding:4px 9px;font-size:12px;border-radius:5px;border:1px solid var(--line);background:var(--bg);color:var(--ink)';
+  const bar=`<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">`
+    +`${fbtn('','Alle ('+alle.length+')')}${fbtn('raus','📤 Gesendet ('+cntS+')')}${fbtn('rein','📥 Empfangen ('+cntR+')')}`
+    +`<input id="mailSucheInp" value="${esc(_mailSuche).replace(/"/g,'&quot;')}" oninput="setMailSuche(this.value)" placeholder="🔎 Betreff/Text suchen…" style="${inStyle};flex:1;min-width:140px">`
+    +`<button type="button" onclick="toggleMailSort()" style="${inStyle};cursor:pointer" title="Sortierung umschalten">${sortLabel}</button>`
+    +`</div>`;
+  let liste=_mailFilter?alle.filter(m=>_mailDir(m)===_mailFilter):alle.slice();
+  const q=_mailSuche.trim().toLowerCase();
+  if(q) liste=liste.filter(m=>((m.betreff||'')+' '+(m.nachricht||'')).toLowerCase().includes(q));
+  liste.sort((a,b)=>{ const da=a.erstellt_am?Date.parse(a.erstellt_am):-8e15, db=b.erstellt_am?Date.parse(b.erstellt_am):-8e15; return _mailSort==='desc'?(db-da):(da-db); });
+  if(!liste.length) return bar+'<div style="color:var(--muted);font-size:13px">Keine E-Mails für diese Auswahl/Suche.</div>';
   const LIMIT=5;
   const rows=liste.map(m=>{
     // Richtung: neue Mails ueber Feld 'richtung', alte ueber Betreff-Prefix
