@@ -1153,6 +1153,22 @@
       </div>
     </div>
 
+    <!-- Datenanreicherung-Felder -->
+    <div class="setSec" data-cat="listen" style="margin-bottom:20px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">🔎 Datenanreicherung-Felder</div>
+      <div style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;overflow:hidden">
+        <div id="datenanreicherungVerwaltungCont"></div>
+        <div style="padding:11px 16px;display:flex;gap:8px;align-items:center;border-top:1px solid var(--line)">
+          <input id="datenanreicherungNeuInp" placeholder="Neues Feld (z.B. Lusha 3) …" onkeydown="if(event.key==='Enter')datenanreicherungHinzufuegen()"
+                 style="flex:1;padding:6px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
+          <button onclick="datenanreicherungHinzufuegen()"
+                  style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--accent2);color:#fff;border:none;font-size:13px;font-weight:600">+ Hinzufügen</button>
+          <button onclick="datenanreicherungAufStandardReset()" title="Auf Standard-Werte zurücksetzen"
+                  style="padding:6px 12px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);font-size:13px;color:var(--muted)">↺</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Firmen-Branchen -->
     <div class="setSec" data-cat="listen" style="margin-bottom:20px">
       <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">🏭 Firmen-Branchen</div>
@@ -2872,6 +2888,12 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
         ${ri('Mobil privat','mobil_privat', d.mobil_privat, actTel)}
       </div>
 
+      <!-- datenanreicherung -->
+      ${(()=>{ const _da=datenanreicherungListe(); return _da.length?`<div class="dblock">
+        <div class="dbh">Datenanreicherung</div>
+        ${_da.map(lbl=>r(esc(lbl),'')).join('')}
+      </div>`:''; })()}
+
 
       <!-- status & sperren -->
       <div class="dblock">
@@ -3301,6 +3323,11 @@ function branchenListe(){
 function anredeListe(){
   try{ const s=localStorage.getItem('yavis_anreden'); if(s){ const a=JSON.parse(s); if(a&&a.length) return a; } }catch(e){}
   return [...ANREDE_OPTS];
+}
+const DATENANREICHERUNG_STANDARD=['Lusha 1','Lusha 2'];
+function datenanreicherungListe(){
+  try{ const s=localStorage.getItem('yavis_datenanreicherung'); if(s){ const a=JSON.parse(s); if(Array.isArray(a)) return a; } }catch(e){}
+  return [...DATENANREICHERUNG_STANDARD];
 }
 
 function ef(label,id,val,type='text'){
@@ -4927,7 +4954,7 @@ function oeffneEinstellungen(){
   // Kompakt-Button-Label
   const kb=document.getElementById('kompaktBtn');
   if(kb) kb.textContent=document.body.classList.contains('kompakt')?'✅ An':'⬜ Aus';
-  document.getElementById('einstellungenDlg').showModal(); renderStatusVerwaltung(); renderBranchenVerwaltung(); renderAnredeVerwaltung(); einsZoomAnwenden();
+  document.getElementById('einstellungenDlg').showModal(); renderStatusVerwaltung(); renderBranchenVerwaltung(); renderAnredeVerwaltung(); renderDatenanreicherungVerwaltung(); einsZoomAnwenden();
   setEinsTab(localStorage.getItem('yavis_eins_tab')||'darstellung');
   msEinstellungenUI();
 }
@@ -8142,6 +8169,34 @@ function anredeLoeschen(idx){
 function anredeAufStandardReset(){
   if(!confirm('Anrede-Liste auf die Standard-Werte zurücksetzen?\n\n'+ANREDE_OPTS.join(', '))) return;
   localStorage.removeItem('yavis_anreden'); renderAnredeVerwaltung(); zeigeMeldung('Standard-Werte wiederhergestellt ✓','ok');
+}
+
+// ===== Datenanreicherung-Felder-Verwaltung (Einstellungen → Listen) =====
+function renderDatenanreicherungVerwaltung(){
+  const cont=document.getElementById('datenanreicherungVerwaltungCont'); if(!cont) return;
+  const liste=datenanreicherungListe();
+  if(!liste.length){ cont.innerHTML='<div style="padding:10px 16px;font-size:13px;color:var(--muted)">Keine Felder.</div>'; return; }
+  cont.innerHTML=liste.map((v,i)=>
+    '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 16px;'+
+    (i<liste.length-1?'border-bottom:1px solid var(--line)':'')+'">'+
+    '<span style="font-size:13px">'+esc(v)+'</span>'+
+    '<button onclick="datenanreicherungLoeschen('+i+')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;line-height:1;padding:0 2px" title="Entfernen">×</button>'+
+    '</div>').join('');
+}
+function datenanreicherungHinzufuegen(){
+  const inp=document.getElementById('datenanreicherungNeuInp'); const val=(inp.value||'').trim(); if(!val) return;
+  const liste=datenanreicherungListe();
+  if(liste.some(s=>s.toLowerCase()===val.toLowerCase())){ zeigeMeldung('Feld existiert bereits','err'); return; }
+  liste.push(val); localStorage.setItem('yavis_datenanreicherung', JSON.stringify(liste)); inp.value='';
+  renderDatenanreicherungVerwaltung(); zeigeMeldung('"'+val+'" hinzugefügt ✓','ok');
+}
+function datenanreicherungLoeschen(idx){
+  const liste=datenanreicherungListe();
+  liste.splice(idx,1); localStorage.setItem('yavis_datenanreicherung', JSON.stringify(liste)); renderDatenanreicherungVerwaltung();
+}
+function datenanreicherungAufStandardReset(){
+  if(!confirm('Datenanreicherung-Felder auf Standard zurücksetzen?\n\n'+DATENANREICHERUNG_STANDARD.join(', '))) return;
+  localStorage.removeItem('yavis_datenanreicherung'); renderDatenanreicherungVerwaltung(); zeigeMeldung('Standard-Werte wiederhergestellt ✓','ok');
 }
 
 
