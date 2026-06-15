@@ -2669,6 +2669,7 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
   const actOpen=`<span class="inl-act" title="Profil öffnen" onclick="_inlOpen(this)">↗</span>`;
   const _statusOpts=(typeof statusListe==='function'?statusListe():['Aktiv suchend','Offen für Angebote','Nicht verfügbar','Platziert','Gesperrt']);
   const statusSel=`<select class="inl-sel" data-id="${d.id}" data-feld="status" data-orig="${esc(d.status||'')}" onchange="_inlSave(this)"><option value="">—</option>${_statusOpts.map(o=>`<option ${o===d.status?'selected':''}>${esc(o)}</option>`).join('')}${(d.status&&!_statusOpts.includes(d.status))?`<option selected>${esc(d.status)}</option>`:''}</select>`;
+  const _posSelHtml=`<select class="inl-sel" data-id="${d.id}" data-feld="berufsbezeichnung" data-orig="${esc(d.berufsbezeichnung||'')}" onchange="_inlSave(this)"><option value="">—</option>${Object.keys(POSITION_STUFE).map(o=>`<option ${o===d.berufsbezeichnung?'selected':''}>${esc(o)}</option>`).join('')}${(d.berufsbezeichnung&&!Object.keys(POSITION_STUFE).includes(d.berufsbezeichnung))?`<option selected>${esc(d.berufsbezeichnung)}</option>`:''}</select>`;
   const mail=(x)=> x?`<a href="#" onclick="event.preventDefault();mailtoMitLog('${esc(x)}','${d.id}','${esc(d.voller_name)}')" style="color:var(--accent2)">${esc(x)}</a>`:'';
   const chk=(on,feld,label)=>`<span class="dchk ${on?'on':''}" data-id="${d.id}" data-feld="${feld}" data-on="${on?'1':'0'}" data-onic="🚫" data-offic="○" data-label="${label}" onclick="_inlToggle(this)" title="Klicken zum Umschalten">${on?'🚫':'○'} ${label}</span>`;
   const rollen=(d.rollen||'').split(';').map(s=>s.trim()).filter(Boolean).join(', ');
@@ -2717,11 +2718,11 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
     </div>
 
     <div class="dsysline">
-      <span>id: <b title="${esc(d.id)}">${fmtKandidatId(d.id)}</b></span>
-      <span>erstellt: <b>${d.erstellt_am?fmtDat(d.erstellt_am):'—'}</b></span>
-      <span>geändert: <b>${d.geaendert_am?fmtDat(d.geaendert_am):'—'}</b></span>
-      <span>quelle: <b>${esc(d.quelle)||'—'}</b></span>
-      <span>letzte aktivität: <b>${d.letzte_aktivitaet?fmtDat(d.letzte_aktivitaet):'—'}</b></span>
+      <span>ID: <b title="${esc(d.id)}">${fmtKandidatId(d.id)}</b></span>
+      <span>Erstellt: <b>${d.erstellt_am?fmtDat(d.erstellt_am):'—'}</b></span>
+      <span>Geändert: <b>${d.geaendert_am?fmtDat(d.geaendert_am):'—'}</b></span>
+      <span>Quelle: <b>${esc(d.quelle)||'—'}</b></span>
+      <span>Letzte Aktivität: <b>${d.letzte_aktivitaet?fmtDat(d.letzte_aktivitaet):'—'}</b></span>
     </div>
 
     ${geschuetzt?`<div style="background:var(--panel2);border-left:3px solid var(--hot);border-radius:4px;padding:10px 16px;margin-bottom:14px;font-size:13px;color:var(--ink)">
@@ -2736,36 +2737,36 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
       <!-- ident -->
       <div class="dblock">
         <div class="dbh">Ident</div>
-        ${r('anrede', esc(d.begruessung))}
-        ${r('titel', esc(d.titel))}
-        ${ri('vorname','vorname', d.vorname)}
-        ${ri('nachname','nachname', d.nachname)}
-        ${r('position', esc(d.berufsbezeichnung))}
-        ${ri('laut cv','position_original', d.position_original)}
-        ${ri('funktion','funktion', d.funktion)}
-        ${r('arbeitgeber', d.arbeitgeber ? `<a href="#" onclick="event.preventDefault();oeffneFirmaVonKandidat('${esc(d.arbeitgeber)}')" style="color:var(--accent2)" title="Zur Firma springen">${esc(d.arbeitgeber)}</a>` : '')}
-        ${ri('bei firma seit','bei_firma_seit', d.bei_firma_seit)}
-        ${ri('in position seit','in_position_seit', d.in_position_seit)}
-        ${ri('firma zuvor','firma_zuvor', d.firma_zuvor)}
-        ${r('position zuvor', esc(d.position_zuvor))}
-        ${istAnsprechpartner?`<div class="dsubh">Als Ansprechpartner</div>${r('firma', firmaName?`<a href="#" onclick="event.preventDefault();detailKunde('${d.firma_id}')" style="color:var(--accent2)" title="Zur Firma springen">${esc(firmaName)}</a>`:(d.firma_id?esc(d.firma_id):''))}`:''}
+        ${ri('Anrede','begruessung', d.begruessung)}
+        ${ri('Titel','titel', d.titel)}
+        ${ri('Vorname','vorname', d.vorname)}
+        ${ri('Nachname','nachname', d.nachname)}
+        <div class="drow"><span class="dk">Position</span><span class="dv dv-edit">${_posSelHtml}</span></div>
+        ${ri('Position laut CV','position_original', d.position_original)}
+        ${ri('Funktion','funktion', d.funktion)}
+        ${r('Arbeitgeber', d.arbeitgeber ? `<a href="#" onclick="event.preventDefault();oeffneFirmaVonKandidat('${esc(d.arbeitgeber)}')" style="color:var(--accent2)" title="Zur Firma springen">${esc(d.arbeitgeber)}</a>` : '')}
+        ${ri('Bei Firma seit','bei_firma_seit', d.bei_firma_seit)}
+        ${ri('In Position seit','in_position_seit', d.in_position_seit)}
+        ${ri('Firma zuvor','firma_zuvor', d.firma_zuvor)}
+        ${ri('Position zuvor','position_zuvor', d.position_zuvor)}
+        ${istAnsprechpartner?`<div class="dsubh">Als Ansprechpartner</div>${r('Firma', firmaName?`<a href="#" onclick="event.preventDefault();detailKunde('${d.firma_id}')" style="color:var(--accent2)" title="Zur Firma springen">${esc(firmaName)}</a>`:(d.firma_id?esc(d.firma_id):''))}`:''}
       </div>
 
       <!-- anschrift -->
       <div class="dblock">
         <div class="dbh">Anschrift</div>
-        ${ri('straße','strasse', d.strasse)}
-        ${ri('plz','plz', d.plz)}
-        ${ri('ort','stadt', d.stadt)}
-        ${ri('bundesland','bundesland', d.bundesland)}
-        ${ri('land','land', d.land)}
-        ${ri('geburtstag','geburtstag', d.geburtstag)}
+        ${ri('Straße','strasse', d.strasse)}
+        ${ri('PLZ','plz', d.plz)}
+        ${ri('Ort','stadt', d.stadt)}
+        ${ri('Bundesland','bundesland', d.bundesland)}
+        ${ri('Land','land', d.land)}
+        ${ri('Geburtstag','geburtstag', d.geburtstag)}
         <div class="dsubh">Beruflich</div>
-        ${ri('straße','strasse_beruf', d.strasse_beruf)}
-        ${ri('plz','plz_beruf', d.plz_beruf)}
-        ${ri('ort','stadt_beruf', d.stadt_beruf)}
-        ${ri('bundesland','bundesland_beruf', d.bundesland_beruf)}
-        ${ri('land','land_beruf', d.land_beruf)}
+        ${ri('Straße','strasse_beruf', d.strasse_beruf)}
+        ${ri('PLZ','plz_beruf', d.plz_beruf)}
+        ${ri('Ort','stadt_beruf', d.stadt_beruf)}
+        ${ri('Bundesland','bundesland_beruf', d.bundesland_beruf)}
+        ${ri('Land','land_beruf', d.land_beruf)}
       </div>
 
       </div>
@@ -2776,43 +2777,43 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
       <!-- erreichbarkeit -->
       <div class="dblock">
         <div class="dbh">Erreichbarkeit</div>
-        ${ri('mobil','mobil', d.mobil, actTel)}
-        ${ri('telefon','telefon', d.telefon, actTel)}
-        ${ri('fax','fax', d.fax)}
-        ${ri('e-mail','email', d.email, actMail)}
-        ${ri('e-mail berufl.','email_beruflich', d.email_beruflich, actMail)}
-        ${ri('2. e-mail','email_zweit', d.email_zweit, actMail)}
-        ${ri('xing','xing_profil', d.xing_profil, actOpen)}
-        ${ri('linkedin','linkedin_profil', d.linkedin_profil, actOpen)}
+        ${ri('Mobil','mobil', d.mobil, actTel)}
+        ${ri('Telefon','telefon', d.telefon, actTel)}
+        ${ri('Fax','fax', d.fax)}
+        ${ri('E-Mail','email', d.email, actMail)}
+        ${ri('E-Mail beruflich','email_beruflich', d.email_beruflich, actMail)}
+        ${ri('2. E-Mail','email_zweit', d.email_zweit, actMail)}
+        ${ri('XING','xing_profil', d.xing_profil, actOpen)}
+        ${ri('LinkedIn','linkedin_profil', d.linkedin_profil, actOpen)}
         <div class="dsubh">Privat</div>
-        ${ri('tel. privat','telefon_privat', d.telefon_privat, actTel)}
-        ${ri('mobil privat','mobil_privat', d.mobil_privat, actTel)}
+        ${ri('Telefon privat','telefon_privat', d.telefon_privat, actTel)}
+        ${ri('Mobil privat','mobil_privat', d.mobil_privat, actTel)}
       </div>
 
       <!-- datenanreicherung -->
       <div class="dblock">
         <div class="dbh">Datenanreicherung</div>
-        ${r('claytel', '')}
-        ${r('lusha 1', '')}
-        ${r('lusha 2', '')}
+        ${r('Claytel', '')}
+        ${r('Lusha 1', '')}
+        ${r('Lusha 2', '')}
       </div>
 
       <!-- status & sperren -->
       <div class="dblock">
         <div class="dbh">Status &amp; Sperren</div>
-        ${r('rollen', esc(rollen))}
-        <div class="drow"><span class="dk">status</span><span class="dv dv-edit">${statusSel}</span></div>
-        ${ri('int. wertung','wertung_intern', d.wertung_intern)}
-        ${ri('kontaktstatus','kontaktstatus', d.kontaktstatus)}
-        ${r('quelle', esc(d.quelle))}
-        <div class="drow"><span class="dk">hot</span><span class="dv"><span class="inl-act" style="color:inherit" onclick="hotToggle('${d.id}',${d.ist_hot?'true':'false'})" title="Umschalten">${d.ist_hot?'🔥 ja':'nein'}</span></span></div>
-        ${r('abwerbeschutz', geschuetzt?(autoSchutz?'🔒 auto (auftraggeber)':'🔒 manuell'):'frei')}
+        ${r('Rollen', esc(rollen))}
+        <div class="drow"><span class="dk">Status</span><span class="dv dv-edit">${statusSel}</span></div>
+        ${ri('Interne Wertung','wertung_intern', d.wertung_intern)}
+        ${ri('Kontaktstatus','kontaktstatus', d.kontaktstatus)}
+        ${ri('Quelle','quelle', d.quelle)}
+        <div class="drow"><span class="dk">Hot</span><span class="dv"><span class="inl-act" style="color:inherit" onclick="hotToggle('${d.id}',${d.ist_hot?'true':'false'})" title="Umschalten">${d.ist_hot?'🔥 ja':'nein'}</span></span></div>
+        ${r('Abwerbeschutz', geschuetzt?(autoSchutz?'🔒 Auto (Auftraggeber)':'🔒 Manuell'):'Frei')}
         <div class="dsubh">Kontaktsperren</div>
         <div class="dchecks">
-          ${chk(d.sperre_email,'sperre_email','e-mail')}
-          ${chk(d.sperre_brief,'sperre_brief','brief')}
-          ${chk(d.sperre_anruf,'sperre_anruf','anruf')}
-          ${chk(d.kein_newsletter,'kein_newsletter','newsletter')}
+          ${chk(d.sperre_email,'sperre_email','E-Mail')}
+          ${chk(d.sperre_brief,'sperre_brief','Brief')}
+          ${chk(d.sperre_anruf,'sperre_anruf','Anruf')}
+          ${chk(d.kein_newsletter,'kein_newsletter','Newsletter')}
         </div>
       </div>
 
@@ -2824,14 +2825,14 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
       <!-- direktansprache -->
       <div class="dblock">
         <div class="dbh">Direktansprache</div>
-        ${ri('positionswunsch','positionswunsch', d.positionswunsch)}
-        ${ri('wunschregion','wunschregion', d.wunschregion)}
-        ${ri('umzug','umzugsbereitschaft', d.umzugsbereitschaft)}
-        ${r('reisebereitschaft', esc(d.reisebereitschaft))}
-        ${ri('gehalt aktuell','gehalt_aktuell', d.gehalt_aktuell)}
-        ${ri('gehalt wunsch','gehalt_erwartet', d.gehalt_erwartet)}
-        ${ri('kündigungsfrist','kuendigungsfrist', d.kuendigungsfrist)}
-        ${ri('wechselmotivation','wechselmotivation', d.wechselmotivation)}
+        ${ri('Positionswunsch','positionswunsch', d.positionswunsch)}
+        ${ri('Wunschregion','wunschregion', d.wunschregion)}
+        ${ri('Umzug','umzugsbereitschaft', d.umzugsbereitschaft)}
+        ${ri('Reisebereitschaft','reisebereitschaft', d.reisebereitschaft)}
+        ${ri('Gehalt aktuell','gehalt_aktuell', d.gehalt_aktuell)}
+        ${ri('Gehalt Wunsch','gehalt_erwartet', d.gehalt_erwartet)}
+        ${ri('Kündigungsfrist','kuendigungsfrist', d.kuendigungsfrist)}
+        ${ri('Wechselmotivation','wechselmotivation', d.wechselmotivation)}
       </div>
 
       <!-- kategorisierung -->
@@ -2844,10 +2845,10 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
           <span class="fae-saved"></span>
         </div>
         <datalist id="faeDL"></datalist>
-        ${ri('studiengang','studiengang', d.studiengang)}
-        ${ri('qualifikation','qualifikation', d.qualifikation)}
-        ${r('fremdsprachen', esc(d.fremdsprachen))}
-        ${ri('erfahrung (jahre)','erfahrung_jahre', d.erfahrung_jahre)}
+        ${ri('Studiengang','studiengang', d.studiengang)}
+        ${ri('Qualifikation','qualifikation', d.qualifikation)}
+        ${ri('Fremdsprachen','fremdsprachen', d.fremdsprachen)}
+        ${ri('Erfahrung (Jahre)','erfahrung_jahre', d.erfahrung_jahre)}
       </div>
 
       <!-- wiedervorlage -->
