@@ -28,3 +28,9 @@ UEBERGABE_rollen_stufe2_plan.md
 
 # Lokale Vorschau-Hilfe (Auto-Login, enthält Zugangsdaten) — NIEMALS committen
 _dev_autologin.js
+
+# E-Mail-Import (echte Mail-Inhalte/Adressen, Personendaten) — NIEMALS committen
+outlook_emails*.CSV
+outlook_emails*.csv
+_email_*.py
+Email_Vorlagen_tmp.docx
