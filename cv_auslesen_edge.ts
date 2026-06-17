@@ -60,36 +60,45 @@ serve(async (req: Request) => {
       );
     }
 
-    // Request-Body lesen — entweder PDF oder Bild (PNG/JPEG/WebP/GIF, z.B. Screenshot)
-    const { pdf_base64, image_base64, media_type } = await req.json();
-    if (!pdf_base64 && !image_base64) {
+    // Request-Body lesen — PDF, Bild (PNG/JPEG/WebP/GIF, z.B. Screenshot) ODER reiner Text
+    const { pdf_base64, image_base64, media_type, cv_text } = await req.json();
+    if (!pdf_base64 && !image_base64 && !cv_text) {
       return new Response(
-        JSON.stringify({ ok: false, error: "pdf_base64 oder image_base64 fehlt im Request" }),
+        JSON.stringify({ ok: false, error: "pdf_base64, image_base64 oder cv_text fehlt im Request" }),
         { status: 400, headers: { ...CORS, "Content-Type": "application/json" } }
       );
     }
 
-    // Quelle-Block: Bild als image-Block, sonst PDF als document-Block
+    // Content-Blöcke je nach Quelle zusammenstellen
     const ERLAUBTE_BILD_TYPEN = ["image/png", "image/jpeg", "image/webp", "image/gif"];
-    const quelleBlock = image_base64
-      ? {
-          type: "image",
-          source: {
-            type: "base64",
-            media_type: ERLAUBTE_BILD_TYPEN.includes(media_type) ? media_type : "image/png",
-            data: image_base64,
-          },
-        }
-      : {
-          type: "document",
-          source: {
-            type: "base64",
-            media_type: "application/pdf",
-            data: pdf_base64,
-          },
-        };
+    let content;
+    if (cv_text) {
+      // Reiner Text: CV-Text + Prompt in einem Text-Block
+      content = [
+        { type: "text", text: PROMPT + "\n\nLEBENSLAUF-TEXT:\n" + String(cv_text) },
+      ];
+    } else {
+      const quelleBlock = image_base64
+        ? {
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: ERLAUBTE_BILD_TYPEN.includes(media_type) ? media_type : "image/png",
+              data: image_base64,
+            },
+          }
+        : {
+            type: "document",
+            source: {
+              type: "base64",
+              media_type: "application/pdf",
+              data: pdf_base64,
+            },
+          };
+      content = [quelleBlock, { type: "text", text: PROMPT }];
+    }
 
-    // Claude aufrufen mit PDF-Dokument bzw. Bild
+    // Claude aufrufen
     const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -103,13 +112,7 @@ serve(async (req: Request) => {
         messages: [
           {
             role: "user",
-            content: [
-              quelleBlock,
-              {
-                type: "text",
-                text: PROMPT,
-              },
-            ],
+            content,
           },
         ],
       }),
