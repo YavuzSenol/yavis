@@ -71,6 +71,19 @@ serve(async (req: Request) => {
 
     // Content-Blöcke je nach Quelle zusammenstellen
     const ERLAUBTE_BILD_TYPEN = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+    // Echtes Bildformat aus den ersten Bytes erkennen (Dateiname/„media_type" kann falsch sein,
+    // z.B. umbenannte oder aus der Zwischenablage eingefügte Datei).
+    const sniffBildTyp = (b64: string, fallback: string): string => {
+      try {
+        const bin = atob(b64.slice(0, 24));
+        const b = (i: number) => bin.charCodeAt(i);
+        if (b(0) === 0x89 && b(1) === 0x50 && b(2) === 0x4e && b(3) === 0x47) return "image/png";
+        if (b(0) === 0xff && b(1) === 0xd8 && b(2) === 0xff) return "image/jpeg";
+        if (bin.slice(0, 4) === "GIF8") return "image/gif";
+        if (bin.slice(0, 4) === "RIFF" && bin.slice(8, 12) === "WEBP") return "image/webp";
+      } catch (_) { /* Fallback unten */ }
+      return ERLAUBTE_BILD_TYPEN.includes(fallback) ? fallback : "image/png";
+    };
     let content;
     if (cv_text) {
       // Reiner Text: CV-Text + Prompt in einem Text-Block
@@ -83,7 +96,7 @@ serve(async (req: Request) => {
             type: "image",
             source: {
               type: "base64",
-              media_type: ERLAUBTE_BILD_TYPEN.includes(media_type) ? media_type : "image/png",
+              media_type: sniffBildTyp(image_base64, media_type),
               data: image_base64,
             },
           }
