@@ -4194,7 +4194,7 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
   kontextDatensatz={typ:'Kandidat',id:d.id,name:d.voller_name};
   const geschuetzt = istGeschuetzt(d);
   const autoSchutz = !d.abwerbeschutz && geschuetzt; // true = Schutz kommt automatisch vom Arbeitgeber
-  ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte','recherche'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
 
   const adrPriv=[d.strasse,[d.plz,d.stadt].filter(Boolean).join(' '),d.bundesland,d.land].filter(Boolean).join(', ');
@@ -4658,12 +4658,23 @@ function initFeldDnD(){
 }
 
 let _zurueckZuSuche=null; // gesetzt von globaleSuche; "← Zurück" aus einem so geöffneten Datensatz stellt die Trefferliste wieder her, statt stumpf zur Liste zu springen
+let _zurueckZuRecherche=false; // gesetzt beim Öffnen eines Kandidaten aus der Recherche; "← Zurück" zeigt die Trefferliste wieder, ohne neu zu suchen (rmBody bleibt erhalten)
 function zurueckZurListe(){
+  if(_zurueckZuRecherche){
+    _zurueckZuRecherche=false;
+    document.getElementById('detailPage').style.display='none';
+    ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte','recherche'].forEach(v=>{const el=document.getElementById('view-'+v); if(el) el.style.display=(v==='recherche'?'block':'none');});
+    document.querySelectorAll('.tab[data-view]').forEach(x=>x.classList.toggle('active', x.dataset.view==='recherche'));
+    return;
+  }
   if(_zurueckZuSuche){ const z=_zurueckZuSuche; const gs=document.getElementById('globalSuche'); if(gs) gs.value=z.term; globaleSuche(z.erw); return; }
   document.getElementById('detailPage').style.display='none';
   const aktiv=document.querySelector('.tab.active')?.dataset.view||'kandidaten';
   document.getElementById('view-'+aktiv).style.display='block';
 }
+// Recherche-Treffer: Linksklick = öffnen (Zurück führt in die Recherche), Rechtsklick = neuer Tab
+function rmOeffneKandidat(id){ _zurueckZuSuche=null; _zurueckZuRecherche=true; detailKandidat(id); }
+function rmKandidatNeuerTab(ev,id){ if(ev){ ev.preventDefault(); ev.stopPropagation(); } window.open(location.pathname+'?kandidat='+encodeURIComponent(id),'_blank'); return false; }
 function sucheVerlassen(){ _zurueckZuSuche=null; document.getElementById('detailPage').style.display='none'; const aktiv=document.querySelector('.tab.active')?.dataset.view||'kandidaten'; document.getElementById('view-'+aktiv).style.display='block'; }
 
 // Browser-Zurück-Button: nicht aus der App raus, sondern zurück zur Liste
@@ -5091,7 +5102,7 @@ function tagFormRemove(t){ _tagFormRender(_tagFormArr().filter(x=>x!==t)); }
 async function _tagFormVorschlaege(){ const dl=document.getElementById('tagFormDL'); if(!dl) return; const alle=await ladeAlleTags(); _alleTagsCache=alle||[]; dl.innerHTML=_alleTagsCache.map(t=>'<option value="'+esc(t)+'">').join(''); }
 
 function zeigeFormular(d){
-  ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte','recherche'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
   const neu = !d.id;
   page.innerHTML=`
@@ -5450,7 +5461,7 @@ async function detailKunde(id){
   const d=k.data; if(!d) return;
   const dok_=dok.data||[];
   kontextDatensatz={typ:'Kunde',id:d.id,name:d.name};
-  ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte','recherche'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
   const adresse=[d.strasse,[d.plz,d.stadt].filter(Boolean).join(' '),d.bundesland,d.land].filter(Boolean).join(', ');
   const kont_=kont.data||[], stel_=stel.data||[], notiz_=notiz.data||[], aufg_=aufg.data||[], mails_=mails.data||[];
@@ -5538,7 +5549,7 @@ function bearbeiteKunde(id){ sb.from('kunden').select('*').eq('id',id).single().
 function neuerKunde(){ zeigeKundeFormular({id:null}); }
 
 function zeigeKundeFormular(d){
-  ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte','recherche'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
   const neu=!d.id;
   page.innerHTML=`
@@ -5620,7 +5631,7 @@ async function detailKontakt(id){
   const {data:mailsTab}=await sb.from('emails').select('*').eq('entity_id',id).order('erstellt_am',{ascending:false}).limit(100);
   const mailsT_=mailsTab||[];
   kontextDatensatz={typ:'Kontakt',id:d.id,name:d.voller_name};
-  ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte','recherche'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
   const adresse=[d.strasse,[d.plz,d.stadt].filter(Boolean).join(' '),d.bundesland,d.land].filter(Boolean).join(', ');
   page.innerHTML=`
@@ -5673,7 +5684,7 @@ function bearbeiteKontakt(id){ sb.from('kontakte').select('*').eq('id',id).singl
 function neuerKontakt(){ zeigeFormular({id:null, rollen:';Ansprechpartner;'}); } // neuer Ansprechpartner = Person mit AP-Rolle (nicht mehr Alt-Tabelle kontakte)
 
 function zeigeKontaktFormular(d){
-  ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte','recherche'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
   const neu=!d.id;
   page.innerHTML=`
@@ -6510,7 +6521,7 @@ async function globaleSuche(erweitert=false){
   if(term.length<2) return;
   _zurueckZuSuche={term, erw:!!erweitert};
   sucheVerlaufHinzufuegen(term);
-  ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte'].forEach(v=>document.getElementById('view-'+v).style.display='none');
+  ['start','kandidaten','kunden','kontakte','wiedervorlagen','newsletter','projekte','recherche'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
   page.innerHTML=`<div class="detail-head"><button class="back" onclick="sucheVerlassen()">← Zurück</button><h2>🔍 Suche: „${esc(term)}"</h2></div><div style="color:var(--muted);font-size:13px">Suche läuft …</div>`;
   const digits=term.replace(/\D/g,'');
@@ -10703,7 +10714,7 @@ function _rmRenderTabelle(){
   seite.forEach(r=>{
     const hatM=!!(r.email||r.email_beruflich||r.email_zweit), hatT=!!(r.mobil||r.mobil_privat||r.telefon||r.telefon_privat);
     const err=[hatM?'<span title="E-Mail vorhanden" style="color:var(--accent2)">✉</span>':'',hatT?'<span title="Telefon/Mobil vorhanden" style="color:var(--ok)">☎</span>':''].filter(Boolean).join('&nbsp;');
-    html+='<tr onclick="detailKandidat(\''+r.id+'\')" style="cursor:pointer;border-bottom:1px solid var(--line)" onmouseover="this.style.background=\'var(--panel2)\'" onmouseout="this.style.background=\'\'">';
+    html+='<tr onclick="rmOeffneKandidat(\''+r.id+'\')" oncontextmenu="return rmKandidatNeuerTab(event,\''+r.id+'\')" title="Klick: Kandidat öffnen · Rechtsklick: in neuem Tab öffnen" style="cursor:pointer;border-bottom:1px solid var(--line)" onmouseover="this.style.background=\'var(--panel2)\'" onmouseout="this.style.background=\'\'">';
     html+='<td onclick="event.stopPropagation()" style="width:1%;white-space:nowrap;padding-left:10px;padding-right:0;text-align:center"><input type="checkbox" '+(_rmSel.has(r.id)?'checked':'')+' onclick="_rmSelToggle(\''+r.id+'\',this)" style="cursor:pointer;width:15px;height:15px;accent-color:var(--accent)"></td>';
     cols.forEach(c=>{ html+='<td style="padding:7px 10px;color:var(--ink);font-size:12px">'+c.render(r)+'</td>'; });
     if(hatKm) html+='<td style="padding:7px 10px;color:var(--muted);font-size:12px">'+(r.entfernung_km!=null?Math.round(r.entfernung_km)+' km':'')+'</td>';

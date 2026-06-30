@@ -12,7 +12,7 @@ The user is technically literate but **not a programmer**. Explanations and inst
 
 ## Architecture
 
-- **Frontend:** `index.html` — one file, no build step. Vanilla JS, `<script>` block starts ~line 267. Supabase JS client loaded from CDN. Dark theme, Calibri font. All state in module-level vars; navigation is show/hide of `<div>` sections plus `localStorage` for Supabase URL/key (`sb_url`, `sb_key`). Three tabs: Kandidaten / Kunden / Kontakte.
+- **Frontend:** `index.html` — one file, no build step. Vanilla JS, `<script>` block starts ~line 267. Supabase JS client loaded from CDN. Dark theme, Calibri font. All state in module-level vars; navigation is a left sidebar (`<nav class="sidebar">`, ~line 333) that show/hides `<div>` sections via `data-view`, plus `localStorage` for Supabase URL/key (`sb_url`, `sb_key`). Seven views: 🏠 Start / 👥 Personen / Firmen / 📋 Wiedervorlagen / 📁 Projekte / 🔍 Recherche / ✉️ Newsletter. Note the legacy `data-view` ids: **Personen** is `kandidaten` and **Firmen** is `kunden`. Since the 29.06.2026 "Personen-Konsolidierung" (Phase 3, Variante B) there is **one combined Personen pool** — candidates and contacts are no longer separate tabs; a person is a Kandidat and/or Ansprechpartner by role (filter chips: Alle / Kandidat / Ansprechpartner).
 - **Backend:** Supabase project `afbyqrwqnccgudpqxziv` (EU). RLS is ON for every table, so all DB access requires an authenticated session — the app logs in via Supabase Auth, and scripts must obtain a token before reading/writing.
 - **CV extraction:** Anthropic API, model `claude-haiku-4-5-20251001`. Two code paths share the same extraction logic:
   - `Python Lebensläufe/cv_auslesen.py` — local batch script for new candidates (PDF → Claude → Supabase).
