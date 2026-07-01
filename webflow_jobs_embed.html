@@ -15,6 +15,21 @@
   var EP = "https://afbyqrwqnccgudpqxziv.supabase.co/functions/v1/jobs";
   var box = document.getElementById("yavis-jobs");
   function esc(s){ return (s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+  // Strukturierte Beschreibung -> sauberes HTML (fette Ueberschriften, Aufzaehlungspunkte)
+  function renderBeschr(text){
+    var lines = String(text||"").split(/\r?\n/), html="", inList=false;
+    var heads = {"Ihre Aufgaben":1,"Ihr Profil":1,"Wir bieten":1};
+    function closeList(){ if(inList){ html+="</ul>"; inList=false; } }
+    lines.forEach(function(ln){
+      var t=ln.trim();
+      if(!t){ closeList(); return; }
+      if(heads[t]){ closeList(); html+='<div style="font-weight:600;color:#1a1a1a;margin:15px 0 6px">'+esc(t)+'</div>'; return; }
+      var m=t.match(/^[-•]\s+(.*)$/);
+      if(m){ if(!inList){ html+='<ul style="margin:0 0 6px;padding-left:22px">'; inList=true; } html+='<li style="margin:3px 0">'+esc(m[1])+'</li>'; return; }
+      closeList(); html+='<p style="margin:0 0 10px">'+esc(t)+'</p>';
+    });
+    closeList(); return html;
+  }
   // Lesbares Kürzel aus Titel (+ Ort zur Eindeutigkeit). MUSS identisch zum CRM (jobSlug/jobAnker) sein.
   function jobSlug(x){ return String(x||"").toLowerCase().replace(/\([^)]*\)/g," ").replace(/ä/g,"ae").replace(/ö/g,"oe").replace(/ü/g,"ue").replace(/ß/g,"ss").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,""); }
   function jobAnker(titel, stadt){ var t=jobSlug(titel), st=jobSlug(stadt); return (st && t.indexOf(st)===-1) ? (t+"-"+st) : t; }
@@ -59,8 +74,8 @@
           +       (meta ? '<div style="font-size:13px;color:#777;margin-top:5px">'+esc(meta)+'</div>' : '')
           +     '</div><span class="yj-arr" style="color:#999;font-size:18px">▾</span>'
           +   '</div>'
-          +   '<div class="yj-body" style="display:none;padding:4px 22px 22px;line-height:1.65;color:#333;white-space:pre-line;font-size:15px">'
-          +     esc(j.beschreibung || "")
+          +   '<div class="yj-body" style="display:none;padding:4px 22px 22px;line-height:1.6;color:#333;font-size:15px">'
+          +     renderBeschr(j.beschreibung)
           +     '<div style="margin-top:16px">'
           +       '<button type="button" class="yj-copy" data-anchor="'+esc(anchor)+'" data-label="'+cpLabel+'" '
           +         'style="font-family:inherit;font-size:13px;padding:8px 14px;border:1px solid #d0d0d0;border-radius:8px;background:#f7f7f7;color:#333;cursor:pointer">'+cpLabel+'</button>'
