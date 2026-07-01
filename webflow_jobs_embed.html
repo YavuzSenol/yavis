@@ -3,6 +3,10 @@
      In Webflow: ein "Embed"-Element (HTML-Code) an die Stelle des
      alten Zoho-Widgets setzen und diesen kompletten Code einfügen.
      Zieht die Stellen aus deiner Supabase (Edge Function "jobs").
+
+     NEU: Jede Stelle hat einen eigenen Anker (…/jobs#job-<id>).
+     - Öffnet man so einen Link, springt die Seite zur Stelle und klappt sie auf.
+     - Jede Stelle hat einen "Link kopieren"-Knopf (für WhatsApp/E-Mail/Newsletter).
      =========================================================== -->
 <div id="yavis-jobs" style="max-width:920px;margin:0 auto;font-family:inherit"></div>
 <script>
@@ -10,6 +14,28 @@
   var EP = "https://afbyqrwqnccgudpqxziv.supabase.co/functions/v1/jobs";
   var box = document.getElementById("yavis-jobs");
   function esc(s){ return (s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+  function domId(id){ return "job-" + String(id); }
+  function shareUrl(id){ return location.origin + location.pathname + "#" + domId(id); }
+  function toggle(card, open){
+    var b = card.querySelector(".yj-body"), a = card.querySelector(".yj-arr");
+    if(!b) return;
+    var show = (open===undefined) ? (b.style.display!=="block") : !!open;
+    b.style.display = show ? "block" : "none";
+    if(a) a.textContent = show ? "▴" : "▾";
+  }
+  function copyLink(id, btn){
+    var url = shareUrl(id);
+    function done(){ var t = btn.getAttribute("data-label"); btn.textContent = "✓ Link kopiert"; setTimeout(function(){ btn.textContent = t; }, 1600); }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(url).then(done, function(){ window.prompt("Link kopieren:", url); });
+    } else { window.prompt("Link kopieren:", url); }
+  }
+  function openFromHash(){
+    var h = location.hash ? decodeURIComponent(location.hash.slice(1)) : "";
+    if(!h) return;
+    var el = document.getElementById(h);
+    if(el){ toggle(el, true); try{ el.scrollIntoView({behavior:"smooth", block:"start"}); }catch(e){ el.scrollIntoView(); } }
+  }
   box.innerHTML = '<p style="color:#888;text-align:center;padding:24px">Stellen werden geladen …</p>';
   fetch(EP).then(function(r){ return r.json(); }).then(function(res){
     var jobs = (res && res.jobs) || [];
@@ -20,21 +46,34 @@
         var ort = [j.stadt, j.bundesland].filter(Boolean).join(", ");
         var meta = [ort, j.stellentyp, (String(j.remote)==="true" ? "Remote möglich" : null), j.berufserfahrung]
                      .filter(Boolean).join("  ·  ");
+        var cpLabel = "🔗 Link zu dieser Stelle kopieren";
         return ''
-          + '<div style="border:1px solid #e3e3e3;border-radius:10px;margin:0 0 14px;overflow:hidden;background:#fff">'
-          +   '<div onclick="var b=this.parentNode.querySelector(\'.yj-body\');var a=this.querySelector(\'.yj-arr\');var o=b.style.display===\'block\';b.style.display=o?\'none\':\'block\';a.textContent=o?\'▾\':\'▴\';" '
-          +        'style="padding:18px 22px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:16px">'
+          + '<div id="'+esc(domId(j.id))+'" class="yj-card" style="border:1px solid #e3e3e3;border-radius:10px;margin:0 0 14px;overflow:hidden;background:#fff;scroll-margin-top:90px">'
+          +   '<div class="yj-head" style="padding:18px 22px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:16px">'
           +     '<div><div style="font-size:18px;font-weight:600;color:#1a1a1a">'+esc(j.jobtitel)+'</div>'
           +       (meta ? '<div style="font-size:13px;color:#777;margin-top:5px">'+esc(meta)+'</div>' : '')
           +     '</div><span class="yj-arr" style="color:#999;font-size:18px">▾</span>'
           +   '</div>'
           +   '<div class="yj-body" style="display:none;padding:4px 22px 22px;line-height:1.65;color:#333;white-space:pre-line;font-size:15px">'
           +     esc(j.beschreibung || "")
+          +     '<div style="margin-top:16px">'
+          +       '<button type="button" class="yj-copy" data-id="'+esc(String(j.id))+'" data-label="'+cpLabel+'" '
+          +         'style="font-family:inherit;font-size:13px;padding:8px 14px;border:1px solid #d0d0d0;border-radius:8px;background:#f7f7f7;color:#333;cursor:pointer">'+cpLabel+'</button>'
+          +     '</div>'
           +   '</div>'
           + '</div>';
       }).join("");
+    box.querySelectorAll(".yj-card").forEach(function(card){
+      var head = card.querySelector(".yj-head");
+      if(head) head.addEventListener("click", function(){ toggle(card); });
+    });
+    box.querySelectorAll(".yj-copy").forEach(function(btn){
+      btn.addEventListener("click", function(e){ e.stopPropagation(); copyLink(btn.getAttribute("data-id"), btn); });
+    });
+    openFromHash();
   }).catch(function(e){
     box.innerHTML = '<p style="color:#c0392b;text-align:center;padding:24px">Die Stellen konnten gerade nicht geladen werden.</p>';
   });
+  window.addEventListener("hashchange", openFromHash);
 })();
 </script>
