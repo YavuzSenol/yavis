@@ -29,6 +29,14 @@ Leitungsregel: Eine Leitungs-Kategorie (z.B. Projektleitung, Bereichsleitung) NU
 
 RANGREGEL (wichtig): Nennt der Jobtitel MEHRERE Positionen (z.B. "Fachplaner und Projektleiter"), wähle IMMER die ranghöhere. Die obige 21er-Liste ist von hoch nach niedrig sortiert (Geschäftsführung am höchsten, Techniker am niedrigsten). Beispiel: "Fachplaner und Projektleiter" → "Projektleitung" (nicht "Fachplanung").
 
+WERDEGANG-REGELN (arbeitgeber, bei_firma_seit, in_position_seit, firma_zuvor, position_zuvor):
+- "arbeitgeber": der AKTUELLE/letzte Arbeitgeber (Firmenname), oder null.
+- "bei_firma_seit": seit wann die Person beim aktuellen Arbeitgeber ist. Format IMMER TT.MM.JJJJ.
+  Ist nur Monat/Jahr bekannt (z.B. "seit 03/2019"): "01.03.2019". Ist nur das Jahr bekannt (z.B. "seit 2019"): "01.01.2019". Sonst null.
+- "in_position_seit": seit wann die Person in der AKTUELLEN Position ist (kann von bei_firma_seit abweichen, wenn es eine interne Beförderung gab). Gleiches Format wie oben. Sonst null.
+- "firma_zuvor": der Arbeitgeber VOR dem aktuellen (die vorletzte Station im Werdegang), oder null.
+- "position_zuvor": die Berufsbezeichnung/der Jobtitel bei diesem vorherigen Arbeitgeber, wörtlich wie angegeben, oder null.
+
 Antworte NUR mit folgendem JSON-Objekt, kein Text davor oder danach:
 {
   "berufsbezeichnung": "eine der 21 erlaubten Positionen",
@@ -41,7 +49,12 @@ Antworte NUR mit folgendem JSON-Objekt, kein Text davor oder danach:
   "studiengang": "Studiengang oder null",
   "erfahrung_jahre": "Anzahl Berufsjahre als Zahl (ohne Einheit) oder null",
   "faehigkeiten": "kommagetrennte Skills und Fachgebiete oder null",
-  "profil_zusammenfassung": "3–5 Sätze sachliche Zusammenfassung der Qualifikationen oder null"
+  "profil_zusammenfassung": "3–5 Sätze sachliche Zusammenfassung der Qualifikationen oder null",
+  "arbeitgeber": "aktueller Arbeitgeber oder null",
+  "bei_firma_seit": "TT.MM.JJJJ oder null",
+  "in_position_seit": "TT.MM.JJJJ oder null",
+  "firma_zuvor": "vorheriger Arbeitgeber oder null",
+  "position_zuvor": "vorherige Position, wörtlich, oder null"
 }`;
 
 serve(async (req: Request) => {

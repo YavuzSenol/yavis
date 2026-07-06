@@ -37,7 +37,12 @@ Felder:
   Arbeitssicherheit, Techniker, BIM Konstrukteur, technische Systemplanung
 - position_unsicher: true NUR wenn sich GAR KEINE fachliche Rolle erkennen laesst, sonst false.
   Wenn unsicher: setze berufsbezeichnung auf "Ingenieur" und position_unsicher auf true.
-- arbeitgeber
+- arbeitgeber: der AKTUELLE/letzte Arbeitgeber (Firmenname), oder "".
+- bei_firma_seit: seit wann die Person beim aktuellen Arbeitgeber ist. Format IMMER TT.MM.JJJJ.
+  Ist nur Monat/Jahr bekannt (z.B. "seit 03/2019"): "01.03.2019". Ist nur das Jahr bekannt (z.B. "seit 2019"): "01.01.2019". Sonst "".
+- in_position_seit: seit wann die Person in der AKTUELLEN Position ist (kann von bei_firma_seit abweichen, z.B. bei interner Befoerderung). Gleiches Format. Sonst "".
+- firma_zuvor: der Arbeitgeber VOR dem aktuellen (die vorletzte Station im Werdegang), oder "".
+- position_zuvor: die Berufsbezeichnung/der Jobtitel bei diesem vorherigen Arbeitgeber, woertlich wie angegeben, oder "".
 - qualifikation, studiengang
 - faehigkeiten (Skills, kommagetrennt)
 - erfahrung_jahre (grobe Schaetzung als Zahl)
