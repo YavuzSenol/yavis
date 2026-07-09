@@ -4,6 +4,7 @@ login.local
 *token*.txt
 *Token*.txt
 Management_token.txt
+_starface_zugang.txt
 
 # Lokale Claude-/Editor-Konfiguration
 .claude/
@@ -34,3 +35,13 @@ outlook_emails*.CSV
 outlook_emails*.csv
 _email_*.py
 Email_Vorlagen_tmp.docx
+
+# --- Lokale Workspace-Ordner (Reorg 08.07.2026): NIE ins Deploy-Repo committen ---
+# Enthalten Doku, Backups, Prompt-Skripte, Homepage-Assets etc. — rein lokale Organisation.
+/Fusion/
+/Shared/
+/YAVIS/
+/YSC-Homepage/
+/STRUKTUR.md
+/check_reorganization.js
+/check_reorganization_sauber.js
