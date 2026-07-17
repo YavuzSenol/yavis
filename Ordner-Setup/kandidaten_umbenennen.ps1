@@ -10,8 +10,8 @@
 # ============================================================
 
 # ---------- KONFIGURATION (bei Bedarf anpassen) ----------
-# Ordner mit den Kandidaten-Unterordnern. Standard: OneDrive\Kandidaten
-$ORDNER_PFAD = Join-Path $env:OneDrive 'Kandidaten'
+# Ordner mit den Kandidaten-Unterordnern. Standard: OneDrive\YSC-Media\Kandidaten
+$ORDNER_PFAD = Join-Path $env:OneDrive 'YSC-Media\Kandidaten'
 # Exportierte CSV. Leer lassen = neueste "YAVIS_Kandidaten_Export*.csv" in Downloads suchen.
 $CSV_PFAD = ''
 # ---------------------------------------------------------
