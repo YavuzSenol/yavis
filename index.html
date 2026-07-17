@@ -1799,6 +1799,21 @@
 
     <!-- Datenverwaltung -->
     <div class="setSec" data-cat="daten" style="margin-bottom:20px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">📁 Ordner automatisch zuordnen</div>
+      <div style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;overflow:hidden">
+        <div style="padding:11px 16px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted)">Gleicht die <b>Namen deiner OneDrive-Ordner</b> mit der Datenbank ab und trägt den passenden Ordner automatisch ein. Du wählst einmal den Ordner aus, siehst eine <b>Vorschau</b> und bestätigst — erst dann wird gespeichert. (Braucht Chrome oder Edge.)</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--line)">
+          <div><b>👥 Kandidaten-Ordner zuordnen</b><div style="font-size:12px;color:var(--muted)">Deinen „Kandidaten"-Ordner auswählen → Namen abgleichen</div></div>
+          <button onclick="ordnerAutoZuordnen('kandidat')" style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:13px;flex-shrink:0;margin-left:12px">📁 Auswählen</button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px">
+          <div><b>🏢 Kunden-Ordner zuordnen</b><div style="font-size:12px;color:var(--muted)">Deinen „Kunden"-Ordner auswählen → Firmennamen abgleichen</div></div>
+          <button onclick="ordnerAutoZuordnen('kunde')" style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:13px;flex-shrink:0;margin-left:12px">📁 Auswählen</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="setSec" data-cat="daten" style="margin-bottom:20px">
       <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">📋 Datenverwaltung</div>
       <div style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;overflow:hidden">
         <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--line)">
@@ -6063,6 +6078,164 @@ function ordnerFormCard(d){ return `<div class="card"><h3>📁 Ordner (OneDrive)
       <div class="ordner-hint" style="font-size:11px;margin-top:6px;line-height:1.5">${_ordnerHintHtml(d.ordner)}</div>
     </div>
   </div>`; }
+
+// ===== 📁 Ordner automatisch zuordnen — Ordnernamen ⟷ Datenbank-Namen abgleichen =====
+function _ordNorm(s){
+  s=(s||'').toString().toLowerCase();
+  s=s.replace(/\([^)]*\)/g,' ');                                   // (Klammern) raus
+  s=s.replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss');
+  s=s.replace(/[^a-z0-9 ,&+-]/g,' ');
+  return s.replace(/\s+/g,' ').trim();
+}
+const _ORD_TITEL=new Set(['dr','prof','dipl','ing','herr','frau','mba','msc','bsc','ma','ba']);
+const _ORD_RECHTS=new Set(['gmbh','mbh','ag','kg','se','co','ohg','ug','ek','kgaa','gbr','ev','ggmbh','holding','deutschland','group','gruppe','and','und','the']);
+function _ordTokens(s, typ){
+  let toks=_ordNorm(s).replace(/[,&+]/g,' ').split(/\s+/).filter(Boolean);
+  const stop = (typ==='kunde') ? _ORD_RECHTS : _ORD_TITEL;
+  return toks.filter(t=>t.length>1 && !stop.has(t));
+}
+function _ordEqual(a,b){ if(a.length!==b.length) return false; const x=[...a].sort(), y=[...b].sort(); return x.every((v,i)=>v===y[i]); }
+function _ordContainsAll(container, tokens){ return tokens.length>0 && tokens.every(t=>container.includes(t)); }
+function _ordFindMatch(folderName, recs, typ){
+  const f=_ordTokens(folderName, typ);
+  if(!f.length) return {status:'none'};
+  const eq=recs.filter(r=>_ordEqual(r._tok, f));
+  if(eq.length===1) return {status:'sure', rec:eq[0]};
+  if(eq.length>1)  return {status:'ambig', recs:eq};
+  const cont=recs.filter(r=>_ordContainsAll(r._tok,f) || _ordContainsAll(f,r._tok));
+  if(cont.length===1) return {status:'maybe', rec:cont[0]};
+  if(cont.length>1)  return {status:'ambig', recs:cont};
+  return {status:'none'};
+}
+async function _ordLadeRecs(typ){
+  if(typ==='kunde'){
+    let q=await sb.from('kunden').select('id,name,ordner').is('geloescht_am',null);
+    if(q.error) q=await sb.from('kunden').select('id,name,ordner');
+    return (q.data||[]).map(r=>({id:r.id, label:r.name||'', ordner:r.ordner||'', _tok:_ordTokens(r.name, 'kunde')}));
+  }
+  let q=await sb.from('kandidaten').select('id,voller_name,vorname,nachname,ordner').is('geloescht_am',null);
+  if(q.error) q=await sb.from('kandidaten').select('id,voller_name,vorname,nachname,ordner');
+  return (q.data||[]).map(r=>{ const nm=r.voller_name||[r.vorname,r.nachname].filter(Boolean).join(' '); return {id:r.id, label:nm||'', ordner:r.ordner||'', _tok:_ordTokens(nm,'kandidat')}; });
+}
+
+let _ordPreview=null; // {typ, prefix, rows:[{folder, path, recId, recLabel, status, options:[{id,label}]}]}
+async function ordnerAutoZuordnen(typ){
+  if(!window.showDirectoryPicker){ zeigeMeldung('Diese Automatik braucht Chrome oder Edge — dein Browser bietet die Ordner-Auswahl nicht an. Du kannst Ordner aber jederzeit von Hand im Bearbeiten-Formular hinterlegen.','warn'); return; }
+  let dir;
+  try{ dir=await window.showDirectoryPicker({id:'yavis_ord_'+typ, mode:'read'}); }
+  catch(e){ return; } // Nutzer hat abgebrochen
+  const namen=[];
+  try{ for await (const ent of dir.values()){ if(ent.kind==='directory') namen.push(ent.name); } }
+  catch(e){ zeigeMeldung('Konnte die Unterordner nicht lesen: '+(e.message||e),'warn'); return; }
+  if(!namen.length){ zeigeMeldung('In „'+dir.name+'" wurden keine Unterordner gefunden.','warn'); return; }
+  // Relativen OneDrive-Präfix erfragen (Standard = Name des gewählten Ordners)
+  const def=dir.name;
+  let prefix=prompt('Wo liegt „'+def+'" relativ zu deinem OneDrive?\n\n• Liegt er direkt im OneDrive (…\\OneDrive\\'+def+'\\…) → einfach „'+def+'" lassen.\n• Liegt er tiefer, z.B. …\\OneDrive\\Recruiting\\'+def+'\\… → „Recruiting\\'+def+'" eintragen.', def);
+  if(prefix===null) return;
+  prefix=prefix.trim().replace(/\//g,'\\').replace(/^\\+|\\+$/g,'');
+  zeigeMeldung('Gleiche '+namen.length+' Ordner mit der Datenbank ab …','info');
+  const recs=await _ordLadeRecs(typ);
+  const rows=namen.sort((a,b)=>a.localeCompare(b)).map(folder=>{
+    const m=_ordFindMatch(folder, recs, typ);
+    const path=(prefix?prefix+'\\':'')+folder;
+    const base={folder, path, status:m.status, recId:'', recLabel:'', options:[]};
+    if(m.status==='sure'||m.status==='maybe'){ base.recId=m.rec.id; base.recLabel=m.rec.label; base.schon=m.rec.ordner; }
+    if(m.status==='ambig'){ base.options=m.recs.map(r=>({id:r.id,label:r.label,ordner:r.ordner})); }
+    return base;
+  });
+  _ordPreview={typ, prefix, rows};
+  try{ document.getElementById('einstellungenDlg').close(); }catch(e){}
+  _ordPreviewRender();
+}
+
+function _ordPreviewRender(){
+  const {typ, rows}=_ordPreview;
+  const was = typ==='kunde' ? 'Firmen' : 'Kandidaten';
+  const nSure=rows.filter(r=>r.status==='sure').length;
+  const nMaybe=rows.filter(r=>r.status==='maybe').length;
+  const nAmbig=rows.filter(r=>r.status==='ambig').length;
+  const nNone=rows.filter(r=>r.status==='none').length;
+  const stBadge=s=>({sure:'<span style="color:var(--ok);font-weight:600">✓ sicher</span>', maybe:'<span style="color:#d08b00;font-weight:600">≈ prüfen</span>', ambig:'<span style="color:#d08b00;font-weight:600">? mehrdeutig</span>', none:'<span style="color:var(--muted)">— kein Treffer</span>'}[s]||s);
+  const rowHtml=rows.map((r,i)=>{
+    let ziel;
+    if(r.status==='ambig'){
+      ziel=`<select data-idx="${i}" class="ordsel" style="max-width:230px;padding:3px 6px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font-size:12px" onchange="_ordRowSel(${i},this.value)"><option value="">— nicht zuordnen —</option>${r.options.map(o=>`<option value="${esc(o.id)}">${esc(o.label)}${o.ordner?' (hat schon Ordner)':''}</option>`).join('')}</select>`;
+    } else if(r.recId){
+      ziel=`<span>${esc(r.recLabel)}</span>${r.schon?`<span style="font-size:11px;color:#d08b00" title="Diese Person/Firma hat bereits einen Ordner: ${esc(r.schon).replace(/"/g,'&quot;')}"> · überschreibt „${esc(r.schon)}"</span>`:''}`;
+    } else { ziel='<span style="color:var(--muted)">—</span>'; }
+    const kannHaken=(r.status==='sure'||r.status==='maybe');
+    // Standard: sichere Treffer OHNE Bestandsordner angehakt; unsichere/überschreibende NICHT
+    const checkedDefault = r.status==='sure' && !r.schon;
+    const cb=kannHaken?`<input type="checkbox" data-idx="${i}" class="ordcb" ${checkedDefault?'checked':''} style="width:16px;height:16px;cursor:pointer" onchange="_ordUpdateCount()">`:'<span style="color:var(--muted)">·</span>';
+    return `<tr style="border-bottom:1px solid var(--line)">
+      <td style="padding:5px 8px;text-align:center">${cb}</td>
+      <td style="padding:5px 8px;font-size:12px">${stBadge(r.status)}</td>
+      <td style="padding:5px 8px;font-weight:600">📁 ${esc(r.folder)}</td>
+      <td style="padding:5px 8px">${ziel}</td>
+    </tr>`;
+  }).join('');
+  const dlg=document.createElement('dialog');
+  dlg.id='ordPreviewDlg';
+  dlg.style.cssText='max-width:920px;width:94vw;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);padding:0';
+  dlg.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line)">
+      <h2 style="margin:0;font-size:17px;font-weight:700">📁 Vorschau: ${was}-Ordner zuordnen</h2>
+      <button onclick="this.closest('dialog').remove()" style="background:none;border:none;cursor:pointer;font-size:22px;color:var(--muted);line-height:1">×</button>
+    </div>
+    <div style="padding:12px 20px;font-size:13px;color:var(--muted);border-bottom:1px solid var(--line)">
+      <b style="color:var(--ok)">${nSure} sicher</b> · <b style="color:#d08b00">${nMaybe} zum Prüfen</b> · <b style="color:#d08b00">${nAmbig} mehrdeutig</b> · <span>${nNone} ohne Treffer</span>.
+      Angehakte Zeilen werden gespeichert. Sichere Treffer sind vorausgewählt — <b>prüfe die anderen selbst</b> und hake an, was stimmt.
+    </div>
+    <div style="max-height:52vh;overflow:auto;padding:0 20px">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr style="position:sticky;top:0;background:var(--panel);border-bottom:2px solid var(--line);text-align:left">
+          <th style="padding:8px;width:38px">✓</th><th style="padding:8px;width:110px">Status</th><th style="padding:8px">Ordner</th><th style="padding:8px">→ zugeordnet zu</th>
+        </tr></thead>
+        <tbody>${rowHtml}</tbody>
+      </table>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 20px;border-top:1px solid var(--line)">
+      <span id="ordCountMsg" style="font-size:13px;color:var(--muted)"></span>
+      <div style="display:flex;gap:8px">
+        <button onclick="this.closest('dialog').remove()" style="padding:8px 16px;border-radius:6px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:13px">Abbrechen</button>
+        <button id="ordDoBtn" onclick="_ordZuordnenAusfuehren()" style="padding:8px 18px;border-radius:6px;cursor:pointer;background:var(--accent2);border:1px solid var(--accent2);color:#fff;font-size:13px;font-weight:600">✓ Zuordnen</button>
+      </div>
+    </div>`;
+  document.body.appendChild(dlg);
+  dlg.addEventListener('close',()=>dlg.remove());
+  dlg.showModal();
+  _ordUpdateCount();
+}
+function _ordRowSel(i, val){ // mehrdeutige Zeile: Auswahl im Dropdown übernehmen
+  const r=_ordPreview.rows[i]; r.recId=val||''; const opt=r.options.find(o=>o.id===val); r.recLabel=opt?opt.label:''; r.schon=opt?opt.ordner:''; _ordUpdateCount();
+}
+function _ordUpdateCount(){
+  const dlg=document.getElementById('ordPreviewDlg'); if(!dlg) return;
+  let n=0;
+  dlg.querySelectorAll('.ordcb').forEach(cb=>{ if(cb.checked){ const i=+cb.dataset.idx; if(_ordPreview.rows[i].recId) n++; } });
+  // mehrdeutige mit gewähltem Ziel zählen ebenfalls (haben kein Häkchen, Auswahl = Zustimmung)
+  dlg.querySelectorAll('.ordsel').forEach(sel=>{ if(sel.value) n++; });
+  const btn=document.getElementById('ordDoBtn'); if(btn){ btn.textContent='✓ Zuordnen ('+n+')'; btn.disabled=n===0; btn.style.opacity=n===0?'.5':'1'; }
+  const msg=document.getElementById('ordCountMsg'); if(msg) msg.textContent=n+' Ordner werden gespeichert.';
+}
+async function _ordZuordnenAusfuehren(){
+  const dlg=document.getElementById('ordPreviewDlg'); if(!dlg||!_ordPreview) return;
+  const {typ, rows}=_ordPreview;
+  const tabelle = typ==='kunde' ? 'kunden' : 'kandidaten';
+  // Zu schreibende Zeilen sammeln: angehakte (sure/maybe) + mehrdeutige mit gewähltem Ziel
+  const jobs=[];
+  dlg.querySelectorAll('.ordcb').forEach(cb=>{ if(cb.checked){ const r=rows[+cb.dataset.idx]; if(r.recId) jobs.push({id:r.recId, ordner:r.path, folder:r.folder}); } });
+  dlg.querySelectorAll('.ordsel').forEach(sel=>{ if(sel.value){ const r=rows[+sel.dataset.idx]; jobs.push({id:sel.value, ordner:r.path, folder:r.folder}); } });
+  if(!jobs.length){ return; }
+  const btn=document.getElementById('ordDoBtn'); if(btn){ btn.disabled=true; btn.textContent='Speichere …'; }
+  let ok=0, fehler=0;
+  for(const j of jobs){
+    const res=await sb.from(tabelle).update({ordner:j.ordner}).eq('id',j.id);
+    if(res.error) fehler++; else ok++;
+  }
+  dlg.remove();
+  zeigeMeldung('📁 Fertig: '+ok+' Ordner zugeordnet'+(fehler?(' · '+fehler+' Fehler'):'')+'.', fehler?'warn':'ok');
+}
 
 // ===== Eigene Felder (Zusatzfelder) — frei definierbar, gespeichert in JSON-Spalte kandidaten.zusatzfelder =====
 const CF_TYPEN={ text:'Text', number:'Zahl', date:'Datum', bool:'Ja/Nein', multiline:'Mehrzeilig' };
