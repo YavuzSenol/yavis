@@ -24,6 +24,15 @@ function Get-Tokens([string]$s){
   $s = $s.ToLower()
   $s = [regex]::Replace($s, '\([^)]*\)', ' ')
   $s = $s -replace 'ä','ae' -replace 'ö','oe' -replace 'ü','ue' -replace 'ß','ss'
+  # Akzente/diakritische Zeichen abstreifen (Mušović -> musovic, Çekçeoğlu -> cekceoglu).
+  # Ohne das fanden Ordnernamen ohne Akzente ihre Datenbank-Eintraege mit Akzenten nicht.
+  $sb = New-Object System.Text.StringBuilder
+  foreach($ch in $s.Normalize([Text.NormalizationForm]::FormD).ToCharArray()){
+    if([Globalization.CharUnicodeInfo]::GetUnicodeCategory($ch) -ne [Globalization.UnicodeCategory]::NonSpacingMark){
+      [void]$sb.Append($ch)
+    }
+  }
+  $s = $sb.ToString()
   $s = [regex]::Replace($s, '[^a-z0-9 ,]', ' ')
   $titel = @('dr','prof','dipl','ing','herr','frau','mba','msc','bsc','ma','ba')
   $toks = ($s -replace ',',' ') -split '\s+' | Where-Object { $_.Length -gt 1 -and $titel -notcontains $_ }
