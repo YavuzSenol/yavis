@@ -48,4 +48,6 @@ Email_Vorlagen_tmp.docx
 
 # Sicherungskopie der ALTEN Ordnerstruktur (13.07.2026, enthaelt Zugangsdaten- und Personendaten-Kopien) — NIE committen
 /alt/
-/KONSISTENZ.md
+
+# KONSISTENZ.md ist seit 20.07.2026 BEWUSST im Repo (reines Gestaltungs-Regelwerk, keine
+# Personen- oder Zugangsdaten) — damit es sich zwischen Buero- und Heim-PC selbst abgleicht.
