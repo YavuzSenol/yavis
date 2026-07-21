@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The user is technically literate but **not a programmer**. Explanations and instructions must be in **German**, step-by-step, click-by-click, with jargon explained. Never invent tool output or claim something was built/tested without real evidence. Offer a dry run before any write operation.
 
-**Read `UEBERGABE_YAVIS.md` first** — it is the living handover doc (current feature status, open tasks, DB schema, endpoints). Keep it updated as work progresses.
+**Read the handover doc first.** Since 21.07.2026 it lives **in OneDrive** (privately synced across all machines — NUC/Laptop/Büro), not in this repo: `%OneDrive%\YSC-Media\YAVIS-Doku\UEBERGABE_YAVIS.md` (on this account the concrete path is `C:\Users\senol\OneDrive - Yavuz Senol Consulting\YSC-Media\YAVIS-Doku\UEBERGABE_YAVIS.md`). It is the living handover doc (current feature status, open tasks, DB schema, endpoints) — keep it updated there. **It is deliberately NOT in Git** because it contains real personal data (candidate/contact names + private emails) and this repo is public. ⚠️ If an old `C:\Claude\UEBERGABE_YAVIS.md` still exists on any machine, it is a stale month-old copy — delete it and use the OneDrive one. Rule going forward: only personal-data-free docs (like `KONSISTENZ.md`) belong in the public repo; anything with names/emails/credentials syncs via OneDrive.
 
 ## Architecture
 
