@@ -5,6 +5,12 @@ login.local
 *Token*.txt
 Management_token.txt
 _starface_zugang.txt
+*.local
+*.local.txt
+lemlist.local*
+lemlist_key*
+*_key*.txt
+*API*.txt
 
 # Lokale Claude-/Editor-Konfiguration
 .claude/
