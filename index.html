@@ -2723,8 +2723,12 @@ async function ladeAuftraggeberNamen(force){
   const {data}=await sb.from('kunden').select('id,name,typ,stammhaus_id');
   const firmen=data||[];
   firmaKonzern=new Map(firmen.map(k=>[k.id, k.stammhaus_id||k.id]));
-  // Konzerne, in denen mindestens eine Firma Auftraggeber ist -> ganzer Konzern geschützt
-  geschuetzteKonzerne=new Set(firmen.filter(k=>k.typ==='Auftraggeber').map(k=>k.stammhaus_id||k.id));
+  // Konzerne, in denen mindestens eine Firma echter Auftraggeber/Kunde ist -> ganzer Konzern geschützt.
+  // ⚠️ „Kunde" muss mit rein: der Listenwert wurde von „Auftraggeber" auf „Kunde" umbenannt, dadurch
+  // hat der Abwerbeschutz zeitweise für KEINE Firma mehr gegriffen. „Auftraggeber-Potenzial" ist
+  // bewusst NICHT geschützt (noch kein Kunde).
+  const _istKunde=t=>t==='Auftraggeber'||t==='Kunde';
+  geschuetzteKonzerne=new Set(firmen.filter(k=>_istKunde(k.typ)).map(k=>k.stammhaus_id||k.id));
   // Text-Fallback konzernweit: Namen ALLER Firmen geschützter Konzerne
   auftraggeberNamen=firmen.filter(k=>geschuetzteKonzerne.has(k.stammhaus_id||k.id)).map(k=>normFirma(k.name||'')).filter(Boolean);
 }
