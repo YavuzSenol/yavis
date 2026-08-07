@@ -4174,7 +4174,26 @@ function heuteISO(){ const d=new Date(); return new Date(d.getTime()-d.getTimezo
 function plusTageISO(n){ const d=new Date(); d.setDate(d.getDate()+n); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
 function fmtDatum(s){ if(!s) return ''; const d=new Date(s); return isNaN(d)?esc(s):d.toLocaleDateString('de-DE'); }
 // Geburtstag anzeigen: ISO (JJJJ-MM-TT) -> TT.MM.JJJJ; Nicht-ISO-Altwerte bleiben unveraendert
-function fmtGeb(s){ if(!s) return ''; const m=String(s).match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? (m[3]+'.'+m[2]+'.'+m[1]) : esc(String(s)); }
+// Jahre vor 1910 sind Platzhalter aus Import und LinkedIn-Ernte (Geburtstag ohne Jahrgang) → Jahr weglassen
+function fmtGeb(s){ if(!s) return ''; const m=String(s).match(/^(\d{4})-(\d{2})-(\d{2})/); if(!m) return esc(String(s)); return (+m[1]<1910) ? (m[3]+'.'+m[2]+'.') : (m[3]+'.'+m[2]+'.'+m[1]); }
+// Nebendaten aus der LinkedIn-Kontaktinfo-Ernte (anreicherung.linkedin_kontaktinfo) — nur zeigen, wenn vorhanden
+function liErnteHtml(d){
+  const li=(d&&d.anreicherung&&d.anreicherung.linkedin_kontaktinfo)||null; if(!li) return '';
+  const zeilen=[];
+  if(li.vernetzt_seit){
+    const m=String(li.vernetzt_seit).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    const jahre=m?Math.floor((Date.now()-new Date(li.vernetzt_seit).getTime())/31557600000):null;
+    zeilen.push('<div class="drow"><span class="dk">Vernetzt seit</span><span class="dv">'
+      +(m?m[3]+'.'+m[2]+'.'+m[1]:esc(String(li.vernetzt_seit)))
+      +(jahre>=1?' <span style="color:var(--muted)">('+jahre+' J.)</span>':'')+'</span></div>');
+  }
+  (li.website||[]).forEach(w=>{
+    const url=String(w).replace(/\s*\(.*\)\s*$/,'').trim(); if(!url) return;
+    zeilen.push('<div class="drow"><span class="dk">Website</span><span class="dv"><a class="calllink" href="'
+      +esc(/^https?:/i.test(url)?url:'https://'+url)+'" target="_blank" rel="noopener">'+esc(w)+' ↗</a></span></div>');
+  });
+  return zeilen.join('');
+}
 function istOffen(status){ if(!status) return true; const s=String(status).toLowerCase(); return s!=='completed'&&s!=='erledigt'&&s!=='abgeschlossen'; }
 
 async function ladeAufgabenFuer(id){
@@ -5218,6 +5237,7 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
         ${ri('2. E-Mail','email_zweit', d.email_zweit, actMail)}
         ${ri('XING','xing_profil', d.xing_profil, actOpen)}
         ${ri('LinkedIn','linkedin_profil', d.linkedin_profil, actOpen)}
+        ${liErnteHtml(d)}
       </div>
 
       </div>
