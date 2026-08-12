@@ -2325,21 +2325,79 @@ async function selTagsAnwenden(modus,dlg){
 }
 
 // ---- Massenaktualisierung ----
+// Alle Felder, die sich sinnvoll für viele Personen auf einmal setzen lassen.
+// typ: text | zahl | datum | liste (feste Werte) | ml (Merkliste) | position | ja/nein | tags | lang
+const MASS_FELDER=[
+  {g:'Ansprache',   f:'begruessung',       l:'Anrede',                typ:'liste', werte:['Herr','Frau']},
+  {g:'Ansprache',   f:'kontaktstatus',     l:'Kontaktstatus',         typ:'ml',    liste:'kontaktstatus'},
+  {g:'Ansprache',   f:'status',            l:'Status',                typ:'liste', werte:['New','Active','Inactive','Blacklisted','Rejected','Placed']},
+  {g:'Ansprache',   f:'wertung',           l:'Wertung',               typ:'ml',    liste:'wertung'},
+  {g:'Ansprache',   f:'letzte_aktivitaet', l:'Letzte Aktivität',      typ:'datum'},
+  {g:'Ansprache',   f:'besitzer_id',       l:'Betreuer',              typ:'text'},
+
+  {g:'Beruf',       f:'berufsbezeichnung', l:'Berufsbezeichnung',     typ:'position'},
+  {g:'Beruf',       f:'position_original', l:'Position (Originaltitel)', typ:'text'},
+  {g:'Beruf',       f:'arbeitgeber',       l:'Arbeitgeber',           typ:'text'},
+  {g:'Beruf',       f:'abteilung',         l:'Abteilung',             typ:'text'},
+  {g:'Beruf',       f:'funktion',          l:'Funktion',              typ:'text'},
+  {g:'Beruf',       f:'planung_ausfuehrung',l:'Planung / Ausführung', typ:'ml',    liste:'planung'},
+  {g:'Beruf',       f:'erfahrung_jahre',   l:'Berufsjahre',           typ:'zahl'},
+  {g:'Beruf',       f:'qualifikation',     l:'Qualifikation',         typ:'text'},
+  {g:'Beruf',       f:'studiengang',       l:'Studiengang',           typ:'text'},
+  {g:'Beruf',       f:'faehigkeiten',      l:'Fähigkeiten',           typ:'text'},
+
+  {g:'Ort',         f:'strasse',           l:'Straße',                typ:'text'},
+  {g:'Ort',         f:'plz',               l:'PLZ',                   typ:'text'},
+  {g:'Ort',         f:'stadt',             l:'Stadt',                 typ:'text'},
+  {g:'Ort',         f:'bundesland',        l:'Bundesland',            typ:'text'},
+  {g:'Ort',         f:'land',              l:'Land',                  typ:'ml',    liste:'land'},
+  {g:'Ort',         f:'stadt_beruf',       l:'Stadt (beruflich)',     typ:'text'},
+  {g:'Ort',         f:'plz_beruf',         l:'PLZ (beruflich)',       typ:'text'},
+
+  {g:'Wechsel',     f:'gehalt_aktuell',    l:'Gehalt aktuell',        typ:'zahl'},
+  {g:'Wechsel',     f:'gehalt_erwartet',   l:'Gehalt erwartet',       typ:'zahl'},
+  {g:'Wechsel',     f:'kuendigungsfrist',  l:'Kündigungsfrist',       typ:'text'},
+  {g:'Wechsel',     f:'wechselmotivation', l:'Wechselmotivation',     typ:'lang'},
+  {g:'Wechsel',     f:'wunschregion',      l:'Wunschregion',          typ:'text'},
+  {g:'Wechsel',     f:'positionswunsch',   l:'Positionswunsch',       typ:'text'},
+  {g:'Wechsel',     f:'umzugsbereitschaft',l:'Umzugsbereitschaft',    typ:'ml',    liste:'umzug'},
+  {g:'Wechsel',     f:'reisebereitschaft', l:'Reisebereitschaft',     typ:'text'},
+
+  {g:'Merkmale',    f:'tags',              l:'Tags',                  typ:'tags'},
+  {g:'Merkmale',    f:'quelle',            l:'Quelle',                typ:'ml',    liste:'quelle'},
+  {g:'Merkmale',    f:'bemerkung',         l:'Bemerkung',             typ:'lang'},
+  {g:'Merkmale',    f:'fremdsprachen',     l:'Fremdsprachen',         typ:'text'},
+
+  {g:'Schalter',    f:'abwerbeschutz',     l:'Abwerbeschutz',         typ:'janein'},
+  {g:'Schalter',    f:'ist_hot',           l:'Hot-Kandidat',          typ:'janein'},
+  {g:'Schalter',    f:'kein_newsletter',   l:'Kein Newsletter',       typ:'janein'},
+  {g:'Schalter',    f:'sperre_email',      l:'Sperre E-Mail',         typ:'janein'},
+  {g:'Schalter',    f:'sperre_anruf',      l:'Sperre Anruf',          typ:'janein'},
+  {g:'Schalter',    f:'sperre_brief',      l:'Sperre Brief',          typ:'janein'},
+  {g:'Schalter',    f:'email_unzustellbar',l:'E-Mail unzustellbar',   typ:'janein'},
+  {g:'Schalter',    f:'ist_gesperrt',      l:'Gesperrt',              typ:'janein'},
+];
+function _massOptionen(){
+  const gruppen={};
+  MASS_FELDER.forEach(x=>{ (gruppen[x.g]=gruppen[x.g]||[]).push(x); });
+  return Object.keys(gruppen).map(g=>
+    `<optgroup label="${esc(g)}">`+gruppen[g].map(x=>`<option value="${x.f}">${esc(x.l)}</option>`).join('')+`</optgroup>`
+  ).join('');
+}
 async function selMassenupdate(){
   if(!selectedKandIds.size) return;
   const dlg=document.createElement('dialog');
-  dlg.style.cssText='background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:24px;max-width:500px;width:95vw';
+  dlg.style.cssText='background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:24px;max-width:520px;width:95vw';
   dlg.innerHTML=`<h3 style="margin:0 0 14px">✏️ Massenaktualisierung — ${selectedKandIds.size} Kandidaten</h3>
     <label style="font-size:13px;color:var(--muted)">Feld</label>
     <select id="massFeld" onchange="massFeldWechseln(this)" style="width:100%;padding:8px;font-size:14px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;margin:6px 0 14px">
-      <option value="">– Feld wählen –</option>
-      <option value="berufsbezeichnung">Berufsbezeichnung</option>
-      <option value="status">Status</option>
-      <option value="arbeitgeber">Arbeitgeber</option>
-      <option value="stadt">Stadt</option>
-      <option value="abwerbeschutz">Abwerbeschutz</option>
+      <option value="">– Feld wählen –</option>${_massOptionen()}
     </select>
     <div id="massWertBox"></div>
+    <label style="display:flex;align-items:center;gap:7px;margin-top:12px;font-size:13px;color:var(--muted);cursor:pointer">
+      <input type="checkbox" id="massNurLeere" style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer">
+      Nur dort setzen, wo das Feld noch <b style="color:var(--fg)">leer</b> ist
+    </label>
     <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
       <button onclick="this.closest('dialog').close();this.closest('dialog').remove()" style="padding:7px 16px;border-radius:4px;cursor:pointer;background:var(--panel2);border:1px solid var(--line)">Abbrechen</button>
       <button onclick="selMassenAnwenden(this.closest('dialog'))" style="padding:7px 20px;border-radius:4px;cursor:pointer;background:var(--accent);color:#fff;border:none;font-weight:600">Auf alle anwenden</button>
@@ -2348,25 +2406,77 @@ async function selMassenupdate(){
 }
 function massFeldWechseln(sel){
   const box=sel.closest('dialog').querySelector('#massWertBox');
-  const feld=sel.value; if(!feld){box.innerHTML=''; return;}
+  const def=MASS_FELDER.find(x=>x.f===sel.value);
+  if(!def){box.innerHTML=''; return;}
   const st='width:100%;padding:8px;font-size:14px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;margin-top:6px;box-sizing:border-box';
-  if(feld==='berufsbezeichnung') box.innerHTML=`<label style="font-size:13px;color:var(--muted)">Neue Position</label><select id="massWert" style="${st}"><option value="">– wählen –</option>${Object.keys(POSITION_STUFE).map(p=>`<option>${esc(p)}</option>`).join('')}</select>`;
-  else if(feld==='status') box.innerHTML=`<label style="font-size:13px;color:var(--muted)">Neuer Status</label><select id="massWert" style="${st}">${['New','Active','Inactive','Blacklisted','Rejected','Placed'].map(s=>`<option>${s}</option>`).join('')}</select>`;
-  else if(feld==='abwerbeschutz') box.innerHTML=`<select id="massWert" style="${st}"><option value="true">🔒 Abwerbeschutz SETZEN</option><option value="false">🔓 Abwerbeschutz ENTFERNEN</option></select>`;
-  else box.innerHTML=`<label style="font-size:13px;color:var(--muted)">Neuer Wert</label><input id="massWert" style="${st}" placeholder="Wert eingeben…">`;
+  const lab=t=>`<label style="font-size:13px;color:var(--muted)">${t}</label>`;
+  const leeren=`<label style="display:flex;align-items:center;gap:7px;margin-top:9px;font-size:13px;color:var(--muted);cursor:pointer"><input type="checkbox" id="massLeeren" onchange="const w=this.closest('#massWertBox').querySelector('#massWert'); if(w) w.disabled=this.checked" style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer">Feld stattdessen <b style="color:var(--fg)">leeren</b></label>`;
+  if(def.typ==='position')      box.innerHTML=lab('Neue Berufsbezeichnung')+`<select id="massWert" style="${st}"><option value="">– wählen –</option>${Object.keys(POSITION_STUFE).map(p=>`<option>${esc(p)}</option>`).join('')}</select>`+leeren;
+  else if(def.typ==='liste')    box.innerHTML=lab('Neuer Wert')+`<select id="massWert" style="${st}">${def.werte.map(s=>`<option>${esc(s)}</option>`).join('')}</select>`+leeren;
+  else if(def.typ==='ml'){
+    const werte=(typeof mlGet==='function'?mlGet(def.liste):[])||[];
+    box.innerHTML=lab('Neuer Wert')+`<select id="massWert" style="${st}">${werte.map(s=>`<option>${esc(s)}</option>`).join('')}</select>`+leeren;
+  }
+  else if(def.typ==='janein')   box.innerHTML=`<select id="massWert" style="${st}"><option value="true">✅ ${esc(def.l)} SETZEN</option><option value="false">⬜ ${esc(def.l)} ENTFERNEN</option></select>`;
+  else if(def.typ==='zahl')     box.innerHTML=lab('Neuer Wert')+`<input id="massWert" type="number" style="${st}" placeholder="Zahl eingeben…">`+leeren;
+  else if(def.typ==='datum')    box.innerHTML=lab('Neues Datum')+`<input id="massWert" type="date" style="${st}">`+leeren;
+  else if(def.typ==='lang')     box.innerHTML=lab('Neuer Text')+`<textarea id="massWert" rows="3" style="${st};resize:vertical" placeholder="Text eingeben…"></textarea>`+leeren;
+  else if(def.typ==='tags')     box.innerHTML=`<select id="massTagModus" style="${st}"><option value="add">Tags HINZUFÜGEN (vorhandene bleiben)</option><option value="del">Tags ENTFERNEN</option><option value="set">Tags ERSETZEN (alle vorherigen weg)</option></select>`+lab('Tags, mit Komma getrennt')+`<input id="massWert" style="${st}" placeholder="z. B. TGA, Krankenhaus">`;
+  else                          box.innerHTML=lab('Neuer Wert')+`<input id="massWert" style="${st}" placeholder="Wert eingeben…">`+leeren;
 }
 async function selMassenAnwenden(dlg){
   const feld=dlg.querySelector('#massFeld').value;
+  const def=MASS_FELDER.find(x=>x.f===feld);
   const wertEl=dlg.querySelector('#massWert');
-  if(!feld||!wertEl||!wertEl.value){zeigeMeldung('Feld und Wert wählen','warn'); return;}
+  const leeren=!!(dlg.querySelector('#massLeeren')||{}).checked;
+  const nurLeere=!!(dlg.querySelector('#massNurLeere')||{}).checked;
+  if(!def||!wertEl){zeigeMeldung('Feld wählen','warn'); return;}
+  if(!leeren && def.typ!=='janein' && !String(wertEl.value||'').trim()){zeigeMeldung('Wert eingeben oder „Feld leeren" ankreuzen','warn'); return;}
   const ids=[...selectedKandIds];
-  const upd=feld==='abwerbeschutz'?{abwerbeschutz:wertEl.value==='true'}:{[feld]:wertEl.value};
+
+  // Tags müssen je Datensatz zusammengeführt werden, deshalb eigener Weg
+  if(def.typ==='tags'){
+    const modus=dlg.querySelector('#massTagModus').value;
+    const neue=String(wertEl.value||'').split(',').map(s=>s.trim()).filter(Boolean);
+    if(!neue.length && modus!=='set'){zeigeMeldung('Tags eingeben','warn'); return;}
+    let n=0;
+    for(let i=0;i<ids.length;i+=200){
+      const teil=ids.slice(i,i+200);
+      const {data,error}=await sb.from('kandidaten').select('id,tags').in('id',teil);
+      if(error){zeigeMeldung('Fehler: '+error.message,'err'); return;}
+      for(const r of (data||[])){
+        const alt=String(r.tags||'').split(';').map(s=>s.trim()).filter(Boolean);
+        let neu;
+        if(modus==='add')      neu=[...new Set([...alt,...neue])];
+        else if(modus==='del') neu=alt.filter(t=>!neue.some(x=>x.toLowerCase()===t.toLowerCase()));
+        else                   neu=[...new Set(neue)];
+        const wert=neu.length?';'+neu.join(';')+';':null;
+        const {error:e2}=await sb.from('kandidaten').update({tags:wert}).eq('id',r.id);
+        if(e2){zeigeMeldung('Fehler: '+e2.message,'err'); return;}
+        n++;
+      }
+    }
+    dlg.close(); dlg.remove();
+    zeigeMeldung(`Tags bei ${n} Kandidaten aktualisiert`,'ok');
+    ladeKandidaten(); return;
+  }
+
+  let wert;
+  if(leeren)                    wert=null;
+  else if(def.typ==='janein')   wert=(wertEl.value==='true');
+  else if(def.typ==='zahl')     wert=Number(wertEl.value);
+  else                          wert=wertEl.value;
+
+  let n=0;
   for(let i=0;i<ids.length;i+=100){
-    const {error}=await sb.from('kandidaten').update(upd).in('id',ids.slice(i,i+100));
+    let q=sb.from('kandidaten').update({[feld]:wert}).in('id',ids.slice(i,i+100));
+    if(nurLeere && def.typ!=='janein') q=q.is(feld,null);
+    const {error}=await q;
     if(error){zeigeMeldung('Fehler: '+error.message,'err'); dlg.close(); dlg.remove(); return;}
+    n+=Math.min(100,ids.length-i);
   }
   dlg.close(); dlg.remove();
-  zeigeMeldung(`${ids.length} Kandidaten aktualisiert`);
+  zeigeMeldung(`${def.l}: ${ids.length} Kandidaten aktualisiert${nurLeere?' (nur leere Felder)':''}`,'ok');
   ladeKandidaten();
 }
 
