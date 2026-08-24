@@ -10447,7 +10447,7 @@ function msEinstellungenUI(){
           <div style="font-size:12px;color:var(--muted)">Token gültig bis ca. ${ablauf}</div>
         </div>
         <div style="display:flex;gap:8px">
-          <button onclick="msSyncOutlook()" style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--accent2);color:#fff;border:none;font-size:13px;font-weight:600">🔄 Sync</button>
+          <button onclick="msSyncOutlook()" title="Prüft NUR die letzten 50 gesendeten Mails und bietet an, sie als Verlauf nachzutragen. Für den kompletten Mailverlauf (auch eingehende, alle Ordner) weiter unten „🔄 Vollsync“ benutzen." style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:13px">📤 Gesendete nachtragen (letzte 50)</button>
           <button onclick="msTrennen();msEinstellungenUI()" style="padding:6px 12px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--hot);font-size:13px">Trennen</button>
         </div>
       </div>`;
