@@ -880,8 +880,9 @@
         </div>
         <div>
           <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Branche</div>
-          <input id="rmFirmBranche" placeholder="z.B. TGA" onkeydown="if(event.key==='Enter')rechercheAusfuehren()"
-                 style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:130px">
+          <select id="rmFirmBranche" style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:170px">
+            <option value="">alle</option>
+          </select>
         </div>
         <div>
           <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Stadt</div>
@@ -6156,7 +6157,7 @@ const FIRMEN_TYP_BG={
   'Lieferant':'var(--muted)',
   'Sonstige':'var(--muted)'
 };
-const BRANCHEN_STANDARD=['Ingenieurbüro','Ausführer / Anlagenbau','Bauunternehmen / GU','Immobilien / Projektentwickler','Hersteller / Industrie','Sonstige'];
+const BRANCHEN_STANDARD=['Ingenieurbüro','Ausführer / Anlagenbau','Bauunternehmen / GU','Immobilien / Projektentwickler','Hersteller / Industrie','Bauherrenseite','Sonstige'];
 function branchenListe(){
   try{ const s=localStorage.getItem('yavis_branchen'); if(s){ const a=JSON.parse(s); if(a&&a.length) return a; } }catch(e){}
   return [...BRANCHEN_STANDARD];
@@ -12383,6 +12384,11 @@ function zeigeRechercheMaske() {
   const rmAn = document.getElementById('rmAnrede');
   if (rmAn && rmAn.options.length <= 2) {
     anredeListe().forEach(a => { if(a==='Keine') return; const o=document.createElement('option'); o.value=a; o.textContent=a; rmAn.appendChild(o); });
+  }
+  // rmFirmBranche-Dropdown mit den festen Branchen-Kategorien befuellen (wie #cBranche in der Firmenansicht)
+  const rmFb = document.getElementById('rmFirmBranche');
+  if (rmFb && rmFb.options.length <= 1) {
+    branchenListe().forEach(b => { const o = document.createElement('option'); o.textContent = b; rmFb.appendChild(o); });
   }
   _rmExWertFuellen();
   _rmFuelleAusFeld('rmBundeslandDD','bundesland','alle Bundesländer');
