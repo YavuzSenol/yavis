@@ -5705,7 +5705,14 @@ let _naechsteZurueckAktion=null; // ein Opener (z.B. Dialog) setzt das VOR detai
 let _navStack=[];                // universeller Zurück-Stapel: Wiederherstell-Funktionen vorheriger Detailseiten/Dialoge
 let _aktuellesDetail=null;       // {typ,id} der aktuell gezeigten Detailseite (für Quer-Sprünge Firma<->Person usw.)
 let _blaetternAktiv=false;       // von kandidatBlaettern/kundeBlaettern VOR detailX gesetzt: Blättern innerhalb derselben Trefferliste ist keine neue Ebene, landet NICHT auf dem Zurück-Stapel
+let _listeScrollY={};            // Scrollposition je Listen-Tab (kandidaten/kunden/…), damit "← Zurück" aus der Detailansicht nicht auf den Listenanfang zurückspringt
 function _detailBetreten(typ,id){
+  // Kommt der Aufruf direkt aus einer Liste (Detailseite war noch zu)? -> deren Scrollposition merken
+  const _dp=document.getElementById('detailPage');
+  if(_dp && _dp.style.display!=='block'){
+    const _aktivTab=document.querySelector('.tab.active')?.dataset.view;
+    if(_aktivTab) _listeScrollY[_aktivTab]=window.scrollY;
+  }
   // 1) Aufruf kam aus einem Dialog (Herkunft gesetzt)? -> Wiederherstellung auf den Stapel
   if(_naechsteZurueckAktion){ _navStack.push(_naechsteZurueckAktion); _naechsteZurueckAktion=null; }
   // 2) Blättern (‹ / › im selben Datensatz-Typ)? -> nicht stapeln, nur aktuellen Datensatz austauschen
@@ -5741,6 +5748,8 @@ function zurueckZurListe(){
   document.getElementById('detailPage').style.display='none';
   const aktiv=document.querySelector('.tab.active')?.dataset.view||'kandidaten';
   document.getElementById('view-'+aktiv).style.display='block';
+  const _merkY=_listeScrollY[aktiv];
+  if(_merkY!==undefined) setTimeout(()=>window.scrollTo(0,_merkY),0);
 }
 // Recherche-Treffer: Linksklick = öffnen (Zurück führt in die Recherche), Rechtsklick = neuer Tab
 function rmOeffneKandidat(id){ _zurueckZuSuche=null; _zurueckZuRecherche=true; detailKandidat(id); }
