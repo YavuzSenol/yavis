@@ -469,6 +469,9 @@
         <select id="cBranche" onchange="ladeKunden()"><option value="">alle</option></select></div>
       <div class="field" data-filter="stadt"><label>Stadt</label>
         <input id="cStadt" placeholder="z.B. Köln" style="width:130px" onkeydown="if(event.key==='Enter')ladeKunden()"></div>
+      <div class="field" data-filter="ausland"><label>&nbsp;</label>
+        <label style="display:flex;align-items:center;gap:6px;height:32px;cursor:pointer;white-space:nowrap;font-size:13px">
+          <input type="checkbox" id="cAusland" onchange="ladeKunden()" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)">🌍 Nur Ausland</label></div>
       <div class="field" data-filter="plz"><label>PLZ (Umkreis)</label>
         <input id="cPlz" placeholder="z.B. 50667" style="width:90px" maxlength="5" onkeydown="if(event.key==='Enter')ladeKunden()"></div>
       <div class="field" data-filter="radius"><label>Radius km</label>
@@ -7439,6 +7442,7 @@ const KUNDEN_FILTER_DEF=[
   {key:'typ',label:'Typ',el:'cTyp'},
   {key:'branche',label:'Branche',el:'cBranche'},
   {key:'stadt',label:'Stadt',el:'cStadt'},
+  {key:'ausland',label:'Nur Ausland',el:'cAusland'},
   {key:'plz',label:'PLZ (Umkreis)',el:'cPlz'},
   {key:'radius',label:'Radius',el:'cRadius'},
 ];
@@ -7460,7 +7464,7 @@ function toggleKFilter(key){
     if(kFilterSichtbar.length<=1) return;
     kFilterSichtbar=kFilterSichtbar.filter(k=>k!==key);
     const def=KUNDEN_FILTER_DEF.find(f=>f.key===key); const el=def&&document.getElementById(def.el);
-    if(el){ if(el.tagName==='SELECT') el.value=(key==='radius'?'50':''); else el.value=''; }
+    if(el){ if(el.type==='checkbox') el.checked=false; else if(el.tagName==='SELECT') el.value=(key==='radius'?'50':''); else el.value=''; }
   } else {
     kFilterSichtbar=KUNDEN_FILTER_DEF.filter(f=>kFilterSichtbar.includes(f.key)||f.key===key).map(f=>f.key);
   }
@@ -7473,6 +7477,7 @@ async function ladeKunden(){
   const typ=document.getElementById('cTyp').value;
   const branche=(document.getElementById('cBranche')||{}).value||'';
   const stadtEl=document.getElementById('cStadt'); const stadt=stadtEl?stadtEl.value.trim():'';
+  const ausland=!!(document.getElementById('cAusland')||{}).checked;
   const cPlzEl=document.getElementById('cPlz');
   const plz=cPlzEl?cPlzEl.value.trim():'';
   const radius=parseInt((document.getElementById('cRadius')||{}).value||'50')||50;
@@ -7510,6 +7515,7 @@ async function ladeKunden(){
     }
     let pool=data;
     if(branche) pool=pool.filter(r=>(r.branche||'')===branche);
+    if(ausland) pool=pool.filter(r=>{const l=(r.land||'').trim(); return l&&l!=='Deutschland'&&l!=='Germany';});
     if(stadt){const sl=stadt.toLowerCase();pool=pool.filter(r=>(r.stadt||'').toLowerCase().includes(sl));}
     if(q){const ql=q.toLowerCase();pool=pool.filter(r=>(r.name||'').toLowerCase().includes(ql)||(r.branche||'').toLowerCase().includes(ql)||(r.stadt||'').toLowerCase().includes(ql));}
     const ohneKoord=pool.filter(r=>r.lat==null||r.lng==null).length;
@@ -7517,7 +7523,7 @@ async function ladeKunden(){
     rows.forEach(r=>{ r._km=Math.round(haversineKm(cLat,cLng,r.lat,r.lng)); });
     rows.sort((a,b)=>a._km-b._km);
     _kundenGeladen=rows;
-    let txt=rows.length+' Firmen im Umkreis von '+radius+' km um '+plz+(typ?' · '+typ:'')+(branche?' · '+branche:'')+(stadt?' · '+stadt:'')+(q?' · "'+q+'"':'');
+    let txt=rows.length+' Firmen im Umkreis von '+radius+' km um '+plz+(typ?' · '+typ:'')+(branche?' · '+branche:'')+(stadt?' · '+stadt:'')+(ausland?' · 🌍 Ausland':'')+(q?' · "'+q+'"':'');
     if(ohneKoord) txt+=' · ⚠️ '+ohneKoord+' ohne Koordinaten nicht berücksichtigt';
     document.getElementById('cCount').textContent=txt;
     renderKundenTabelle(true);
@@ -7531,10 +7537,11 @@ async function ladeKunden(){
   if(typ) query=query.eq('typ',typ);
   if(branche) query=query.eq('branche',branche);
   if(stadt) query=query.ilike('stadt',`%${stadt}%`);
+  if(ausland) query=query.not('land','is',null).neq('land','').not('land','in','("Deutschland","Germany")');
   const {data,error}=await query;
   if(error){document.getElementById('cCount').textContent='Fehler: '+error.message;return;}
   _kundenGeladen=data;
-  const cTxt=data.length+' Firmen'+(data.length>=_kundenLimit?` (erste ${_kundenLimit})`:'')+(typ?' · '+typ:'')+(branche?' · '+branche:'')+(stadt?' · '+stadt:'');
+  const cTxt=data.length+' Firmen'+(data.length>=_kundenLimit?` (erste ${_kundenLimit})`:'')+(typ?' · '+typ:'')+(branche?' · '+branche:'')+(stadt?' · '+stadt:'')+(ausland?' · 🌍 Ausland':'');
   const cEl=document.getElementById('cCount');
   if(data.length>=_kundenLimit){ cEl.innerHTML=esc(cTxt)+' · <span onclick="kundenMehrLaden()" style="color:var(--accent);cursor:pointer;text-decoration:underline">▸ weitere 200 laden</span>'; }
   else cEl.textContent=cTxt;
