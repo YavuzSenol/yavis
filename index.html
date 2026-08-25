@@ -6770,6 +6770,8 @@ async function speichereKandidat(id){
   if(!(vorname||'').trim() && !(nachname||'').trim()){ msg.style.color='var(--hot)'; msg.textContent='Bitte mindestens einen Namen (Vor- oder Nachname) angeben.'; return; }
   const _mailFelder={email:'E-Mail (privat)', email_beruflich:'E-Mail (beruflich)', email_zweit:'E-Mail (2. privat)'};
   for(const f in _mailFelder){ if(!_mailFormatOk(gv(f))){ msg.style.color='var(--hot)'; msg.textContent='Ungültige '+_mailFelder[f]+' — bitte korrigieren (z.B. name@firma.de).'; return; } }
+  // Pflichtfeld beim NEUANLEGEN (Nutzer-Regel 25.08.): Fähigkeiten/Tags müssen gefüllt sein
+  if(!id && !gv('tags')){ msg.style.color='var(--hot)'; msg.textContent='Pflichtfeld fehlt: Fähigkeiten (Tags) — bitte mindestens einen Tag hinzufügen.'; return; }
   // --- Dubletten-Vorbeugung (weich, nur beim Neuanlegen) ---
   if(!id){
     const conds=[];
