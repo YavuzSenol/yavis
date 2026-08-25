@@ -498,6 +498,7 @@
       <button onclick="kundenMassenupdate()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">✏️ Ändern</button>
       <button onclick="firmenZusammenfuehren()" title="Genau 2 Firmen markieren — Werte werden gerettet, Verknüpfungen umgehängt, Dublette in den Papierkorb" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">🔗 Zusammenführen</button>
       <button onclick="kundenCsvExport()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">📥 CSV</button>
+      <button onclick="kundenMassenLoeschen()" title="Markierte Firmen in den Papierkorb verschieben — wiederherstellbar, Kandidaten/Ansprechpartner bleiben unberührt" style="background:rgba(229,72,77,0.3);color:#fff;border:1px solid rgba(255,255,255,0.4);padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">🗑️ Löschen</button>
       <button onclick="kundeSelAufheben()" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.4);padding:5px 10px;border-radius:4px;cursor:pointer;font-size:13px;margin-left:auto">✕ Aufheben</button>
     </div>
     <div style="overflow-x:auto"><table class="listtbl" style="width:100%"><thead><tr id="cHead"></tr></thead><tbody id="cBody"></tbody></table></div>
@@ -7172,6 +7173,39 @@ function updateKundeSelBar(){
 function kundeSelToggle(id,cb){ if(cb.checked) selectedKundenIds.add(id); else selectedKundenIds.delete(id); updateKundeSelBar(); }
 function kundeSelAll(checked){ document.querySelectorAll('.kunde-cb').forEach(cb=>{ cb.checked=checked; if(checked) selectedKundenIds.add(cb.dataset.id); else selectedKundenIds.delete(cb.dataset.id); }); updateKundeSelBar(); }
 function kundeSelAufheben(){ selectedKundenIds.clear(); document.querySelectorAll('.kunde-cb').forEach(cb=>cb.checked=false); const all=document.getElementById('cSelAll'); if(all){all.checked=false;all.indeterminate=false;} updateKundeSelBar(); }
+
+// ---- Firmen-Massenlöschung (Papierkorb) ----
+function kundenMassenLoeschen(){
+  const ids=[...selectedKundenIds];
+  if(!ids.length){ zeigeMeldung('Keine Firmen ausgewählt','warn'); return; }
+  const dlg=document.createElement('dialog');
+  dlg.style.cssText='background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:24px;max-width:440px;width:95vw';
+  dlg.innerHTML=`
+    <div style="font-size:17px;font-weight:700;margin-bottom:10px">🗑️ ${ids.length} ${ids.length===1?'Firma':'Firmen'} in Papierkorb verschieben?</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:18px;line-height:1.5">
+      Die markierten Firmen werden in den Papierkorb verschoben und können dort wiederhergestellt werden.<br>
+      Verknüpfte Ansprechpartner, Kandidaten, Notizen und Aufgaben bleiben erhalten.
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="this.closest('dialog').close();this.closest('dialog').remove()"
+              style="padding:7px 18px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line)">Abbrechen</button>
+      <button id="kMassLoeschBtn" onclick="_kundenMassenLoeschenAusfuehren(this.closest('dialog'))"
+              style="padding:7px 22px;border-radius:5px;cursor:pointer;background:var(--hot);color:#fff;border:none;font-weight:700">In Papierkorb</button>
+    </div>`;
+  document.body.appendChild(dlg);
+  dlg.showModal();
+}
+async function _kundenMassenLoeschenAusfuehren(dlg){
+  const ids=[...selectedKundenIds];
+  const btn=document.getElementById('kMassLoeschBtn');
+  btn.textContent='Verschiebe …'; btn.disabled=true;
+  const { error } = await sb.from('kunden').update({geloescht_am:new Date().toISOString()}).in('id',ids);
+  if(error){ zeigeMeldung('Fehler: '+error.message,'err'); btn.disabled=false; btn.textContent='In Papierkorb'; return; }
+  dlg.close(); dlg.remove();
+  zeigeMeldung(ids.length+' '+(ids.length===1?'Firma':'Firmen')+' in Papierkorb verschoben ✓','ok');
+  kundeSelAufheben();
+  ladeKunden();
+}
 
 // ---- Firmen-Massenbearbeitung ----
 function kundenMassenupdate(){
