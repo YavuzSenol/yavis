@@ -432,6 +432,7 @@
       <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="kPosUnter" onchange="ladeKandidaten()" style="min-width:auto;width:14px;height:14px;padding:0;margin:0">Position ＋ niedrigere einbeziehen</label>
       <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="kMitProfil" onchange="nachfassToggle()" style="min-width:auto;width:14px;height:14px;padding:0;margin:0">🔗 nur mit XING/LinkedIn-Profil</label>
       <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="kNurHot" onchange="ladeKandidaten()" style="min-width:auto;width:14px;height:14px;padding:0;margin:0">🔥 nur Hot</label>
+      <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="kAusland" onchange="ladeKandidaten()" style="min-width:auto;width:14px;height:14px;padding:0;margin:0">🌍 nur ausland</label>
       <button class="tab" onclick="toggleTagPanel()">🏷️ Nach Fähigkeiten filtern <span id="tagFilterCount"></span></button>
       <button class="tab" onclick="toggleSpaltenPanel()">🗂 Spalten</button>
       <button class="tab" onclick="duplikateFinden()" title="Doppelte Kandidaten nach Name oder E-Mail suchen">🔍 Duplikate</button>
@@ -469,6 +470,9 @@
         <select id="cBranche" onchange="ladeKunden()"><option value="">alle</option></select></div>
       <div class="field" data-filter="stadt"><label>Stadt</label>
         <input id="cStadt" placeholder="z.B. Köln" style="width:130px" onkeydown="if(event.key==='Enter')ladeKunden()"></div>
+      <div class="field" data-filter="ausland"><label>&nbsp;</label>
+        <label style="display:flex;align-items:center;gap:6px;height:32px;cursor:pointer;white-space:nowrap;font-size:12px;text-transform:none;letter-spacing:normal;color:var(--muted)">
+          <input type="checkbox" id="cAusland" onchange="ladeKunden()" style="width:13px;height:13px;cursor:pointer;accent-color:var(--muted)">nur ausland</label></div>
       <div class="field" data-filter="plz"><label>PLZ (Umkreis)</label>
         <input id="cPlz" placeholder="z.B. 50667" style="width:90px" maxlength="5" onkeydown="if(event.key==='Enter')ladeKunden()"></div>
       <div class="field" data-filter="radius"><label>Radius km</label>
@@ -495,6 +499,7 @@
       <button onclick="kundenMassenupdate()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">✏️ Ändern</button>
       <button onclick="firmenZusammenfuehren()" title="Genau 2 Firmen markieren — Werte werden gerettet, Verknüpfungen umgehängt, Dublette in den Papierkorb" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">🔗 Zusammenführen</button>
       <button onclick="kundenCsvExport()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">📥 CSV</button>
+      <button onclick="kundenMassenLoeschen()" title="Markierte Firmen in den Papierkorb verschieben — wiederherstellbar, Kandidaten/Ansprechpartner bleiben unberührt" style="background:rgba(229,72,77,0.3);color:#fff;border:1px solid rgba(255,255,255,0.4);padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">🗑️ Löschen</button>
       <button onclick="kundeSelAufheben()" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.4);padding:5px 10px;border-radius:4px;cursor:pointer;font-size:13px;margin-left:auto">✕ Aufheben</button>
     </div>
     <div style="overflow-x:auto"><table class="listtbl" style="width:100%"><thead><tr id="cHead"></tr></thead><tbody id="cBody"></tbody></table></div>
@@ -880,8 +885,9 @@
         </div>
         <div>
           <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Branche</div>
-          <input id="rmFirmBranche" placeholder="z.B. TGA" onkeydown="if(event.key==='Enter')rechercheAusfuehren()"
-                 style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:130px">
+          <select id="rmFirmBranche" style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px;width:170px">
+            <option value="">alle</option>
+          </select>
         </div>
         <div>
           <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Stadt</div>
@@ -2325,21 +2331,79 @@ async function selTagsAnwenden(modus,dlg){
 }
 
 // ---- Massenaktualisierung ----
+// Alle Felder, die sich sinnvoll für viele Personen auf einmal setzen lassen.
+// typ: text | zahl | datum | liste (feste Werte) | ml (Merkliste) | position | ja/nein | tags | lang
+const MASS_FELDER=[
+  {g:'Ansprache',   f:'begruessung',       l:'Anrede',                typ:'liste', werte:['Herr','Frau']},
+  {g:'Ansprache',   f:'kontaktstatus',     l:'Kontaktstatus',         typ:'ml',    liste:'kontaktstatus'},
+  {g:'Ansprache',   f:'status',            l:'Status',                typ:'liste', werte:['New','Active','Inactive','Blacklisted','Rejected','Placed']},
+  {g:'Ansprache',   f:'wertung',           l:'Wertung',               typ:'ml',    liste:'wertung'},
+  {g:'Ansprache',   f:'letzte_aktivitaet', l:'Letzte Aktivität',      typ:'datum'},
+  {g:'Ansprache',   f:'besitzer_id',       l:'Betreuer',              typ:'text'},
+
+  {g:'Beruf',       f:'berufsbezeichnung', l:'Berufsbezeichnung',     typ:'position'},
+  {g:'Beruf',       f:'position_original', l:'Position (Originaltitel)', typ:'text'},
+  {g:'Beruf',       f:'arbeitgeber',       l:'Arbeitgeber',           typ:'text'},
+  {g:'Beruf',       f:'abteilung',         l:'Abteilung',             typ:'text'},
+  {g:'Beruf',       f:'funktion',          l:'Funktion',              typ:'text'},
+  {g:'Beruf',       f:'planung_ausfuehrung',l:'Planung / Ausführung', typ:'ml',    liste:'planung'},
+  {g:'Beruf',       f:'erfahrung_jahre',   l:'Berufsjahre',           typ:'zahl'},
+  {g:'Beruf',       f:'qualifikation',     l:'Qualifikation',         typ:'text'},
+  {g:'Beruf',       f:'studiengang',       l:'Studiengang',           typ:'text'},
+  {g:'Beruf',       f:'faehigkeiten',      l:'Fähigkeiten',           typ:'text'},
+
+  {g:'Ort',         f:'strasse',           l:'Straße',                typ:'text'},
+  {g:'Ort',         f:'plz',               l:'PLZ',                   typ:'text'},
+  {g:'Ort',         f:'stadt',             l:'Stadt',                 typ:'text'},
+  {g:'Ort',         f:'bundesland',        l:'Bundesland',            typ:'text'},
+  {g:'Ort',         f:'land',              l:'Land',                  typ:'ml',    liste:'land'},
+  {g:'Ort',         f:'stadt_beruf',       l:'Stadt (beruflich)',     typ:'text'},
+  {g:'Ort',         f:'plz_beruf',         l:'PLZ (beruflich)',       typ:'text'},
+
+  {g:'Wechsel',     f:'gehalt_aktuell',    l:'Gehalt aktuell',        typ:'zahl'},
+  {g:'Wechsel',     f:'gehalt_erwartet',   l:'Gehalt erwartet',       typ:'zahl'},
+  {g:'Wechsel',     f:'kuendigungsfrist',  l:'Kündigungsfrist',       typ:'text'},
+  {g:'Wechsel',     f:'wechselmotivation', l:'Wechselmotivation',     typ:'lang'},
+  {g:'Wechsel',     f:'wunschregion',      l:'Wunschregion',          typ:'text'},
+  {g:'Wechsel',     f:'positionswunsch',   l:'Positionswunsch',       typ:'text'},
+  {g:'Wechsel',     f:'umzugsbereitschaft',l:'Umzugsbereitschaft',    typ:'ml',    liste:'umzug'},
+  {g:'Wechsel',     f:'reisebereitschaft', l:'Reisebereitschaft',     typ:'text'},
+
+  {g:'Merkmale',    f:'tags',              l:'Tags',                  typ:'tags'},
+  {g:'Merkmale',    f:'quelle',            l:'Quelle',                typ:'ml',    liste:'quelle'},
+  {g:'Merkmale',    f:'bemerkung',         l:'Bemerkung',             typ:'lang'},
+  {g:'Merkmale',    f:'fremdsprachen',     l:'Fremdsprachen',         typ:'text'},
+
+  {g:'Schalter',    f:'abwerbeschutz',     l:'Abwerbeschutz',         typ:'janein'},
+  {g:'Schalter',    f:'ist_hot',           l:'Hot-Kandidat',          typ:'janein'},
+  {g:'Schalter',    f:'kein_newsletter',   l:'Kein Newsletter',       typ:'janein'},
+  {g:'Schalter',    f:'sperre_email',      l:'Sperre E-Mail',         typ:'janein'},
+  {g:'Schalter',    f:'sperre_anruf',      l:'Sperre Anruf',          typ:'janein'},
+  {g:'Schalter',    f:'sperre_brief',      l:'Sperre Brief',          typ:'janein'},
+  {g:'Schalter',    f:'email_unzustellbar',l:'E-Mail unzustellbar',   typ:'janein'},
+  {g:'Schalter',    f:'ist_gesperrt',      l:'Gesperrt',              typ:'janein'},
+];
+function _massOptionen(){
+  const gruppen={};
+  MASS_FELDER.forEach(x=>{ (gruppen[x.g]=gruppen[x.g]||[]).push(x); });
+  return Object.keys(gruppen).map(g=>
+    `<optgroup label="${esc(g)}">`+gruppen[g].map(x=>`<option value="${x.f}">${esc(x.l)}</option>`).join('')+`</optgroup>`
+  ).join('');
+}
 async function selMassenupdate(){
   if(!selectedKandIds.size) return;
   const dlg=document.createElement('dialog');
-  dlg.style.cssText='background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:24px;max-width:500px;width:95vw';
+  dlg.style.cssText='background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:24px;max-width:520px;width:95vw';
   dlg.innerHTML=`<h3 style="margin:0 0 14px">✏️ Massenaktualisierung — ${selectedKandIds.size} Kandidaten</h3>
     <label style="font-size:13px;color:var(--muted)">Feld</label>
     <select id="massFeld" onchange="massFeldWechseln(this)" style="width:100%;padding:8px;font-size:14px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;margin:6px 0 14px">
-      <option value="">– Feld wählen –</option>
-      <option value="berufsbezeichnung">Berufsbezeichnung</option>
-      <option value="status">Status</option>
-      <option value="arbeitgeber">Arbeitgeber</option>
-      <option value="stadt">Stadt</option>
-      <option value="abwerbeschutz">Abwerbeschutz</option>
+      <option value="">– Feld wählen –</option>${_massOptionen()}
     </select>
     <div id="massWertBox"></div>
+    <label style="display:flex;align-items:center;gap:7px;margin-top:12px;font-size:13px;color:var(--muted);cursor:pointer">
+      <input type="checkbox" id="massNurLeere" style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer">
+      Nur dort setzen, wo das Feld noch <b style="color:var(--fg)">leer</b> ist
+    </label>
     <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
       <button onclick="this.closest('dialog').close();this.closest('dialog').remove()" style="padding:7px 16px;border-radius:4px;cursor:pointer;background:var(--panel2);border:1px solid var(--line)">Abbrechen</button>
       <button onclick="selMassenAnwenden(this.closest('dialog'))" style="padding:7px 20px;border-radius:4px;cursor:pointer;background:var(--accent);color:#fff;border:none;font-weight:600">Auf alle anwenden</button>
@@ -2348,25 +2412,77 @@ async function selMassenupdate(){
 }
 function massFeldWechseln(sel){
   const box=sel.closest('dialog').querySelector('#massWertBox');
-  const feld=sel.value; if(!feld){box.innerHTML=''; return;}
+  const def=MASS_FELDER.find(x=>x.f===sel.value);
+  if(!def){box.innerHTML=''; return;}
   const st='width:100%;padding:8px;font-size:14px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;margin-top:6px;box-sizing:border-box';
-  if(feld==='berufsbezeichnung') box.innerHTML=`<label style="font-size:13px;color:var(--muted)">Neue Position</label><select id="massWert" style="${st}"><option value="">– wählen –</option>${Object.keys(POSITION_STUFE).map(p=>`<option>${esc(p)}</option>`).join('')}</select>`;
-  else if(feld==='status') box.innerHTML=`<label style="font-size:13px;color:var(--muted)">Neuer Status</label><select id="massWert" style="${st}">${['New','Active','Inactive','Blacklisted','Rejected','Placed'].map(s=>`<option>${s}</option>`).join('')}</select>`;
-  else if(feld==='abwerbeschutz') box.innerHTML=`<select id="massWert" style="${st}"><option value="true">🔒 Abwerbeschutz SETZEN</option><option value="false">🔓 Abwerbeschutz ENTFERNEN</option></select>`;
-  else box.innerHTML=`<label style="font-size:13px;color:var(--muted)">Neuer Wert</label><input id="massWert" style="${st}" placeholder="Wert eingeben…">`;
+  const lab=t=>`<label style="font-size:13px;color:var(--muted)">${t}</label>`;
+  const leeren=`<label style="display:flex;align-items:center;gap:7px;margin-top:9px;font-size:13px;color:var(--muted);cursor:pointer"><input type="checkbox" id="massLeeren" onchange="const w=this.closest('#massWertBox').querySelector('#massWert'); if(w) w.disabled=this.checked" style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer">Feld stattdessen <b style="color:var(--fg)">leeren</b></label>`;
+  if(def.typ==='position')      box.innerHTML=lab('Neue Berufsbezeichnung')+`<select id="massWert" style="${st}"><option value="">– wählen –</option>${Object.keys(POSITION_STUFE).map(p=>`<option>${esc(p)}</option>`).join('')}</select>`+leeren;
+  else if(def.typ==='liste')    box.innerHTML=lab('Neuer Wert')+`<select id="massWert" style="${st}">${def.werte.map(s=>`<option>${esc(s)}</option>`).join('')}</select>`+leeren;
+  else if(def.typ==='ml'){
+    const werte=(typeof mlGet==='function'?mlGet(def.liste):[])||[];
+    box.innerHTML=lab('Neuer Wert')+`<select id="massWert" style="${st}">${werte.map(s=>`<option>${esc(s)}</option>`).join('')}</select>`+leeren;
+  }
+  else if(def.typ==='janein')   box.innerHTML=`<select id="massWert" style="${st}"><option value="true">✅ ${esc(def.l)} SETZEN</option><option value="false">⬜ ${esc(def.l)} ENTFERNEN</option></select>`;
+  else if(def.typ==='zahl')     box.innerHTML=lab('Neuer Wert')+`<input id="massWert" type="number" style="${st}" placeholder="Zahl eingeben…">`+leeren;
+  else if(def.typ==='datum')    box.innerHTML=lab('Neues Datum')+`<input id="massWert" type="date" style="${st}">`+leeren;
+  else if(def.typ==='lang')     box.innerHTML=lab('Neuer Text')+`<textarea id="massWert" rows="3" style="${st};resize:vertical" placeholder="Text eingeben…"></textarea>`+leeren;
+  else if(def.typ==='tags')     box.innerHTML=`<select id="massTagModus" style="${st}"><option value="add">Tags HINZUFÜGEN (vorhandene bleiben)</option><option value="del">Tags ENTFERNEN</option><option value="set">Tags ERSETZEN (alle vorherigen weg)</option></select>`+lab('Tags, mit Komma getrennt')+`<input id="massWert" style="${st}" placeholder="z. B. TGA, Krankenhaus">`;
+  else                          box.innerHTML=lab('Neuer Wert')+`<input id="massWert" style="${st}" placeholder="Wert eingeben…">`+leeren;
 }
 async function selMassenAnwenden(dlg){
   const feld=dlg.querySelector('#massFeld').value;
+  const def=MASS_FELDER.find(x=>x.f===feld);
   const wertEl=dlg.querySelector('#massWert');
-  if(!feld||!wertEl||!wertEl.value){zeigeMeldung('Feld und Wert wählen','warn'); return;}
+  const leeren=!!(dlg.querySelector('#massLeeren')||{}).checked;
+  const nurLeere=!!(dlg.querySelector('#massNurLeere')||{}).checked;
+  if(!def||!wertEl){zeigeMeldung('Feld wählen','warn'); return;}
+  if(!leeren && def.typ!=='janein' && !String(wertEl.value||'').trim()){zeigeMeldung('Wert eingeben oder „Feld leeren" ankreuzen','warn'); return;}
   const ids=[...selectedKandIds];
-  const upd=feld==='abwerbeschutz'?{abwerbeschutz:wertEl.value==='true'}:{[feld]:wertEl.value};
+
+  // Tags müssen je Datensatz zusammengeführt werden, deshalb eigener Weg
+  if(def.typ==='tags'){
+    const modus=dlg.querySelector('#massTagModus').value;
+    const neue=String(wertEl.value||'').split(',').map(s=>s.trim()).filter(Boolean);
+    if(!neue.length && modus!=='set'){zeigeMeldung('Tags eingeben','warn'); return;}
+    let n=0;
+    for(let i=0;i<ids.length;i+=200){
+      const teil=ids.slice(i,i+200);
+      const {data,error}=await sb.from('kandidaten').select('id,tags').in('id',teil);
+      if(error){zeigeMeldung('Fehler: '+error.message,'err'); return;}
+      for(const r of (data||[])){
+        const alt=String(r.tags||'').split(';').map(s=>s.trim()).filter(Boolean);
+        let neu;
+        if(modus==='add')      neu=[...new Set([...alt,...neue])];
+        else if(modus==='del') neu=alt.filter(t=>!neue.some(x=>x.toLowerCase()===t.toLowerCase()));
+        else                   neu=[...new Set(neue)];
+        const wert=neu.length?';'+neu.join(';')+';':null;
+        const {error:e2}=await sb.from('kandidaten').update({tags:wert}).eq('id',r.id);
+        if(e2){zeigeMeldung('Fehler: '+e2.message,'err'); return;}
+        n++;
+      }
+    }
+    dlg.close(); dlg.remove();
+    zeigeMeldung(`Tags bei ${n} Kandidaten aktualisiert`,'ok');
+    ladeKandidaten(); return;
+  }
+
+  let wert;
+  if(leeren)                    wert=null;
+  else if(def.typ==='janein')   wert=(wertEl.value==='true');
+  else if(def.typ==='zahl')     wert=Number(wertEl.value);
+  else                          wert=wertEl.value;
+
+  let n=0;
   for(let i=0;i<ids.length;i+=100){
-    const {error}=await sb.from('kandidaten').update(upd).in('id',ids.slice(i,i+100));
+    let q=sb.from('kandidaten').update({[feld]:wert}).in('id',ids.slice(i,i+100));
+    if(nurLeere && def.typ!=='janein') q=q.is(feld,null);
+    const {error}=await q;
     if(error){zeigeMeldung('Fehler: '+error.message,'err'); dlg.close(); dlg.remove(); return;}
+    n+=Math.min(100,ids.length-i);
   }
   dlg.close(); dlg.remove();
-  zeigeMeldung(`${ids.length} Kandidaten aktualisiert`);
+  zeigeMeldung(`${def.l}: ${ids.length} Kandidaten aktualisiert${nurLeere?' (nur leere Felder)':''}`,'ok');
   ladeKandidaten();
 }
 
@@ -3878,6 +3994,8 @@ async function ladeKandidaten(){
   const profilLabel=mitProfil?' · mit Profil':'';
   const nurHot=!!(document.getElementById('kNurHot')||{}).checked;
   const hotLabel=nurHot?' · 🔥 Hot':'';
+  const ausland=!!(document.getElementById('kAusland')||{}).checked;
+  const auslandLabel=ausland?' · ausland':'';
   const plz=document.getElementById('kPlz').value.trim();
   const radius=document.getElementById('kRadius').value;
   const body=document.getElementById('kBody'); body.innerHTML='';
@@ -3902,7 +4020,7 @@ async function ladeKandidaten(){
     if(posListe) rows=rows.filter(r=>posListe.includes(r.berufsbezeichnung));
     // Die Umkreis-Funktion liefert nur Basisfelder → volle Datensätze nachladen,
     // wenn Tag-Filter aktiv ist ODER Spalten angezeigt werden, die sie nicht enthält.
-    if(rows.length && (tagFilterAktiv() || brauchtVolleDaten() || luecke || mitProfil || nurHot || rolleFilter!=='alle')){
+    if(rows.length && (tagFilterAktiv() || brauchtVolleDaten() || luecke || mitProfil || nurHot || ausland || rolleFilter!=='alle')){
       const ids=rows.map(r=>r.id); const map={};
       for(let i=0;i<ids.length;i+=300){ const teil=ids.slice(i,i+300);
         const {data:td}=await sb.from('kandidaten').select('*').in('id',teil);
@@ -3913,8 +4031,9 @@ async function ladeKandidaten(){
     if(luecke) rows=rows.filter(r=>lueckeMatch(r,luecke));
     if(mitProfil) rows=rows.filter(r=>hatProfil(r));
     if(nurHot) rows=rows.filter(r=>r.ist_hot);
+    if(ausland) rows=rows.filter(r=>{const l=(r.land||'').trim(); return l&&l!=='Deutschland'&&l!=='Germany';});
     if(rolleFilter!=='alle') rows=rows.filter(rolleMatch);
-    document.getElementById('kCount').textContent=rows.length+' '+personenNomen()+' im Umkreis von '+radius+' km um '+plz+posLabel+lueckeLabel+profilLabel+hotLabel+tagFilterLabel();
+    document.getElementById('kCount').textContent=rows.length+' '+personenNomen()+' im Umkreis von '+radius+' km um '+plz+posLabel+lueckeLabel+profilLabel+hotLabel+auslandLabel+tagFilterLabel();
     _kandGeladen=rows; _kandMitKm=true; renderKandTabelle();
     return;
   }
@@ -3926,6 +4045,7 @@ async function ladeKandidaten(){
   if(luecke) query=lueckeQuery(query,luecke);
   if(mitProfil) query=query.or('xing_profil.ilike.%http%,linkedin_profil.ilike.%http%');
   if(nurHot) query=query.eq('ist_hot',true);
+  if(ausland) query=query.not('land','is',null).neq('land','').not('land','in','("Deutschland","Germany")');
   if(q) query=query.or(`voller_name.ilike.%${q}%,berufsbezeichnung.ilike.%${q}%,faehigkeiten.ilike.%${q}%,stadt.ilike.%${q}%,arbeitgeber.ilike.%${q}%`);
   const tmod=tagModusWert();
   if(tmod==='leer'){ query=query.or('tags.is.null,tags.eq.,tags.eq.;;'); }
@@ -3944,7 +4064,7 @@ async function ladeKandidaten(){
   const {data,error}=await query;
   if(error){document.getElementById('kCount').textContent='Fehler: '+error.message;return;}
   // ·243 (C10): „weitere laden"-Link, wenn die Liste am Limit abgeschnitten ist
-  const kTxt=(data.length)+' '+personenNomen()+(data.length>=_kandLimit?` (erste ${_kandLimit})`:'')+posLabel+lueckeLabel+profilLabel+hotLabel+tagFilterLabel();
+  const kTxt=(data.length)+' '+personenNomen()+(data.length>=_kandLimit?` (erste ${_kandLimit})`:'')+posLabel+lueckeLabel+profilLabel+hotLabel+auslandLabel+tagFilterLabel();
   const kEl=document.getElementById('kCount');
   if(data.length>=_kandLimit){ kEl.innerHTML=esc(kTxt)+' · <span onclick="kandMehrLaden()" style="color:var(--accent);cursor:pointer;text-decoration:underline">▸ weitere 200 laden</span>'; }
   else kEl.textContent=kTxt;
@@ -4174,7 +4294,26 @@ function heuteISO(){ const d=new Date(); return new Date(d.getTime()-d.getTimezo
 function plusTageISO(n){ const d=new Date(); d.setDate(d.getDate()+n); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
 function fmtDatum(s){ if(!s) return ''; const d=new Date(s); return isNaN(d)?esc(s):d.toLocaleDateString('de-DE'); }
 // Geburtstag anzeigen: ISO (JJJJ-MM-TT) -> TT.MM.JJJJ; Nicht-ISO-Altwerte bleiben unveraendert
-function fmtGeb(s){ if(!s) return ''; const m=String(s).match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? (m[3]+'.'+m[2]+'.'+m[1]) : esc(String(s)); }
+// Jahre vor 1910 sind Platzhalter aus Import und LinkedIn-Ernte (Geburtstag ohne Jahrgang) → Jahr weglassen
+function fmtGeb(s){ if(!s) return ''; const m=String(s).match(/^(\d{4})-(\d{2})-(\d{2})/); if(!m) return esc(String(s)); return (+m[1]<1910) ? (m[3]+'.'+m[2]+'.') : (m[3]+'.'+m[2]+'.'+m[1]); }
+// Nebendaten aus der LinkedIn-Kontaktinfo-Ernte (anreicherung.linkedin_kontaktinfo) — nur zeigen, wenn vorhanden
+function liErnteHtml(d){
+  const li=(d&&d.anreicherung&&d.anreicherung.linkedin_kontaktinfo)||null; if(!li) return '';
+  const zeilen=[];
+  if(li.vernetzt_seit){
+    const m=String(li.vernetzt_seit).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    const jahre=m?Math.floor((Date.now()-new Date(li.vernetzt_seit).getTime())/31557600000):null;
+    zeilen.push('<div class="drow"><span class="dk">Vernetzt seit</span><span class="dv">'
+      +(m?m[3]+'.'+m[2]+'.'+m[1]:esc(String(li.vernetzt_seit)))
+      +(jahre>=1?' <span style="color:var(--muted)">('+jahre+' J.)</span>':'')+'</span></div>');
+  }
+  (li.website||[]).forEach(w=>{
+    const url=String(w).replace(/\s*\(.*\)\s*$/,'').trim(); if(!url) return;
+    zeilen.push('<div class="drow"><span class="dk">Website</span><span class="dv"><a class="calllink" href="'
+      +esc(/^https?:/i.test(url)?url:'https://'+url)+'" target="_blank" rel="noopener">'+esc(w)+' ↗</a></span></div>');
+  });
+  return zeilen.join('');
+}
 function istOffen(status){ if(!status) return true; const s=String(status).toLowerCase(); return s!=='completed'&&s!=='erledigt'&&s!=='abgeschlossen'; }
 
 async function ladeAufgabenFuer(id){
@@ -5218,6 +5357,7 @@ function zeigeKandidatSeite(d, ausb, erf, notiz, bew, aufg, dok, fotoUrl, mails,
         ${ri('2. E-Mail','email_zweit', d.email_zweit, actMail)}
         ${ri('XING','xing_profil', d.xing_profil, actOpen)}
         ${ri('LinkedIn','linkedin_profil', d.linkedin_profil, actOpen)}
+        ${liErnteHtml(d)}
       </div>
 
       </div>
@@ -5574,7 +5714,14 @@ let _naechsteZurueckAktion=null; // ein Opener (z.B. Dialog) setzt das VOR detai
 let _navStack=[];                // universeller Zurück-Stapel: Wiederherstell-Funktionen vorheriger Detailseiten/Dialoge
 let _aktuellesDetail=null;       // {typ,id} der aktuell gezeigten Detailseite (für Quer-Sprünge Firma<->Person usw.)
 let _blaetternAktiv=false;       // von kandidatBlaettern/kundeBlaettern VOR detailX gesetzt: Blättern innerhalb derselben Trefferliste ist keine neue Ebene, landet NICHT auf dem Zurück-Stapel
+let _listeScrollY={};            // Scrollposition je Listen-Tab (kandidaten/kunden/…), damit "← Zurück" aus der Detailansicht nicht auf den Listenanfang zurückspringt
 function _detailBetreten(typ,id){
+  // Kommt der Aufruf direkt aus einer Liste (Detailseite war noch zu)? -> deren Scrollposition merken
+  const _dp=document.getElementById('detailPage');
+  if(_dp && _dp.style.display!=='block'){
+    const _aktivTab=document.querySelector('.tab.active')?.dataset.view;
+    if(_aktivTab) _listeScrollY[_aktivTab]=window.scrollY;
+  }
   // 1) Aufruf kam aus einem Dialog (Herkunft gesetzt)? -> Wiederherstellung auf den Stapel
   if(_naechsteZurueckAktion){ _navStack.push(_naechsteZurueckAktion); _naechsteZurueckAktion=null; }
   // 2) Blättern (‹ / › im selben Datensatz-Typ)? -> nicht stapeln, nur aktuellen Datensatz austauschen
@@ -5610,6 +5757,8 @@ function zurueckZurListe(){
   document.getElementById('detailPage').style.display='none';
   const aktiv=document.querySelector('.tab.active')?.dataset.view||'kandidaten';
   document.getElementById('view-'+aktiv).style.display='block';
+  const _merkY=_listeScrollY[aktiv];
+  if(_merkY!==undefined) setTimeout(()=>window.scrollTo(0,_merkY),0);
 }
 // Recherche-Treffer: Linksklick = öffnen (Zurück führt in die Recherche), Rechtsklick = neuer Tab
 function rmOeffneKandidat(id){ _zurueckZuSuche=null; _zurueckZuRecherche=true; detailKandidat(id); }
@@ -6026,7 +6175,7 @@ const FIRMEN_TYP_BG={
   'Lieferant':'var(--muted)',
   'Sonstige':'var(--muted)'
 };
-const BRANCHEN_STANDARD=['Ingenieurbüro','Ausführer / Anlagenbau','Bauunternehmen / GU','Immobilien / Projektentwickler','Hersteller / Industrie','Sonstige'];
+const BRANCHEN_STANDARD=['Ingenieurbüro','Ausführer / Anlagenbau','Bauunternehmen / GU','Immobilien / Projektentwickler','Hersteller / Industrie','Bauherrenseite','Sonstige'];
 function branchenListe(){
   try{ const s=localStorage.getItem('yavis_branchen'); if(s){ const a=JSON.parse(s); if(a&&a.length) return a; } }catch(e){}
   return [...BRANCHEN_STANDARD];
@@ -6639,6 +6788,8 @@ async function speichereKandidat(id){
   if(!(vorname||'').trim() && !(nachname||'').trim()){ msg.style.color='var(--hot)'; msg.textContent='Bitte mindestens einen Namen (Vor- oder Nachname) angeben.'; return; }
   const _mailFelder={email:'E-Mail (privat)', email_beruflich:'E-Mail (beruflich)', email_zweit:'E-Mail (2. privat)'};
   for(const f in _mailFelder){ if(!_mailFormatOk(gv(f))){ msg.style.color='var(--hot)'; msg.textContent='Ungültige '+_mailFelder[f]+' — bitte korrigieren (z.B. name@firma.de).'; return; } }
+  // Pflichtfeld beim NEUANLEGEN (Nutzer-Regel 25.08.): Fähigkeiten/Tags müssen gefüllt sein
+  if(!id && !gv('tags')){ msg.style.color='var(--hot)'; msg.textContent='Pflichtfeld fehlt: Fähigkeiten (Tags) — bitte mindestens einen Tag hinzufügen.'; return; }
   // --- Dubletten-Vorbeugung (weich, nur beim Neuanlegen) ---
   if(!id){
     const conds=[];
@@ -7028,6 +7179,39 @@ function kundeSelToggle(id,cb){ if(cb.checked) selectedKundenIds.add(id); else s
 function kundeSelAll(checked){ document.querySelectorAll('.kunde-cb').forEach(cb=>{ cb.checked=checked; if(checked) selectedKundenIds.add(cb.dataset.id); else selectedKundenIds.delete(cb.dataset.id); }); updateKundeSelBar(); }
 function kundeSelAufheben(){ selectedKundenIds.clear(); document.querySelectorAll('.kunde-cb').forEach(cb=>cb.checked=false); const all=document.getElementById('cSelAll'); if(all){all.checked=false;all.indeterminate=false;} updateKundeSelBar(); }
 
+// ---- Firmen-Massenlöschung (Papierkorb) ----
+function kundenMassenLoeschen(){
+  const ids=[...selectedKundenIds];
+  if(!ids.length){ zeigeMeldung('Keine Firmen ausgewählt','warn'); return; }
+  const dlg=document.createElement('dialog');
+  dlg.style.cssText='background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:24px;max-width:440px;width:95vw';
+  dlg.innerHTML=`
+    <div style="font-size:17px;font-weight:700;margin-bottom:10px">🗑️ ${ids.length} ${ids.length===1?'Firma':'Firmen'} in Papierkorb verschieben?</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:18px;line-height:1.5">
+      Die markierten Firmen werden in den Papierkorb verschoben und können dort wiederhergestellt werden.<br>
+      Verknüpfte Ansprechpartner, Kandidaten, Notizen und Aufgaben bleiben erhalten.
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="this.closest('dialog').close();this.closest('dialog').remove()"
+              style="padding:7px 18px;border-radius:5px;cursor:pointer;background:var(--panel2);border:1px solid var(--line)">Abbrechen</button>
+      <button id="kMassLoeschBtn" onclick="_kundenMassenLoeschenAusfuehren(this.closest('dialog'))"
+              style="padding:7px 22px;border-radius:5px;cursor:pointer;background:var(--hot);color:#fff;border:none;font-weight:700">In Papierkorb</button>
+    </div>`;
+  document.body.appendChild(dlg);
+  dlg.showModal();
+}
+async function _kundenMassenLoeschenAusfuehren(dlg){
+  const ids=[...selectedKundenIds];
+  const btn=document.getElementById('kMassLoeschBtn');
+  btn.textContent='Verschiebe …'; btn.disabled=true;
+  const { error } = await sb.from('kunden').update({geloescht_am:new Date().toISOString()}).in('id',ids);
+  if(error){ zeigeMeldung('Fehler: '+error.message,'err'); btn.disabled=false; btn.textContent='In Papierkorb'; return; }
+  dlg.close(); dlg.remove();
+  zeigeMeldung(ids.length+' '+(ids.length===1?'Firma':'Firmen')+' in Papierkorb verschoben ✓','ok');
+  kundeSelAufheben();
+  ladeKunden();
+}
+
 // ---- Firmen-Massenbearbeitung ----
 function kundenMassenupdate(){
   if(!selectedKundenIds.size){ zeigeMeldung('Keine Firmen ausgewählt','warn'); return; }
@@ -7297,6 +7481,7 @@ const KUNDEN_FILTER_DEF=[
   {key:'typ',label:'Typ',el:'cTyp'},
   {key:'branche',label:'Branche',el:'cBranche'},
   {key:'stadt',label:'Stadt',el:'cStadt'},
+  {key:'ausland',label:'nur ausland',el:'cAusland'},
   {key:'plz',label:'PLZ (Umkreis)',el:'cPlz'},
   {key:'radius',label:'Radius',el:'cRadius'},
 ];
@@ -7318,7 +7503,7 @@ function toggleKFilter(key){
     if(kFilterSichtbar.length<=1) return;
     kFilterSichtbar=kFilterSichtbar.filter(k=>k!==key);
     const def=KUNDEN_FILTER_DEF.find(f=>f.key===key); const el=def&&document.getElementById(def.el);
-    if(el){ if(el.tagName==='SELECT') el.value=(key==='radius'?'50':''); else el.value=''; }
+    if(el){ if(el.type==='checkbox') el.checked=false; else if(el.tagName==='SELECT') el.value=(key==='radius'?'50':''); else el.value=''; }
   } else {
     kFilterSichtbar=KUNDEN_FILTER_DEF.filter(f=>kFilterSichtbar.includes(f.key)||f.key===key).map(f=>f.key);
   }
@@ -7331,6 +7516,7 @@ async function ladeKunden(){
   const typ=document.getElementById('cTyp').value;
   const branche=(document.getElementById('cBranche')||{}).value||'';
   const stadtEl=document.getElementById('cStadt'); const stadt=stadtEl?stadtEl.value.trim():'';
+  const ausland=!!(document.getElementById('cAusland')||{}).checked;
   const cPlzEl=document.getElementById('cPlz');
   const plz=cPlzEl?cPlzEl.value.trim():'';
   const radius=parseInt((document.getElementById('cRadius')||{}).value||'50')||50;
@@ -7368,6 +7554,7 @@ async function ladeKunden(){
     }
     let pool=data;
     if(branche) pool=pool.filter(r=>(r.branche||'')===branche);
+    if(ausland) pool=pool.filter(r=>{const l=(r.land||'').trim(); return l&&l!=='Deutschland'&&l!=='Germany';});
     if(stadt){const sl=stadt.toLowerCase();pool=pool.filter(r=>(r.stadt||'').toLowerCase().includes(sl));}
     if(q){const ql=q.toLowerCase();pool=pool.filter(r=>(r.name||'').toLowerCase().includes(ql)||(r.branche||'').toLowerCase().includes(ql)||(r.stadt||'').toLowerCase().includes(ql));}
     const ohneKoord=pool.filter(r=>r.lat==null||r.lng==null).length;
@@ -7375,7 +7562,7 @@ async function ladeKunden(){
     rows.forEach(r=>{ r._km=Math.round(haversineKm(cLat,cLng,r.lat,r.lng)); });
     rows.sort((a,b)=>a._km-b._km);
     _kundenGeladen=rows;
-    let txt=rows.length+' Firmen im Umkreis von '+radius+' km um '+plz+(typ?' · '+typ:'')+(branche?' · '+branche:'')+(stadt?' · '+stadt:'')+(q?' · "'+q+'"':'');
+    let txt=rows.length+' Firmen im Umkreis von '+radius+' km um '+plz+(typ?' · '+typ:'')+(branche?' · '+branche:'')+(stadt?' · '+stadt:'')+(ausland?' · ausland':'')+(q?' · "'+q+'"':'');
     if(ohneKoord) txt+=' · ⚠️ '+ohneKoord+' ohne Koordinaten nicht berücksichtigt';
     document.getElementById('cCount').textContent=txt;
     renderKundenTabelle(true);
@@ -7389,10 +7576,11 @@ async function ladeKunden(){
   if(typ) query=query.eq('typ',typ);
   if(branche) query=query.eq('branche',branche);
   if(stadt) query=query.ilike('stadt',`%${stadt}%`);
+  if(ausland) query=query.not('land','is',null).neq('land','').not('land','in','("Deutschland","Germany")');
   const {data,error}=await query;
   if(error){document.getElementById('cCount').textContent='Fehler: '+error.message;return;}
   _kundenGeladen=data;
-  const cTxt=data.length+' Firmen'+(data.length>=_kundenLimit?` (erste ${_kundenLimit})`:'')+(typ?' · '+typ:'')+(branche?' · '+branche:'')+(stadt?' · '+stadt:'');
+  const cTxt=data.length+' Firmen'+(data.length>=_kundenLimit?` (erste ${_kundenLimit})`:'')+(typ?' · '+typ:'')+(branche?' · '+branche:'')+(stadt?' · '+stadt:'')+(ausland?' · ausland':'');
   const cEl=document.getElementById('cCount');
   if(data.length>=_kundenLimit){ cEl.innerHTML=esc(cTxt)+' · <span onclick="kundenMehrLaden()" style="color:var(--accent);cursor:pointer;text-decoration:underline">▸ weitere 200 laden</span>'; }
   else cEl.textContent=cTxt;
@@ -10317,7 +10505,7 @@ function msEinstellungenUI(){
           <div style="font-size:12px;color:var(--muted)">Token gültig bis ca. ${ablauf}</div>
         </div>
         <div style="display:flex;gap:8px">
-          <button onclick="msSyncOutlook()" style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--accent2);color:#fff;border:none;font-size:13px;font-weight:600">🔄 Sync</button>
+          <button onclick="msSyncOutlook()" title="Prüft NUR die letzten 50 gesendeten Mails und bietet an, sie als Verlauf nachzutragen. Für den kompletten Mailverlauf (auch eingehende, alle Ordner) weiter unten „🔄 Vollsync“ benutzen." style="padding:6px 14px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:13px">📤 Gesendete nachtragen (letzte 50)</button>
           <button onclick="msTrennen();msEinstellungenUI()" style="padding:6px 12px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--hot);font-size:13px">Trennen</button>
         </div>
       </div>`;
@@ -12253,6 +12441,11 @@ function zeigeRechercheMaske() {
   const rmAn = document.getElementById('rmAnrede');
   if (rmAn && rmAn.options.length <= 2) {
     anredeListe().forEach(a => { if(a==='Keine') return; const o=document.createElement('option'); o.value=a; o.textContent=a; rmAn.appendChild(o); });
+  }
+  // rmFirmBranche-Dropdown mit den festen Branchen-Kategorien befuellen (wie #cBranche in der Firmenansicht)
+  const rmFb = document.getElementById('rmFirmBranche');
+  if (rmFb && rmFb.options.length <= 1) {
+    branchenListe().forEach(b => { const o = document.createElement('option'); o.textContent = b; rmFb.appendChild(o); });
   }
   _rmExWertFuellen();
   _rmFuelleAusFeld('rmBundeslandDD','bundesland','alle Bundesländer');
