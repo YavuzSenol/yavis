@@ -19,9 +19,9 @@ const cors = {
 
 // Nur diese Felder werden öffentlich ausgegeben:
 const FELDER = [
-  "id", "jobtitel", "beschreibung", "stellentyp", "stadt", "plz",
+  "id", "jobtitel", "beschreibung", "stellentyp", "strasse", "stadt", "plz",
   "bundesland", "land", "remote", "branche", "berufserfahrung",
-  "erforderliche_skills", "anzahl_positionen", "oeffnungsdatum",
+  "erforderliche_skills", "anzahl_positionen", "oeffnungsdatum", "gehalt",
 ].join(",");
 
 Deno.serve(async (req) => {

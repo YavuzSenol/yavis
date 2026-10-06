@@ -11446,6 +11446,10 @@ function _stelleFormHtml(s) {
       <div id="sApGew" style="font-size:11px;color:var(--ok);margin-top:3px">${s&&s.kontakt_id?'✅ Ansprechpartner gespeichert':''}</div>
     </div>
 
+    <div style="margin-bottom:12px">
+      ${fld('STRASSE (nur ausfüllen, wenn die Adresse veröffentlicht werden darf)', inp('sStrasse','z.B. Im Mediapark 8',v('strasse')))}
+    </div>
+
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
       ${fld('PLZ', inp('sPlz','z.B. 50823',v('plz')))}
       ${fld('STADT', inp('sStadt','z.B. Köln',v('stadt')))}
@@ -11550,6 +11554,7 @@ async function _stelleSpeichern(isNew, stelleId, dlg) {
     gewerk:              g('sGewerk')?.value||null,
     kunde_id:            g('sKundeId')?.value||null,
     kontakt_id:          g('sApId')?.value||null,
+    strasse:             g('sStrasse')?.value?.trim()||null,
     plz:                 g('sPlz')?.value?.trim()||null,
     stadt:               g('sStadt')?.value?.trim()||null,
     gehalt:              g('sGehalt')?.value?.trim()||null,
