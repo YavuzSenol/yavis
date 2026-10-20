@@ -2327,7 +2327,13 @@ async function selTagsAnwenden(modus,dlg){
   }
   dlg.close(); dlg.remove();
   zeigeMeldung(`„${tag}" ${modus==='hinzu'?'hinzugefügt':'entfernt'} bei ${geaendert} Kandidaten`);
-  ladeKandidaten();
+  _nachMassenaktion();
+}
+// Nach einer Massenaktion neu laden: steht der Nutzer auf der Trefferseite der Kopfzeilen-Suche, bleibt er dort (Treffer neu holen), sonst Personenliste
+function _nachMassenaktion(){
+  const dp=document.getElementById('detailPage');
+  if(_zurueckZuSuche && dp && dp.style.display==='block'){ globaleSuche(_zurueckZuSuche.erw); }
+  else ladeKandidaten();
 }
 
 // ---- Massenaktualisierung ----
@@ -2464,7 +2470,7 @@ async function selMassenAnwenden(dlg){
     }
     dlg.close(); dlg.remove();
     zeigeMeldung(`Tags bei ${n} Kandidaten aktualisiert`,'ok');
-    ladeKandidaten(); return;
+    _nachMassenaktion(); return;
   }
 
   let wert;
@@ -2483,7 +2489,7 @@ async function selMassenAnwenden(dlg){
   }
   dlg.close(); dlg.remove();
   zeigeMeldung(`${def.l}: ${ids.length} Kandidaten aktualisiert${nurLeere?' (nur leere Felder)':''}`,'ok');
-  ladeKandidaten();
+  _nachMassenaktion();
 }
 
 // ---- Löschen (→ Papierkorb) ----
@@ -5778,7 +5784,17 @@ document.addEventListener('auxclick', e=>{
   const id=el.getAttribute('data-kandidat-id');
   if(id) window.open(location.pathname+'?kandidat='+encodeURIComponent(id),'_blank');
 });
-function sucheVerlassen(){ _zurueckZuSuche=null; document.getElementById('detailPage').style.display='none'; const aktiv=document.querySelector('.tab.active')?.dataset.view||'kandidaten'; document.getElementById('view-'+aktiv).style.display='block'; }
+// Auswahl auf der Trefferseite der Kopfzeilen-Suche
+function sucheSelUpdate(){
+  const n=selectedKandIds.size, bar=document.getElementById('sucheSelBar'); if(!bar) return;
+  bar.style.display=n?'flex':'none';
+  document.getElementById('sucheSelCount').textContent=n+' ausgewählt';
+  const all=document.getElementById('sucheSelAllCb'), alle=document.querySelectorAll('.suche-cb').length;
+  if(all){ all.checked=n>0&&n===alle; all.indeterminate=n>0&&n<alle; }
+}
+function sucheSelToggle(cb){ if(cb.checked) selectedKandIds.add(cb.dataset.id); else selectedKandIds.delete(cb.dataset.id); sucheSelUpdate(); }
+function sucheSelAll(checked){ document.querySelectorAll('.suche-cb').forEach(cb=>{ cb.checked=checked; if(checked) selectedKandIds.add(cb.dataset.id); else selectedKandIds.delete(cb.dataset.id); }); sucheSelUpdate(); }
+function sucheVerlassen(){ _zurueckZuSuche=null; selectedKandIds.clear(); document.getElementById('detailPage').style.display='none'; const aktiv=document.querySelector('.tab.active')?.dataset.view||'kandidaten'; document.getElementById('view-'+aktiv).style.display='block'; }
 
 // ·240: Browser-Zurück läuft rückwärts durch die App (Dialog zu → Detail zu → Startseite), statt die Seite zu verlassen.
 // EIN Wächter-Eintrag (gesetzt in zeigeApp) fängt den Klick ab und wird nach jeder internen Navigation erneuert.
@@ -8033,6 +8049,7 @@ async function globaleSuche(erweitert=false){
   const term=document.getElementById('globalSuche').value.trim();
   if(term.length<2) return;
   _zurueckZuSuche={term, erw:!!erweitert};
+  selectedKandIds.clear(); // Auswahl auf der Trefferseite beginnt bei jeder Suche neu
   sucheVerlaufHinzufuegen(term);
   ['start','kandidaten','kunden','wiedervorlagen','nachfassen','newsletter','projekte','recherche','offeneanrufe'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
@@ -8086,7 +8103,19 @@ async function globaleSuche(erweitert=false){
       ? `<div style="margin:0 0 12px;font-size:12px;color:var(--muted)">Erweiterte Suche — inkl. Notizen, Bemerkungen, Fähigkeiten &amp; Profil.</div>`
       : `<div style="margin:0 0 12px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span>Normale Suche (Name, Position, Ort, Arbeitgeber).</span><button onclick="globaleSuche(true)" style="padding:5px 12px;border-radius:5px;cursor:pointer;background:var(--accent2);color:#fff;border:none;font-size:12px;font-weight:600">🔎 Auch in Notizen, Bemerkungen &amp; Profil suchen</button></div>`;
   }
-  html+=sektion('Kandidaten','👤',kaR,['Name','Berufsbezeichnung','Ort','Arbeitgeber'],r=>`<tr class="row-click" onclick="detailKandidat('${r.id}')"><td>${esc(r.voller_name)||'–'}</td><td>${esc(r.berufsbezeichnung)||'–'}</td><td>${esc(r.stadt)||''}</td><td>${esc(r.arbeitgeber)||''}</td></tr>`);
+  if(kaR.length){
+    // Auswahl + Massenbearbeitung für die Kandidaten-Treffer (nutzt dieselbe Massenaktualisierung wie die Personenliste)
+    const bt='background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px';
+    html+=`<div id="sucheSelBar" style="display:none;align-items:center;gap:8px;background:var(--accent);color:#fff;padding:8px 14px;border-radius:6px;margin-bottom:8px;flex-wrap:wrap">
+        <span id="sucheSelCount" style="font-weight:600"></span>
+        <button onclick="selMassenupdate()" style="${bt}">✏️ Aktualisieren</button>
+        <button onclick="selTagsModal('hinzu')" style="${bt}">🏷️ Fähigkeiten +</button>
+        <button onclick="exportiereAuswahl()" style="${bt}">📥 CSV</button>
+        <button onclick="sucheSelAll(false)" style="${bt};border:1px solid rgba(255,255,255,0.4);margin-left:auto">✕ Aufheben</button>
+      </div>`;
+    html+=`<div class="card"><h3>👤 Kandidaten (${kaR.length}${kaR.length>=50?'+':''})</h3>
+      <table style="width:100%"><thead><tr><th style="width:28px"><input type="checkbox" id="sucheSelAllCb" title="Alle Kandidaten-Treffer auswählen" onchange="sucheSelAll(this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></th><th>Name</th><th>Berufsbezeichnung</th><th>Ort</th><th>Arbeitgeber</th></tr></thead><tbody>${kaR.map(r=>`<tr class="row-click" onclick="detailKandidat('${r.id}')"><td onclick="event.stopPropagation()"><input type="checkbox" class="suche-cb" data-id="${r.id}" onchange="sucheSelToggle(this)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></td><td>${esc(r.voller_name)||'–'}</td><td>${esc(r.berufsbezeichnung)||'–'}</td><td>${esc(r.stadt)||''}</td><td>${esc(r.arbeitgeber)||''}</td></tr>`).join('')}</tbody></table></div>`;
+  }
   html+=sektion('Firmen','🏢',kuR,['Firma','Typ','Branche','Ort'],r=>`<tr class="row-click" onclick="detailKunde('${r.id}')"><td>${esc(r.name)||'–'}</td><td><span class="pill">${esc(r.typ)||'Auftraggeber'}</span></td><td>${esc(r.branche)||''}</td><td>${esc(r.stadt)||''}</td></tr>`);
   html+=sektion('Ansprechpartner','📇',koR,['Name','Firma','Funktion','E-Mail'],r=>`<tr class="row-click" onclick="detailKontakt('${r.id}')"><td>${esc(r.voller_name)||'–'}</td><td>${r.kunde_id&&fmap[r.kunde_id]?esc(fmap[r.kunde_id]):'<span style="color:var(--muted)">ohne Firma</span>'}</td><td>${esc(r.berufsbezeichnung)||'–'}</td><td>${esc(r.email)||'–'}</td></tr>`);
   if(!gesamt) html+=`<div style="color:var(--muted);font-size:13px;padding:10px 0">Keine Treffer für „${esc(term)}".</div>`;
