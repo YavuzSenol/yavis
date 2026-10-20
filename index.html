@@ -561,10 +561,10 @@
   <div id="view-offeneanrufe" style="display:none">
     <h2 style="color:var(--accent);font-size:17px;margin:0 0 4px">☎ Offene Anrufe</h2>
     <div style="color:var(--muted);font-size:13px;margin-bottom:16px">Anrufe an Nummern, die (noch) zu keiner Person oder Firma passen — eingehend wie ausgehend. Hier ordnest du sie einer neuen Person zu oder verwirfst sie. So geht kein Anruf verloren.</div>
+    <div id="oaBar" style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:8px"></div>
+    <div id="oaSpaltenPanel" style="display:none;border:1px solid var(--line);background:var(--panel);border-radius:4px;padding:12px 14px;margin-bottom:10px"></div>
     <div class="count" id="oaCount"></div>
-    <div style="overflow-x:auto"><table class="listtbl" style="width:100%"><thead><tr>
-      <th title="Richtung (↙ eingehend / ↗ ausgehend)"></th><th style="width:130px">Wann</th><th style="width:160px">Nummer</th><th>Grund</th><th style="width:235px">Aktionen</th>
-    </tr></thead><tbody id="oaBody"></tbody></table></div>
+    <div style="overflow-x:auto"><table class="listtbl" style="width:100%"><thead><tr id="oaHead"></tr></thead><tbody id="oaBody"></tbody></table></div>
   </div>
 
   <!-- Projekte-Tab -->
@@ -2198,32 +2198,75 @@ let _oaPendingId=null; // gemerkter offener Anruf, während dazu eine neue Perso
 const OA_GRUND={ kein_treffer:'unbekannte Nummer', nummer_fehlt:'Nummer unterdrückt', nummer_kurz:'interne/kurze Nummer', insert_fehler:'nachgeholt (Speicherfehler)', fehler:'nachgeholt (techn. Fehler)' };
 function oaZeit(ts){ if(!ts) return ''; const d=new Date(ts); if(isNaN(d.getTime())) return ''; return d.toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); }
 async function oaBadgeRefresh(){ try{ const {count}=await sb.from('anrufe_offen').select('id',{count:'exact',head:true}).eq('status','offen'); const b=document.getElementById('oaBadge'); if(!b) return; if(count>0){ b.textContent=count>99?'99+':count; b.style.display='inline-block'; } else b.style.display='none'; }catch(e){} }
+// --- Ansicht der Offenen Anrufe: Filter, Sortierung und Spalten frei einstellbar, wird im Browser gemerkt ---
+const OA_SPALTEN=[{k:'richtung',l:'Richtung (↙/↗)'},{k:'wann',l:'Wann'},{k:'nummer',l:'Nummer'},{k:'grund',l:'Grund'},{k:'dauer',l:'Dauer'}];
+const OA_STD={richtung:'',zeitraum:'',grund:'',status:'offen',sort:'neu',spalten:['richtung','wann','nummer','grund']};
+let _oaSpaltenOffen=false;
+function oaAnsicht(){ try{ return Object.assign({},OA_STD,JSON.parse(localStorage.getItem('yavis_oa_ansicht'))||{}); }catch(e){ return {...OA_STD}; } }
+function oaAnsichtSpeichern(a){ try{ localStorage.setItem('yavis_oa_ansicht',JSON.stringify(a)); }catch(e){} }
+function oaAnsichtAendern(feld,wert){ const a=oaAnsicht(); a[feld]=wert; oaAnsichtSpeichern(a); ladeOffeneAnrufe(); }
+function oaSpalteSchalten(k,an){ const a=oaAnsicht(); const s=new Set(a.spalten); if(an) s.add(k); else s.delete(k); a.spalten=OA_SPALTEN.map(x=>x.k).filter(x=>s.has(x)); oaAnsichtSpeichern(a); ladeOffeneAnrufe(); }
+function oaAnsichtZuruecksetzen(){ try{ localStorage.removeItem('yavis_oa_ansicht'); }catch(e){} ladeOffeneAnrufe(); }
+function oaSpaltenToggle(){ _oaSpaltenOffen=!_oaSpaltenOffen; const p=document.getElementById('oaSpaltenPanel'); if(p) p.style.display=_oaSpaltenOffen?'block':'none'; }
+function oaDauerFmt(s){ s=Number(s)||0; if(s<=0) return '–'; return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')+' min'; }
+function oaBarRender(a,grundWerte){
+  const bar=document.getElementById('oaBar'); if(!bar) return;
+  const f=(lbl,id,opts,wert)=>`<div class="field"><label>${lbl}</label><select onchange="oaAnsichtAendern('${id}',this.value)">${opts.map(o=>`<option value="${esc(o[0])}"${o[0]===wert?' selected':''}>${esc(o[1])}</option>`).join('')}</select></div>`;
+  bar.innerHTML=
+    f('Status','status',[['offen','offen'],['verworfen','verworfen'],['alle','alle']],a.status)+
+    f('Richtung','richtung',[['','alle'],['rein','↙ eingehend'],['raus','↗ ausgehend']],a.richtung)+
+    f('Zeitraum','zeitraum',[['','alle'],['heute','heute'],['7','letzte 7 Tage'],['30','letzte 30 Tage']],a.zeitraum)+
+    f('Grund','grund',[['','alle']].concat(grundWerte.map(g=>[g,OA_GRUND[g]||g])),a.grund)+
+    f('Sortierung','sort',[['neu','neueste zuerst'],['alt','älteste zuerst']],a.sort)+
+    `<button class="tab" onclick="oaSpaltenToggle()">🗂 Spalten</button><button class="tab" onclick="oaAnsichtZuruecksetzen()" title="Alle Einstellungen dieser Ansicht auf Standard zurücksetzen">↺ Standard</button>`;
+  const p=document.getElementById('oaSpaltenPanel');
+  if(p){ p.style.display=_oaSpaltenOffen?'block':'none';
+    p.innerHTML='<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Welche Spalten sollen angezeigt werden? (Aktionen bleiben immer sichtbar.)</div><div style="display:flex;gap:18px;flex-wrap:wrap">'+
+      OA_SPALTEN.map(x=>`<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" ${a.spalten.includes(x.k)?'checked':''} onchange="oaSpalteSchalten('${x.k}',this.checked)" style="width:15px;height:15px;accent-color:var(--accent)">${esc(x.l)}</label>`).join('')+'</div>'; }
+}
 async function ladeOffeneAnrufe(){
-  const tb=document.getElementById('oaBody'), cnt=document.getElementById('oaCount');
+  const tb=document.getElementById('oaBody'), cnt=document.getElementById('oaCount'), hd=document.getElementById('oaHead');
   if(!tb) return;
-  tb.innerHTML='<tr><td colspan="5" style="color:var(--muted);padding:12px">Lade …</td></tr>';
-  const {data,error}=await sb.from('anrufe_offen').select('*').eq('status','offen').order('erstellt_am',{ascending:false});
-  if(error){ tb.innerHTML='<tr><td colspan="5" style="color:var(--hot);padding:12px">Fehler: '+esc(error.message)+'</td></tr>'; return; }
-  const rows=data||[];
-  if(cnt) cnt.textContent=rows.length?rows.length+' offen':'';
-  if(!rows.length){ tb.innerHTML='<tr><td colspan="5" style="color:var(--muted);padding:12px">Keine offenen Anrufe – alles zugeordnet 🎉</td></tr>'; oaBadgeRefresh(); return; }
+  const a=oaAnsicht();
+  const sp=OA_SPALTEN.map(x=>x.k).filter(k=>a.spalten.includes(k));
+  const cols=sp.length+1;
+  const KOPF={richtung:'<th title="Richtung (↙ eingehend / ↗ ausgehend)"></th>',wann:'<th style="width:130px">Wann</th>',nummer:'<th style="width:160px">Nummer</th>',grund:'<th>Grund</th>',dauer:'<th style="width:90px">Dauer</th>'};
+  if(hd) hd.innerHTML=sp.map(k=>KOPF[k]).join('')+'<th style="width:235px">Aktionen</th>';
+  tb.innerHTML='<tr><td colspan="'+cols+'" style="color:var(--muted);padding:12px">Lade …</td></tr>';
+  let q=sb.from('anrufe_offen').select('*'); if(a.status!=='alle') q=q.eq('status',a.status);
+  const {data,error}=await q.order('erstellt_am',{ascending:a.sort==='alt'});
+  if(error){ tb.innerHTML='<tr><td colspan="'+cols+'" style="color:var(--hot);padding:12px">Fehler: '+esc(error.message)+'</td></tr>'; return; }
+  const alle=data||[];
+  oaBarRender(a,[...new Set(alle.map(r=>r.grund).filter(Boolean))]);
+  const ab=a.zeitraum==='heute'?new Date(new Date().setHours(0,0,0,0)).getTime():(a.zeitraum?Date.now()-Number(a.zeitraum)*864e5:0);
+  const rows=alle.filter(r=>(!a.richtung||(a.richtung==='raus'?r.richtung==='raus':r.richtung!=='raus'))&&(!a.grund||r.grund===a.grund)&&(!ab||new Date(r.ts||r.erstellt_am).getTime()>=ab));
+  const gefiltert=rows.length!==alle.length;
+  const wort=a.status==='offen'?'offen':a.status==='verworfen'?'verworfen':'Anrufe';
+  if(cnt) cnt.textContent=alle.length?(rows.length+' '+wort+(gefiltert?' (von '+alle.length+', gefiltert)':'')):'';
+  if(!rows.length){ tb.innerHTML='<tr><td colspan="'+cols+'" style="color:var(--muted);padding:12px">'+(alle.length?'Keine Anrufe passen zu den gewählten Filtern.':(a.status==='offen'?'Keine offenen Anrufe – alles zugeordnet 🎉':'Keine Anrufe in dieser Ansicht.'))+'</td></tr>'; oaBadgeRefresh(); return; }
   tb.innerHTML=rows.map(r=>{
     const rein=r.richtung!=='raus';
     const icon=rein?'<span title="eingehend" style="color:var(--muted);font-size:16px">↙</span>':'<span title="ausgehend" style="color:var(--accent);font-size:16px">↗</span>';
     const nr=r.nummer?esc(r.nummer):'<span style="color:var(--muted)">(unterdrückt)</span>';
-    const grund=esc(OA_GRUND[r.grund]||r.grund||'');
+    const grund=esc(OA_GRUND[r.grund]||r.grund||'')+(a.status==='alle'&&r.status!=='offen'?' · '+esc(r.status):'');
     const hatNr=!!(r.nummer&&(r.nummer_kern||'').length>=5);
-    return '<tr>'+
-      '<td>'+icon+'</td>'+
-      '<td style="white-space:nowrap">'+oaZeit(r.ts||r.erstellt_am)+'</td>'+
-      '<td style="font-variant-numeric:tabular-nums;white-space:nowrap">'+nr+'</td>'+
-      '<td style="overflow:hidden;text-overflow:ellipsis"><span style="color:var(--muted);font-size:12px">'+grund+'</span></td>'+
-      '<td style="white-space:nowrap;overflow:visible">'+
-        (hatNr?'<button class="tab" onclick="oaNeuerKandidat(\''+esc(r.id)+'\',\''+esc(r.nummer)+'\')">→ neue Person</button> ':'')+
-        '<button class="tab" onclick="oaVerwerfen(\''+esc(r.id)+'\')" title="Aus der Liste entfernen">✕ verwerfen</button>'+
-      '</td></tr>';
+    const ZELLE={
+      richtung:'<td>'+icon+'</td>',
+      wann:'<td style="white-space:nowrap">'+oaZeit(r.ts||r.erstellt_am)+'</td>',
+      nummer:'<td style="font-variant-numeric:tabular-nums;white-space:nowrap">'+nr+'</td>',
+      grund:'<td style="overflow:hidden;text-overflow:ellipsis"><span style="color:var(--muted);font-size:12px">'+grund+'</span></td>',
+      dauer:'<td style="white-space:nowrap;color:var(--muted)">'+oaDauerFmt(r.dauer)+'</td>'};
+    const aktion=r.status==='offen'
+      ? (hatNr?'<button class="tab" onclick="oaNeuerKandidat(\''+esc(r.id)+'\',\''+esc(r.nummer)+'\')">→ neue Person</button> ':'')+'<button class="tab" onclick="oaVerwerfen(\''+esc(r.id)+'\')" title="Aus der Liste entfernen">✕ verwerfen</button>'
+      : '<button class="tab" onclick="oaWiederherstellen(\''+esc(r.id)+'\')" title="Wieder als offenen Anruf führen">↺ wiederherstellen</button>';
+    return '<tr>'+sp.map(k=>ZELLE[k]).join('')+'<td style="white-space:nowrap;overflow:visible">'+aktion+'</td></tr>';
   }).join('');
   oaBadgeRefresh();
+}
+async function oaWiederherstellen(id){
+  const {error}=await sb.from('anrufe_offen').update({status:'offen'}).eq('id',id);
+  if(error){ alert('Konnte nicht wiederherstellen: '+error.message); return; }
+  ladeOffeneAnrufe();
 }
 function oaNeuerKandidat(id, nummer){
   const kn=(nummer||'').replace(/\D/g,'');
