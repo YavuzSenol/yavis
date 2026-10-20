@@ -5794,7 +5794,16 @@ function sucheSelUpdate(){
 }
 function sucheSelToggle(cb){ if(cb.checked) selectedKandIds.add(cb.dataset.id); else selectedKandIds.delete(cb.dataset.id); sucheSelUpdate(); }
 function sucheSelAll(checked){ document.querySelectorAll('.suche-cb').forEach(cb=>{ cb.checked=checked; if(checked) selectedKandIds.add(cb.dataset.id); else selectedKandIds.delete(cb.dataset.id); }); sucheSelUpdate(); }
-function sucheVerlassen(){ _zurueckZuSuche=null; selectedKandIds.clear(); document.getElementById('detailPage').style.display='none'; const aktiv=document.querySelector('.tab.active')?.dataset.view||'kandidaten'; document.getElementById('view-'+aktiv).style.display='block'; }
+function sucheKSelUpdate(){
+  const n=selectedKundenIds.size, bar=document.getElementById('sucheKSelBar'); if(!bar) return;
+  bar.style.display=n?'flex':'none';
+  document.getElementById('sucheKSelCount').textContent=n+(n===1?' Firma':' Firmen')+' ausgewählt';
+  const all=document.getElementById('sucheKSelAllCb'), alle=document.querySelectorAll('.suche-kcb').length;
+  if(all){ all.checked=n>0&&n===alle; all.indeterminate=n>0&&n<alle; }
+}
+function sucheKSelToggle(cb){ if(cb.checked) selectedKundenIds.add(cb.dataset.id); else selectedKundenIds.delete(cb.dataset.id); sucheKSelUpdate(); }
+function sucheKSelAll(checked){ document.querySelectorAll('.suche-kcb').forEach(cb=>{ cb.checked=checked; if(checked) selectedKundenIds.add(cb.dataset.id); else selectedKundenIds.delete(cb.dataset.id); }); sucheKSelUpdate(); }
+function sucheVerlassen(){ _zurueckZuSuche=null; selectedKandIds.clear(); selectedKundenIds.clear(); document.getElementById('detailPage').style.display='none'; const aktiv=document.querySelector('.tab.active')?.dataset.view||'kandidaten'; document.getElementById('view-'+aktiv).style.display='block'; }
 
 // ·240: Browser-Zurück läuft rückwärts durch die App (Dialog zu → Detail zu → Startseite), statt die Seite zu verlassen.
 // EIN Wächter-Eintrag (gesetzt in zeigeApp) fängt den Klick ab und wird nach jeder internen Navigation erneuert.
@@ -7225,7 +7234,7 @@ async function _kundenMassenLoeschenAusfuehren(dlg){
   dlg.close(); dlg.remove();
   zeigeMeldung(ids.length+' '+(ids.length===1?'Firma':'Firmen')+' in Papierkorb verschoben ✓','ok');
   kundeSelAufheben();
-  ladeKunden();
+  _nachFirmenAktion();
 }
 
 // ---- Firmen-Massenbearbeitung ----
@@ -7292,7 +7301,13 @@ async function kundenMassAnwenden(dlg){
   }
   dlg.close(); dlg.remove();
   zeigeMeldung(`✅ ${ids.length} Firmen aktualisiert (${feld})`,'ok');
-  ladeKunden();
+  _nachFirmenAktion();
+}
+// Nach einer Firmen-Massenaktion: auf der Trefferseite der Kopfzeilen-Suche bleiben (Treffer neu holen), sonst Firmenliste neu laden
+function _nachFirmenAktion(){
+  const dp=document.getElementById('detailPage');
+  if(_zurueckZuSuche && dp && dp.style.display==='block'){ globaleSuche(_zurueckZuSuche.erw); }
+  else ladeKunden();
 }
 
 function _csvDownload(name,head,zeilen){
@@ -8049,7 +8064,7 @@ async function globaleSuche(erweitert=false){
   const term=document.getElementById('globalSuche').value.trim();
   if(term.length<2) return;
   _zurueckZuSuche={term, erw:!!erweitert};
-  selectedKandIds.clear(); // Auswahl auf der Trefferseite beginnt bei jeder Suche neu
+  selectedKandIds.clear(); selectedKundenIds.clear(); // Auswahl auf der Trefferseite beginnt bei jeder Suche neu
   sucheVerlaufHinzufuegen(term);
   ['start','kandidaten','kunden','wiedervorlagen','nachfassen','newsletter','projekte','recherche','offeneanrufe'].forEach(v=>document.getElementById('view-'+v).style.display='none');
   const page=document.getElementById('detailPage'); page.style.display='block';
@@ -8062,7 +8077,7 @@ async function globaleSuche(erweitert=false){
     // Telefon-Suche: format-unabhängig, Teil-Nummer (Ausschnitt) reicht
     const [ka,ku]=await Promise.all([
       sd(sb.from('kandidaten').select('id,voller_name,berufsbezeichnung,stadt,arbeitgeber,telefon,mobil,telefon_privat,mobil_privat').limit(2000)),
-      sd(sb.from('kunden').select('id,name,typ,branche,stadt,telefon').limit(2000)),
+      sd(sb.from('kunden').select('id,name,typ,branche,stadt,telefon,plz,webseite,status,account_manager,quelle,bundesland,land').limit(2000)),
     ]);
     kaR=(ka.data||[]).filter(r=>[r.telefon,r.mobil,r.telefon_privat,r.mobil_privat].some(f=>nrEnthaelt(f,term)));
     kuR=(ku.data||[]).filter(r=>nrEnthaelt(r.telefon,term));
@@ -8079,7 +8094,7 @@ async function globaleSuche(erweitert=false){
       : `name.ilike.${like},branche.ilike.${like},stadt.ilike.${like}`;
     const tasks=[
       sd(sb.from('kandidaten').select(kandSel).or(kandOr).limit(60)),
-      sd(sb.from('kunden').select('id,name,typ,branche,stadt').or(kundOr).limit(60)),
+      sd(sb.from('kunden').select('*').or(kundOr).limit(60)), // alle Felder: die Massenbearbeitung/CSV/„An Kandidat" der Firmen-Treffer braucht sie
     ];
     if(erweitert) tasks.push(sb.from('notizen').select('kandidat_id,kunde_id').ilike('inhalt',like).limit(300));
     const [ka,ku,nz]=await Promise.all(tasks);
@@ -8089,7 +8104,7 @@ async function globaleSuche(erweitert=false){
       const nKa=[...new Set((nz.data||[]).map(n=>n.kandidat_id).filter(Boolean))].filter(id=>!kaR.some(r=>r.id===id)).slice(0,40);
       const nKu=[...new Set((nz.data||[]).map(n=>n.kunde_id).filter(Boolean))].filter(id=>!kuR.some(r=>r.id===id)).slice(0,40);
       if(nKa.length){ const {data}=await sd(sb.from('kandidaten').select(kandSel).in('id',nKa)); (data||[]).forEach(r=>kaR.push(r)); }
-      if(nKu.length){ const {data}=await sd(sb.from('kunden').select('id,name,typ,branche,stadt').in('id',nKu)); (data||[]).forEach(r=>kuR.push(r)); }
+      if(nKu.length){ const {data}=await sd(sb.from('kunden').select('*').in('id',nKu)); (data||[]).forEach(r=>kuR.push(r)); }
     }
   }
   const fids=[...new Set((koR||[]).map(r=>r.kunde_id).filter(Boolean))];
@@ -8116,7 +8131,21 @@ async function globaleSuche(erweitert=false){
     html+=`<div class="card"><h3>👤 Kandidaten (${kaR.length}${kaR.length>=50?'+':''})</h3>
       <table style="width:100%"><thead><tr><th style="width:28px"><input type="checkbox" id="sucheSelAllCb" title="Alle Kandidaten-Treffer auswählen" onchange="sucheSelAll(this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></th><th>Name</th><th>Berufsbezeichnung</th><th>Ort</th><th>Arbeitgeber</th></tr></thead><tbody>${kaR.map(r=>`<tr class="row-click" onclick="detailKandidat('${r.id}')"><td onclick="event.stopPropagation()"><input type="checkbox" class="suche-cb" data-id="${r.id}" onchange="sucheSelToggle(this)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></td><td>${esc(r.voller_name)||'–'}</td><td>${esc(r.berufsbezeichnung)||'–'}</td><td>${esc(r.stadt)||''}</td><td>${esc(r.arbeitgeber)||''}</td></tr>`).join('')}</tbody></table></div>`;
   }
-  html+=sektion('Firmen','🏢',kuR,['Firma','Typ','Branche','Ort'],r=>`<tr class="row-click" onclick="detailKunde('${r.id}')"><td>${esc(r.name)||'–'}</td><td><span class="pill">${esc(r.typ)||'Auftraggeber'}</span></td><td>${esc(r.branche)||''}</td><td>${esc(r.stadt)||''}</td></tr>`);
+  if(kuR.length){
+    // Auswahl + Massenbearbeitung für die Firmen-Treffer (nutzt dieselben Funktionen wie die Firmenliste)
+    _kundenGeladen=kuR;
+    const bt='background:rgba(255,255,255,0.2);color:#fff;border:none;padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px';
+    html+=`<div id="sucheKSelBar" style="display:none;align-items:center;gap:8px;background:var(--accent);color:#fff;padding:8px 14px;border-radius:6px;margin-bottom:8px;flex-wrap:wrap">
+        <span id="sucheKSelCount" style="font-weight:600"></span>
+        <button onclick="kundenAnKandidat()" style="${bt}">👤 An Kandidat senden</button>
+        <button onclick="kundenMassenupdate()" style="${bt}">✏️ Ändern</button>
+        <button onclick="kundenCsvExport()" style="${bt}">📥 CSV</button>
+        <button onclick="kundenMassenLoeschen()" title="Markierte Firmen in den Papierkorb verschieben — wiederherstellbar" style="background:rgba(229,72,77,0.3);color:#fff;border:1px solid rgba(255,255,255,0.4);padding:5px 11px;border-radius:4px;cursor:pointer;font-size:13px">🗑️ Löschen</button>
+        <button onclick="sucheKSelAll(false)" style="${bt};border:1px solid rgba(255,255,255,0.4);margin-left:auto">✕ Aufheben</button>
+      </div>`;
+    html+=`<div class="card"><h3>🏢 Firmen (${kuR.length}${kuR.length>=50?'+':''})</h3>
+      <table style="width:100%"><thead><tr><th style="width:28px"><input type="checkbox" id="sucheKSelAllCb" title="Alle Firmen-Treffer auswählen" onchange="sucheKSelAll(this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></th><th>Firma</th><th>Typ</th><th>Branche</th><th>Ort</th></tr></thead><tbody>${kuR.map(r=>`<tr class="row-click" onclick="detailKunde('${r.id}')"><td onclick="event.stopPropagation()"><input type="checkbox" class="suche-kcb" data-id="${r.id}" onchange="sucheKSelToggle(this)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)"></td><td>${esc(r.name)||'–'}</td><td><span class="pill">${esc(r.typ)||'Auftraggeber'}</span></td><td>${esc(r.branche)||''}</td><td>${esc(r.stadt)||''}</td></tr>`).join('')}</tbody></table></div>`;
+  }
   html+=sektion('Ansprechpartner','📇',koR,['Name','Firma','Funktion','E-Mail'],r=>`<tr class="row-click" onclick="detailKontakt('${r.id}')"><td>${esc(r.voller_name)||'–'}</td><td>${r.kunde_id&&fmap[r.kunde_id]?esc(fmap[r.kunde_id]):'<span style="color:var(--muted)">ohne Firma</span>'}</td><td>${esc(r.berufsbezeichnung)||'–'}</td><td>${esc(r.email)||'–'}</td></tr>`);
   if(!gesamt) html+=`<div style="color:var(--muted);font-size:13px;padding:10px 0">Keine Treffer für „${esc(term)}".</div>`;
   page.innerHTML=html;
