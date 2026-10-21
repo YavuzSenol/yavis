@@ -1457,6 +1457,10 @@
           <div><b>Newsletter-Absender</b><div style="font-size:12px;color:var(--muted)">Von dieser Adresse gehen Newsletter raus. Leer = dein eigenes Outlook-Konto. Voraussetzung: dein Konto hat in Microsoft 365 „Senden als" für diese Adresse. Mit „✉️ Test an mich" im Newsletter-Dialog prüfen.</div></div>
           <input id="einsNlAbsender" type="email" placeholder="tga@senolconsulting.de" onchange="einsFeldSave()" style="width:220px;padding:6px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
         </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;padding:11px 16px;border-bottom:1px solid var(--line)">
+          <div><b>Antworten aus dem Absender-Postfach</b><div style="font-size:12px;color:var(--muted)">Der Mail-Abgleich liest zusätzlich das Postfach des Newsletter-Absenders mit, damit Antworten auf Newsletter im E-Mail-Verlauf der Person erscheinen. Voraussetzung: dein Konto hat dort „Lesen und verwalten".</div></div>
+          <div style="display:flex;align-items:center;gap:10px;white-space:nowrap"><span id="gpStatus" style="font-size:12px;color:var(--muted)"></span><button onclick="gpPruefen()" style="padding:6px 12px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:13px">Postfach prüfen</button></div>
+        </div>
         <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--line)">
           <div><b>Jobs-Link (Newsletter)</b><div style="font-size:12px;color:var(--muted)">Allgemeine Jobseite — Fallback, wenn eine Stelle keinen eigenen Link hat</div></div>
           <input id="einsJobsUrl" type="text" placeholder="https://www.senolconsulting.de/jobs" onchange="einsFeldSave()" style="width:260px;padding:6px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
@@ -2285,6 +2289,16 @@ async function oaWiederherstellen(id){
   const {error}=await sb.from('anrufe_offen').update({status:'offen'}).eq('id',id);
   if(error){ alert('Konnte nicht wiederherstellen: '+error.message); return; }
   ladeOffeneAnrufe();
+}
+// Wird aus einem offenen Anruf eine neue Person, bekommt sie den Anruf als Anrufnotiz (Zeit, Richtung, Dauer) – er erscheint im Verlauf und in der Aktivität
+async function oaAlsNotizAnhaengen(oaId, kandidatId){
+  const {data:r}=await sb.from('anrufe_offen').select('*').eq('id',oaId).single();
+  if(!r) return;
+  const rein=r.richtung!=='raus', dur=Number(r.dauer)||0, ts=r.ts||r.erstellt_am||new Date().toISOString();
+  const dTxt=dur?(' · '+Math.floor(dur/60)+':'+String(dur%60).padStart(2,'0')+' min'):'';
+  const inhalt='☎ Anruf '+(rein?'(eingehend)':'(ausgehend)')+(dur?'':' – kein Gespräch')+dTxt+' · via Starface'+(r.callid?' [SF#'+r.callid+']':'')+(r.nummer?' · '+r.nummer:'');
+  const {error}=await sb.from('notizen').upsert({id:'oa_'+r.id, typ:'Anruf', richtung:rein?'rein':'raus', inhalt, erstellt_am:ts, geaendert_am:ts, modul:'kandidat', kandidat_id:kandidatId});
+  if(error) console.error('Anruf als Notiz anhängen:', error.message);
 }
 function oaNeuerKandidat(id, nummer){
   const kn=(nummer||'').replace(/\D/g,'');
@@ -6972,7 +6986,7 @@ async function speichereKandidat(id){
   // (still — kein Outlook-Token vorhanden oder Fehler = einfach überspringen, darf den Speichervorgang nie stören)
   if(!id && (obj.email||obj.email_beruflich)){ mailsNachimportieren(obj.id, true).catch(()=>{}); }
   // Kam die neue Person aus einem "nicht zugeordneten Anruf"? Dann diesen Eintrag erledigen (Nummer ist jetzt bekannt).
-  if(!id && _oaPendingId){ try{ await sb.from('anrufe_offen').update({status:'zugeordnet'}).eq('id',_oaPendingId); }catch(e){} _oaPendingId=null; }
+  if(!id && _oaPendingId){ const _oaId=_oaPendingId; _oaPendingId=null; try{ await oaAlsNotizAnhaengen(_oaId, obj.id); await sb.from('anrufe_offen').update({status:'zugeordnet'}).eq('id',_oaId); }catch(e){} }
   setTimeout(()=>detailKandidat(id||obj.id), 600);
 }
 
@@ -7180,6 +7194,7 @@ function zeigeKundeFormular(d){
       ${eselV('Status','status',d.status,mlGet('firmenstatus'))}
       ${esel('Branche'+(neu?' *':''),'branche',d.branche,branchenListe())}
       ${ef('Telefon'+(neu?' *':''),'telefon',d.telefon)}
+      ${neu?'<div style="grid-column:1/-1;font-size:12px;color:var(--muted);margin-top:-4px">* Pflichtfelder gelten nicht für den Typ <b>Lieferant</b> – dort reicht der Firmenname.</div>':''}
       ${ef('Fax','fax',d.fax)}
       ${ef('E-Mail','email',d.email,'email')}
       ${ef('2. E-Mail','email_zweit',d.email_zweit,'email')}
@@ -7221,7 +7236,7 @@ async function speichereKunde(id){
   if(obj.plz){ try{ const {data:g}=await sb.from('plz_geo').select('lat,lng,bundesland,ort').eq('plz',obj.plz).single(); if(g){ obj.lat=g.lat;obj.lng=g.lng; if(!obj.bundesland&&g.bundesland) obj.bundesland=g.bundesland; if(!obj.stadt&&g.ort) obj.stadt=g.ort; } }catch(e){} }
   // --- Validierung (hart) ---
   if(!obj.name||!obj.name.trim()){ msg.style.color='var(--hot)'; msg.textContent='Bitte einen Firmennamen angeben.'; return; }
-  if(!id){ // Pflichtfelder beim NEUANLEGEN (Nutzer-Regel 21.07.): keine leeren Firmen-Hüllen mehr
+  if(!id && obj.typ!=='Lieferant'){ // Pflichtfelder beim NEUANLEGEN (Nutzer-Regel 21.07.): keine leeren Firmen-Hüllen mehr — Ausnahme Lieferant (oft nur Name + service@-Adresse bekannt)
     const fehlt=[];
     if(!obj.branche) fehlt.push('Branche');
     if(!obj.telefon||!obj.telefon.trim()) fehlt.push('Telefon');
@@ -8593,6 +8608,7 @@ function oeffneEinstellungen(){
   Array.from(radSel.options).forEach(o=>o.selected=(o.value===radVal));
   document.getElementById('einsBcc').value=localStorage.getItem('yavis_bcc')||'';
   { const na=document.getElementById('einsNlAbsender'); if(na) na.value=nlAbsender(); }
+  gpStatusAnzeigen();
   { const ju=document.getElementById('einsJobsUrl'); if(ju) ju.value=localStorage.getItem('yavis_jobs_url')||''; }
   { const jv=document.getElementById('einsJobLinkVorlage'); if(jv) jv.value=jobLinkVorlage(); }
   document.getElementById('einsSignatur').value=localStorage.getItem('yavis_signatur')||'';
@@ -8618,7 +8634,7 @@ function einsFeldSave(){
   if(g('einsMeinePlz'))  localStorage.setItem('yavis_meine_plz', g('einsMeinePlz').value.trim());
   if(g('einsRadius'))    localStorage.setItem('yavis_radius', g('einsRadius').value);
   if(g('einsBcc'))       localStorage.setItem('yavis_bcc', g('einsBcc').value.trim());
-  { const na=g('einsNlAbsender'); if(na){ const v=na.value.trim(); if(v&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)){ zeigeMeldung('Ungültige Absender-Adresse','warn'); } else { localStorage.setItem('yavis_nl_absender', v); _nlSendRoute=null; } } } // leer wird bewusst gespeichert = eigenes Konto
+  { const na=g('einsNlAbsender'); if(na){ const v=na.value.trim(); if(v&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)){ zeigeMeldung('Ungültige Absender-Adresse','warn'); } else { localStorage.setItem('yavis_nl_absender', v); _nlSendRoute=null; localStorage.removeItem('yavis_gp_status'); gpStatusAnzeigen(); } } } // leer wird bewusst gespeichert = eigenes Konto
   { const ju=g('einsJobsUrl'); if(ju){ const v=ju.value.trim(); if(v) localStorage.setItem('yavis_jobs_url',v); else localStorage.removeItem('yavis_jobs_url'); } }
   { const jv=g('einsJobLinkVorlage'); if(jv) localStorage.setItem('yavis_job_link_vorlage', jv.value.trim()); }
   if(g('einsSignatur'))  localStorage.setItem('yavis_signatur', g('einsSignatur').value);
@@ -9874,6 +9890,10 @@ const MS_CLIENT_ID = '3b720301-85dc-48c7-9033-b6e0805c378c';
 const MS_TENANT_ID = '308cccc9-d663-4179-a78c-69fdfbec1565';
 const MS_REDIRECT_URI = 'https://yavuzsenol.github.io/yavis';
 const MS_SCOPES = 'https://graph.microsoft.com/Mail.ReadWrite https://graph.microsoft.com/Mail.Send https://graph.microsoft.com/Calendars.ReadWrite offline_access';
+// Zusätzliches Recht, um das Postfach des Newsletter-Absenders (z. B. tga@) im Mail-Abgleich mitzulesen.
+// Wird erst NACH erfolgreicher Zustimmung dauerhaft in die Anfrage aufgenommen (Flag ms_shared) – schlägt es fehl, bleibt die normale Outlook-Verbindung unberührt.
+const MS_SHARED_SCOPE = 'https://graph.microsoft.com/Mail.Read.Shared';
+function msScopes(){ return MS_SCOPES + (localStorage.getItem('ms_shared')==='1' ? ' '+MS_SHARED_SCOPE : ''); }
 
 // ---- PKCE Hilfsfunktionen ----
 async function msPKCEErzeugen(){
@@ -9887,16 +9907,17 @@ async function msPKCEErzeugen(){
 }
 
 // ---- Login (Weiterleitung zu Microsoft) ----
-async function msLogin(){
+async function msLogin(mitShared){
   const {verifier,challenge}=await msPKCEErzeugen();
   const state=Math.random().toString(36).slice(2);
   localStorage.setItem('ms_pkce_verifier',verifier);
   localStorage.setItem('ms_oauth_state',state);
+  if(mitShared===true) localStorage.setItem('ms_shared_pending','1'); else localStorage.removeItem('ms_shared_pending'); // (onclick=msLogin übergibt ein Event – nur echtes true zählt)
   const params=new URLSearchParams({
     client_id:MS_CLIENT_ID,
     response_type:'code',
     redirect_uri:MS_REDIRECT_URI,
-    scope:MS_SCOPES,
+    scope:msScopes()+((mitShared===true&&localStorage.getItem('ms_shared')!=='1')?' '+MS_SHARED_SCOPE:''),
     state,
     code_challenge:challenge,
     code_challenge_method:'S256',
@@ -9927,6 +9948,8 @@ async function msHandleCallback(){
     localStorage.setItem('ms_token_expiry',Date.now()+(tok.expires_in*1000));
     localStorage.removeItem('ms_pkce_verifier');
     localStorage.removeItem('ms_oauth_state');
+    // Nur wenn Microsoft das Zusatzrecht wirklich erteilt hat, wird es künftig mit angefragt
+    if(localStorage.getItem('ms_shared_pending')==='1'){ localStorage.removeItem('ms_shared_pending'); if(/Mail\.Read\.Shared/i.test(tok.scope||'')){ localStorage.setItem('ms_shared','1'); localStorage.removeItem('yavis_gp_status'); } }
     return true;
   }catch(e){console.error('Token-Tausch fehlgeschlagen:',e);return false;}
 }
@@ -9939,12 +9962,14 @@ async function msGetToken(){
   const refresh=localStorage.getItem('ms_refresh_token');
   if(!refresh) return null;
   try{
-    const resp=await fetch(`https://login.microsoftonline.com/${MS_TENANT_ID}/oauth2/v2.0/token`,{
+    const holen=(scope)=>fetch(`https://login.microsoftonline.com/${MS_TENANT_ID}/oauth2/v2.0/token`,{
       method:'POST',
       headers:{'Content-Type':'application/x-www-form-urlencoded'},
-      body:new URLSearchParams({client_id:MS_CLIENT_ID,grant_type:'refresh_token',refresh_token:refresh,scope:MS_SCOPES})
-    });
-    const tok2=await resp.json();
+      body:new URLSearchParams({client_id:MS_CLIENT_ID,grant_type:'refresh_token',refresh_token:refresh,scope})
+    }).then(r=>r.json());
+    let tok2=await holen(msScopes());
+    // Schlägt die Anfrage MIT Zusatzrecht fehl, darf die normale Outlook-Verbindung nicht kaputtgehen: Zusatzrecht abschalten, ohne erneut versuchen
+    if(tok2.error && localStorage.getItem('ms_shared')==='1'){ localStorage.removeItem('ms_shared'); tok2=await holen(MS_SCOPES); }
     if(tok2.error) return null;
     localStorage.setItem('ms_access_token',tok2.access_token);
     if(tok2.refresh_token) localStorage.setItem('ms_refresh_token',tok2.refresh_token);
@@ -10425,6 +10450,67 @@ async function outlookVollsync(){
   }catch(e){ alert('Fehler: '+(e.message||e)); }
 }
 
+// ===== Gemeinsames Postfach des Newsletter-Absenders (tga@) im Mail-Abgleich =====
+function gpAdresse(){ const a=(typeof nlAbsender==='function'?nlAbsender():'').toLowerCase(); return a; }
+// Liest neue Mails des Absender-Postfachs (Graph /users/<adresse>) und hängt zuordenbare an ctx.rows an. Rückgabe-Status: ok | verweigert | nicht_gefunden | fehler
+async function gpScan(token, adresse, ctx){
+  const kopf={'Authorization':'Bearer '+token};
+  const base='https://graph.microsoft.com/v1.0/users/'+encodeURIComponent(adresse);
+  const skip=new Set();
+  for(const wk of ['junkemail','deleteditems','drafts']){
+    try{
+      const r=await fetch(base+'/mailFolders/'+wk+'?$select=id',{headers:kopf});
+      if(r.status===401||r.status===403) return {status:'verweigert'};
+      if(r.status===404) return {status:'nicht_gefunden'};
+      if(r.ok){ const j=await r.json(); if(j.id) skip.add(j.id); }
+    }catch(e){}
+  }
+  let url=base+'/messages?$top=50&$orderby=receivedDateTime%20desc&$select='+_SYNC_SELECT+',parentFolderId,isDraft';
+  let stop=false, pages=0, neu=0;
+  while(url && !stop && pages<60){
+    pages++;
+    const resp=await fetch(url,{headers:{...kopf,'Prefer':'outlook.body-content-type="text"'}});
+    if(resp.status===401||resp.status===403) return {status:'verweigert'};
+    if(resp.status===404) return {status:'nicht_gefunden'};
+    if(!resp.ok) return {status:'fehler'};
+    const data=await resp.json();
+    for(const m of (data.value||[])){
+      if(m.isDraft) continue;
+      if(m.parentFolderId && skip.has(m.parentFolderId)) continue;
+      const iid=m.internetMessageId;
+      if(iid && ctx.known.has(iid)){ stop=true; break; }   // ab hier alles bereits synchronisiert
+      if(iid && ctx.seen.has(iid)) continue;
+      const r=_msgZuRow(m, ctx.addr2id, ctx.myAddrs);
+      if(r){ if(iid) ctx.seen.add(iid); ctx.rows.push(r); neu++; }
+    }
+    url=data['@odata.nextLink']||null;
+  }
+  return {status:'ok', neu};
+}
+// Einstellungen: Zugriff auf das Absender-Postfach prüfen; fehlt das Recht, kann es mit einer erneuten Microsoft-Anmeldung erteilt werden
+async function gpPruefen(){
+  const gp=gpAdresse(); const lbl=document.getElementById('gpStatus');
+  if(!gp){ zeigeMeldung('Erst einen Newsletter-Absender eintragen','warn'); return; }
+  const token=await msGetToken(); if(!token){ zeigeMeldung('Outlook ist nicht verbunden','warn'); return; }
+  if(lbl) lbl.textContent='prüfe …';
+  const r=await fetch('https://graph.microsoft.com/v1.0/users/'+encodeURIComponent(gp)+'/mailFolders/inbox?$select=id,totalItemCount',{headers:{'Authorization':'Bearer '+token}});
+  let status = r.ok?'ok':(r.status===401||r.status===403?'verweigert':(r.status===404?'nicht_gefunden':'fehler'));
+  localStorage.setItem('yavis_gp_status', status);
+  gpStatusAnzeigen();
+  if(status==='ok'){ zeigeMeldung('Postfach '+gp+' ist lesbar ✓ – Antworten werden beim nächsten Abgleich übernommen','ok'); return; }
+  if(status==='verweigert'){
+    if(localStorage.getItem('ms_shared')!=='1'){
+      if(confirm('Microsoft verweigert YAVIS den Zugriff auf das Postfach '+gp+'.\n\nDazu braucht YAVIS ein zusätzliches Lese-Recht für gemeinsame Postfächer (nur lesen, nichts ändern).\n\nJetzt erteilen? Du wirst kurz zu Microsoft weitergeleitet, meldest dich an und stimmst zu; danach kommst du zu YAVIS zurück.')) msLogin(true);
+    } else alert('Der Zugriff auf '+gp+' ist trotz zusätzlichem Lese-Recht verweigert.\n\nPrüfe im Exchange-Admin-Center, ob dein Konto beim Postfach '+gp+' „Lesen und verwalten" (Vollzugriff) hat – und ob die Änderung schon wirksam ist (bis zu 1 Stunde).');
+  } else if(status==='nicht_gefunden') alert('Das Postfach '+gp+' wurde nicht gefunden. Stimmt die Adresse?');
+  else zeigeMeldung('Postfach-Prüfung fehlgeschlagen (HTTP '+r.status+')','err');
+}
+function gpStatusAnzeigen(){
+  const lbl=document.getElementById('gpStatus'); if(!lbl) return;
+  const s=localStorage.getItem('yavis_gp_status');
+  lbl.textContent = s==='ok'?'✅ lesbar':(s==='verweigert'?'⛔ Zugriff fehlt':(s==='nicht_gefunden'?'❓ Postfach nicht gefunden':(s==='fehler'?'⚠️ Fehler':'noch nicht geprüft')));
+}
+
 // INKREMENTELLER SYNC = nur neue Mails ergänzen, NIE löschen (YAVIS bleibt dauerhaftes Archiv)
 let _incSyncLaeuft=false;
 async function outlookIncSync(silent){
@@ -10468,6 +10554,16 @@ async function outlookIncSync(silent){
       }
     }
     await scanRecentAlle();
+    // Postfach des Newsletter-Absenders (z. B. tga@) mitlesen: dort landen die Antworten auf Newsletter
+    try{
+      const gp=gpAdresse();
+      if(gp && (!silent || localStorage.getItem('yavis_gp_status')!=='verweigert')){
+        const res=await gpScan(token, gp, {known, seen, rows, addr2id, myAddrs});
+        const alt=localStorage.getItem('yavis_gp_status');
+        localStorage.setItem('yavis_gp_status', res.status);
+        if(res.status==='verweigert' && alt!=='verweigert') zeigeMeldung('Postfach '+gp+' ist für YAVIS noch nicht freigegeben – Einstellungen → Newsletter-Absender → „Postfach prüfen"','warn');
+      }
+    }catch(e){ console.error('Gemeinsames Postfach', e); }
     if(!rows.length){ if(!silent){ alert('Keine neuen Mails gefunden — alles aktuell. ✓'); } zeigeMeldung('Aktuell — keine neuen Mails ✓','ok'); return; }
     let ok=0;
     for(let i=0;i<rows.length;i+=200){ const {error}=await sb.from('emails').insert(rows.slice(i,i+200)); if(!error) ok+=Math.min(200,rows.length-i); }
@@ -14425,6 +14521,8 @@ function _nlTrackUrl(target, kandidatId){
   q+='&c='+encodeURIComponent(nlProtokollLabel?nlProtokollLabel():'Newsletter');
   return NL_TRACK_URL+q;
 }
+// Newsletter-Signatur: dieselbe Signatur wie überall, nur die Kontakt-Adresse ist die des Newsletter-Absenders (Antworten gehen dorthin)
+function _nlSignatur(){ let s=signaturHtml(); const a=nlAbsender(); if(s && a) s=s.split('senol@senolconsulting.de').join(a); return s; }
 function nlHtmlBody(text, kandidatId){
   const escH=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   // 1) URLs vor dem Escapen herausziehen (Token), 2) escapen + Umbrüche, 3) als (getrackte) Links wieder einsetzen
@@ -14447,7 +14545,7 @@ function nlHtmlBody(text, kandidatId){
   // RESPONSIVE Spalte: bis 640px (Desktop/Web zentriert), aber flexibel -> schrumpft mobil auf Bildschirmbreite.
   // MSO-Ghost-Table fixiert nur Outlook-Desktop auf 640 (versteht kein max-width).
   const inner=_nlHeaderHtml()
-    +'<div style="font-family:Calibri,Arial,sans-serif;font-size:14px;color:#1d1d1b;line-height:1.55">'+html+signaturHtml()+'</div>';
+    +'<div style="font-family:Calibri,Arial,sans-serif;font-size:14px;color:#1d1d1b;line-height:1.55">'+html+_nlSignatur()+'</div>';
   return '<div style="max-width:640px;width:100%;margin:0 auto">'
     +'<!--[if mso]><table role="presentation" align="center" width="640" cellpadding="0" cellspacing="0" border="0"><tr><td style="width:640px;padding:0"><![endif]-->'
     + inner
