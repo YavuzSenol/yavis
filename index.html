@@ -10248,6 +10248,27 @@ async function starfaceCsvImport(input){
 const _NDR_FROM=/(postmaster|mailer-daemon|maildelivery|microsoftexchange3|delivery.?(subsystem|status|failure))/i;
 const _NDR_SUBJ=/(unzustellbar|undeliverable|delivery has failed|delivery status notification|nicht zugestellt|returned mail|mail delivery (failed|subsystem)|zustellung.*(fehlgeschlagen|nicht m[öo]glich)|failure notice)/i;
 let _rlTreffer=[];
+// Microsoft lehnt Mails ab, weil der ABSENDER gesperrt ist (z. B. nach Spam-Alarm): „550 5.1.8 Access denied, bad outbound sender AS(42004)". Die Empfänger-Adressen sind dabei völlig in Ordnung.
+const _RL_SPERRE=/bad outbound sender|AS\(420\d\d\)|not recognized as a valid sender|sending email address was not recognized|5\.1\.8 Access denied|5\.7\.50[0-9]/i;
+// Personen, die den Newsletter wegen der Sperre NIE bekommen haben, aber als „gesendet" protokolliert sind: Protokoll von heute auf Wunsch entfernen (Sicherung wird vorher heruntergeladen)
+async function rlGesperrtAufraeumen(liste, anzNdr){
+  const ids=liste.map(x=>x.id);
+  if(!ids.length) return;
+  const heute=new Date(new Date().setHours(0,0,0,0)).toISOString();
+  const rows=[];
+  for(let i=0;i<ids.length;i+=100){
+    const {data}=await sb.from('emails').select('*').in('entity_id',ids.slice(i,i+100)).like('id','nl_%').gte('erstellt_am',heute);
+    (data||[]).forEach(r=>rows.push(r));
+  }
+  alert(anzNdr+' der Rückläufer stammen NICHT von falschen Adressen, sondern von der Microsoft-Sperre deines Absenders („bad outbound sender").\n\nDiese '+ids.length+' Adressen sind in Ordnung und werden NICHT als „unzustellbar" markiert.');
+  if(!rows.length) return;
+  if(!confirm(ids.length+' Personen haben den Newsletter wegen der Sperre nie erhalten, YAVIS hat aber „gesendet" protokolliert ('+rows.length+' Einträge von heute).\n\nDiese Protokolleinträge jetzt entfernen, damit die Personen wieder als „noch nicht angeschrieben" gelten?\n\nVorher wird eine Sicherungsdatei heruntergeladen.')) return;
+  const blob=new Blob([JSON.stringify(rows,null,1)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='newsletter_protokoll_gesperrt_'+new Date().toISOString().slice(0,10)+'.json'; a.click();
+  let n=0;
+  for(let i=0;i<rows.length;i+=100){ const teil=rows.slice(i,i+100).map(r=>r.id); const {error}=await sb.from('emails').delete().in('id',teil); if(!error) n+=teil.length; else console.error('Protokoll entfernen',error); }
+  zeigeMeldung(n+' Protokolleinträge entfernt ✓ (Sicherung heruntergeladen)','ok');
+}
 async function rueckLaeuferPruefen(){
   const token=await msGetToken();
   if(!token){ alert('Nicht mit Outlook verbunden.\n\nBitte zuerst in Einstellungen → Konto auf „🔗 Mit Outlook verbinden".'); return; }
@@ -10256,6 +10277,7 @@ async function rueckLaeuferPruefen(){
     const {addr2id, myAddrs}=await _syncKontext(token);
     zeigeMeldung('Durchsuche Posteingang nach Rückläufern …','ok');
     const gefunden={}; let geprueft=0, ndr=0;
+    const gesperrt={}; let gesperrtNdr=0; // Rückläufer wegen Absender-Sperre (Microsoft „bad outbound sender"): Empfänger-Adresse ist in Ordnung!
     let url='https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=50&$select='+_SYNC_SELECT+'&$orderby=receivedDateTime%20desc';
     while(url && geprueft<1500){
       const resp=await fetch(url,{headers:{'Authorization':'Bearer '+token,'Prefer':'outlook.body-content-type="text"'}});
@@ -10270,13 +10292,19 @@ async function rueckLaeuferPruefen(){
         const body=(m.body&&m.body.content||'');
         const alle=((subj+' '+body).match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/gi)||[]);
         const seen=new Set();
+        // Absender-Sperre (nicht die Schuld des Empfängers): NICHT als „unzustellbar" markieren, sondern gesondert sammeln
+        const istSperre=_RL_SPERRE.test(subj+' '+body);
+        if(istSperre) gesperrtNdr++;
         alle.forEach(a=>{ const low=a.toLowerCase(); if(seen.has(low)) return; seen.add(low);
           const kid=addr2id[low];
-          if(kid && !gefunden[kid]) gefunden[kid]={id:kid, email:low, betreff:subj.slice(0,140), datum:m.receivedDateTime}; });
+          if(!kid) return;
+          if(istSperre){ if(!gesperrt[kid]) gesperrt[kid]={id:kid, email:low}; return; }
+          if(!gefunden[kid]) gefunden[kid]={id:kid, email:low, betreff:subj.slice(0,140), datum:m.receivedDateTime}; });
       }
       url=data['@odata.nextLink']||null;
       zeigeMeldung('Durchsuche … '+geprueft+' geprüft, '+ndr+' Rückläufer','ok');
     }
+    if(gesperrtNdr){ await rlGesperrtAufraeumen(Object.values(gesperrt), gesperrtNdr); }
     const treffer=Object.values(gefunden);
     if(!treffer.length){ alert('Keine unzustellbaren Kandidaten-Mails im Posteingang gefunden.\n\nGeprüft: '+geprueft+' Mails, davon '+ndr+' Rückläufer-Meldungen (keine passte zu einer Kandidaten-Adresse).'); zeigeMeldung('Keine Rückläufer zugeordnet','warn'); return; }
     const ids=treffer.map(t=>t.id); const namen={};
