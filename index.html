@@ -14026,7 +14026,7 @@ const NL_ZITATE_STD = [
   '„Es ist nicht von Bedeutung, wie langsam du gehst, solange du nicht stehenbleibst." – Konfuzius',
   '„Ich habe niemals an Erfolg geglaubt. Ich habe dafür gearbeitet." – Estée Lauder',
   '„Nur wer selbst brennt, kann Feuer in anderen entfachen." – Aurelius Augustinus',
-  '„Wünsch dir nicht, es wäre einfacher. Sorg dafür, dass du besser wirst!"',
+  '„Wünsch dir nicht, es wäre einfacher. Sorg dafür, dass du besser wirst!" – Jim Rohn',
   '„Der Unterschied zwischen dem Unmöglichen und dem Möglichen liegt immer in der Entschlossenheit der Person." – Tommy Lasorda',
   '„Wenn es dir nicht gefällt, wie die Dinge sind: Beweg dich! Du bist kein Baum." – Jim Rohn',
   '„Der eine wartet, dass die Zeit sich wandelt, der andere packt sie an und handelt." – Dante Alighieri',
@@ -14060,21 +14060,18 @@ const NL_ZITATE_STD = [
   '„Wer kämpft, kann verlieren. Wer nicht kämpft, hat schon verloren." – Bertolt Brecht',
   '„Es ist nie zu spät, das zu werden, was man hätte sein können." – George Eliot',
   '„Wachstum und Komfort können nicht nebeneinander bestehen." – Ginni Rometty',
-  '„Wer will, findet Wege. Wer nicht will, findet Gründe."',
-  '„Die beste Zeit für einen Neuanfang ist jetzt."',
-  '„Mut ist nicht die Abwesenheit von Angst, sondern die Entscheidung, dass etwas wichtiger ist."',
-  '„Sprünge nach vorn macht nur, wer den sicheren Boden verlässt."',
-  '„Veränderung beginnt am Ende der Komfortzone."',
-  '„Talent öffnet Türen – Charakter hält sie offen."',
-  '„Zukunft ist kein Ort, den man findet, sondern einer, den man baut."',
-  '„Der richtige Moment kommt selten von allein – meistens muss man ihn ergreifen."',
-  '„Ein neuer Weg beginnt mit der Entscheidung, den alten zu verlassen."'
+  '„Es ist nicht genug zu wissen, man muss auch anwenden; es ist nicht genug zu wollen, man muss auch tun." – Johann Wolfgang von Goethe',
+  '„Wer immer strebend sich bemüht, den können wir erlösen." – Johann Wolfgang von Goethe',
+  '„Das Leben ist wie Fahrradfahren. Um die Balance zu halten, musst du in Bewegung bleiben." – Albert Einstein',
+  '„Phantasie ist wichtiger als Wissen, denn Wissen ist begrenzt." – Albert Einstein'
 ];
+// Regel (Nutzer): Ein Zitat wird NIE ohne Verfasser verwendet. Gültig = endet auf „… " – Name (Anführungszeichen, dann Gedankenstrich, dann Verfasser/Herkunft).
+function nlZitatHatVerfasser(z){ return /["”“]\s+[–—-]\s+\S.*$/.test(String(z||'').trim()); }
 function nlZitatePool(){ try{ const s=localStorage.getItem('yavis_nl_zitate'); if(s){ const a=JSON.parse(s); if(Array.isArray(a)&&a.length) return a; } }catch(e){} return [...NL_ZITATE_STD]; }
 function nlZitateUsed(){ try{ const s=localStorage.getItem('yavis_nl_zitate_used'); if(s){ const a=JSON.parse(s); if(Array.isArray(a)) return a; } }catch(e){} return []; }
-function nlZitatStatusUpdate(){ const el=document.getElementById('nlZitatFrei'); if(!el) return; const pool=nlZitatePool(), used=nlZitateUsed(); const frei=pool.filter(z=>!used.includes(z)).length; el.textContent=frei+' von '+pool.length+' Zitaten frei'; }
+function nlZitatStatusUpdate(){ const el=document.getElementById('nlZitatFrei'); if(!el) return; const pool=nlZitatePool().filter(nlZitatHatVerfasser), used=nlZitateUsed(); const frei=pool.filter(z=>!used.includes(z)).length; el.textContent=frei+' von '+pool.length+' Zitaten frei'; }
 function nlZitatGenerieren(){
-  const pool=nlZitatePool(); let used=nlZitateUsed();
+  const pool=nlZitatePool().filter(nlZitatHatVerfasser); let used=nlZitateUsed(); // Zitate ohne Verfasser werden nie verwendet
   let frei=pool.filter(z=>!used.includes(z));
   if(!frei.length){ if(!confirm('Alle Zitate wurden schon verwendet. Liste zurücksetzen und von vorne beginnen?')) return; localStorage.removeItem('yavis_nl_zitate_used'); used=[]; frei=pool.slice(); }
   const z=frei[Math.floor(Math.random()*frei.length)];
@@ -14102,7 +14099,7 @@ function zitatVerwaltungOeffnen(){
       +'<button onclick="zitatHinzufuegen()" style="padding:8px 14px;border-radius:6px;cursor:pointer;background:var(--accent2);color:#fff;border:none;font-weight:700;white-space:nowrap">➕ Hinzufügen</button></div></div>'
     +'<div id="zitatListe" style="overflow-y:auto;flex:1;padding:6px 20px"></div>'
     +'<div style="padding:12px 20px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-shrink:0">'
-      +'<button onclick="zitatPoolReset()" style="padding:7px 14px;border-radius:6px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);color:var(--muted);font-size:12px">↺ Auf Standard zurücksetzen (50)</button>'
+      +'<button onclick="zitatPoolReset()" style="padding:7px 14px;border-radius:6px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);color:var(--muted);font-size:12px">↺ Auf Standard zurücksetzen ('+NL_ZITATE_STD.length+')</button>'
       +'<button onclick="this.closest(\'dialog\').close();this.closest(\'dialog\').remove()" style="padding:8px 18px;border-radius:6px;cursor:pointer;background:var(--accent2);color:#fff;border:none;font-weight:700">Fertig</button></div>';
   document.body.appendChild(dlg); dlg.showModal(); _zitatListeRender();
 }
@@ -14111,12 +14108,13 @@ function _zitatListeRender(){
   const pool=nlZitatePool();
   box.innerHTML='<div style="font-size:12px;color:var(--muted);margin:8px 0">'+pool.length+' Zitate im Pool:</div>'
     + pool.map((z,i)=>'<div style="display:flex;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid var(--line)">'
-        +'<div style="flex:1;font-size:13px;line-height:1.4">'+esc(z)+'</div>'
+        +'<div style="flex:1;font-size:13px;line-height:1.4">'+esc(z)+(nlZitatHatVerfasser(z)?'':' <span style="color:var(--hot);font-size:12px">⚠️ ohne Verfasser – wird nicht verwendet (bitte löschen oder „– Name" ergänzen)</span>')+'</div>'
         +'<button onclick="zitatEntfernen('+i+')" title="Löschen" style="flex-shrink:0;background:none;border:1px solid var(--line);color:var(--hot);border-radius:4px;cursor:pointer;font-size:12px;padding:2px 8px">✕</button></div>').join('');
 }
 function zitatHinzufuegen(){
   const ta=document.getElementById('zitatNeu'); if(!ta) return;
   const t=(ta.value||'').trim(); if(!t){ zeigeMeldung('Bitte ein Zitat eingeben','warn'); return; }
+  if(!nlZitatHatVerfasser(t)){ zeigeMeldung('Ein Zitat braucht immer einen Verfasser – bitte so eingeben: „Text." – Name','warn'); return; }
   const pool=nlZitatePool();
   if(pool.some(z=>z.trim()===t)){ zeigeMeldung('Dieses Zitat ist schon im Pool','warn'); return; }
   pool.push(t); _zitatPoolSpeichern(pool); ta.value=''; _zitatListeRender();
@@ -14127,7 +14125,7 @@ function zitatEntfernen(i){
   pool.splice(i,1); _zitatPoolSpeichern(pool); _zitatListeRender();
 }
 function zitatPoolReset(){
-  if(!confirm('Alle eigenen Änderungen verwerfen und die Standard-Zitatliste (50) wiederherstellen?')) return;
+  if(!confirm('Alle eigenen Änderungen verwerfen und die Standard-Zitatliste ('+NL_ZITATE_STD.length+') wiederherstellen?')) return;
   try{ localStorage.removeItem('yavis_nl_zitate'); }catch(e){}
   nlZitatStatusUpdate(); _zitatListeRender();
   zeigeMeldung('Standard-Zitate wiederhergestellt ✓','ok');
