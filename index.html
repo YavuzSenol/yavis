@@ -14038,12 +14038,8 @@ const NL_ZITATE_STD = [
   '„Der eine wartet, dass die Zeit sich wandelt, der andere packt sie an und handelt." – Dante Alighieri',
   '„Suche nicht nach Fehlern, suche nach Lösungen." – Henry Ford',
   '„Kapital lässt sich beschaffen, Fabriken kann man bauen, Menschen muss man gewinnen." – Hans Christoph von Rohr',
-  '„Ein böses Wort holen hundert Pferde im Galopp nicht zurück." – aus China',
-  '„Die bestverschlossene Tür ist die, die man offenlassen kann." – aus China',
-  '„Bevor du dich daranmachst, die Welt zu verbessern, gehe dreimal durch dein eigenes Haus." – aus China',
   '„Sich zurückziehen heißt nicht davonlaufen; und den Kopf hochgetragen ist nicht Klugheit." – Miguel de Cervantes',
   '„Fehler des Tuns sind meist heilbringender als die des Lassens." – Karl Foerster',
-  '„Als du kamst, waren alle froh. Ob alle weinen, wenn du gehst, hängt von dir ab." – aus dem Kaukasus',
   '„Ein toter Löwe ist nicht so viel wert wie eine lebendige Mücke." – Voltaire',
   '„Aus der Familie kann man Wohlwollen entfernen, nicht aber aus der Freundschaft." – Marcus Tullius Cicero',
   '„Die Kraft des Genies wächst mit dem Umfang der Dinge." – Publius Cornelius Tacitus',
@@ -14071,8 +14067,13 @@ const NL_ZITATE_STD = [
   '„Das Leben ist wie Fahrradfahren. Um die Balance zu halten, musst du in Bewegung bleiben." – Albert Einstein',
   '„Phantasie ist wichtiger als Wissen, denn Wissen ist begrenzt." – Albert Einstein'
 ];
-// Regel (Nutzer): Ein Zitat wird NIE ohne Verfasser verwendet. Gültig = endet auf „… " – Name (Anführungszeichen, dann Gedankenstrich, dann Verfasser/Herkunft).
-function nlZitatHatVerfasser(z){ return /["”“]\s+[–—-]\s+\S.*$/.test(String(z||'').trim()); }
+// Regel (Nutzer): Ein Zitat wird NIE ohne Verfasser verwendet, und zwar mit dem NAMEN des Zitierten (21.10.2026: „nur mit Name des zitierenden").
+// Gültig = endet auf „… " – Name. Herkunftsangaben wie „– aus China", „– Sprichwort", „– Unbekannt" gelten nicht als Verfasser.
+function nlZitatHatVerfasser(z){
+  const m=String(z||'').trim().match(/["”“]\s+[–—-]\s+(\S.*)$/);
+  if(!m) return false;
+  return !/^(aus\s|sprichwort|chinesisch|japanisch|russisch|afrikanisch|unbekannt|anonym|volksmund|altes|alte\s)/i.test(m[1].trim());
+}
 function nlZitatePool(){ try{ const s=localStorage.getItem('yavis_nl_zitate'); if(s){ const a=JSON.parse(s); if(Array.isArray(a)&&a.length) return a; } }catch(e){} return [...NL_ZITATE_STD]; }
 function nlZitateUsed(){ try{ const s=localStorage.getItem('yavis_nl_zitate_used'); if(s){ const a=JSON.parse(s); if(Array.isArray(a)) return a; } }catch(e){} return []; }
 function nlZitatStatusUpdate(){ const el=document.getElementById('nlZitatFrei'); if(!el) return; const pool=nlZitatePool().filter(nlZitatHatVerfasser), used=nlZitateUsed(); const frei=pool.filter(z=>!used.includes(z)).length; el.textContent=frei+' von '+pool.length+' Zitaten frei'; }
