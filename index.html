@@ -14062,17 +14062,26 @@ const NL_ZITATE_STD = [
   '„Wer kämpft, kann verlieren. Wer nicht kämpft, hat schon verloren." – Bertolt Brecht',
   '„Es ist nie zu spät, das zu werden, was man hätte sein können." – George Eliot',
   '„Wachstum und Komfort können nicht nebeneinander bestehen." – Ginni Rometty',
+  '„Ein böses Wort holen hundert Pferde im Galopp nicht zurück." – Berühmtes Sprichwort aus China',
+  '„Die bestverschlossene Tür ist die, die man offenlassen kann." – Berühmtes Sprichwort aus China',
+  '„Bevor du dich daranmachst, die Welt zu verbessern, gehe dreimal durch dein eigenes Haus." – Berühmtes Sprichwort aus China',
+  '„Als du kamst, waren alle froh. Ob alle weinen, wenn du gehst, hängt von dir ab." – Berühmter Spruch aus dem Kaukasus',
   '„Es ist nicht genug zu wissen, man muss auch anwenden; es ist nicht genug zu wollen, man muss auch tun." – Johann Wolfgang von Goethe',
   '„Wer immer strebend sich bemüht, den können wir erlösen." – Johann Wolfgang von Goethe',
   '„Das Leben ist wie Fahrradfahren. Um die Balance zu halten, musst du in Bewegung bleiben." – Albert Einstein',
   '„Phantasie ist wichtiger als Wissen, denn Wissen ist begrenzt." – Albert Einstein'
 ];
-// Regel (Nutzer): Ein Zitat wird NIE ohne Verfasser verwendet, und zwar mit dem NAMEN des Zitierten (21.10.2026: „nur mit Name des zitierenden").
-// Gültig = endet auf „… " – Name. Herkunftsangaben wie „– aus China", „– Sprichwort", „– Unbekannt" gelten nicht als Verfasser.
+// Regel (Nutzer, 21.10.2026): Ein Zitat wird NIE ohne Angabe des Zitierten verwendet.
+// Gültig = endet auf „… " – <Name des Zitierten>. Ist der Name nicht bekannt, genügt eine Angabe in der Form
+// „Berühmtes Sprichwort aus China" / „Berühmter Spruch aus dem Kaukasus" (Wort Spruch/Sprichwort/Weisheit + „aus" + Herkunft).
+// Nicht gültig: nackte Herkunft („– aus China"), „– Unbekannt", „– Anonym", „– Sprichwort", oder gar keine Angabe.
 function nlZitatHatVerfasser(z){
   const m=String(z||'').trim().match(/["”“]\s+[–—-]\s+(\S.*)$/);
   if(!m) return false;
-  return !/^(aus\s|sprichwort|chinesisch|japanisch|russisch|afrikanisch|unbekannt|anonym|volksmund|altes|alte\s)/i.test(m[1].trim());
+  const a=m[1].trim();
+  if(/^(berühmte[rs]?|bekannte[rs]?|alte[rs]?|überlieferte[rs]?)\s+(spruch|sprichwort|weisheit)\s+aus\s+\S+/i.test(a)) return true;
+  if(/^(berühmte[rs]?|bekannte[rs]?|alte[rs]?|überlieferte[rs]?)\s+(spruch|sprichwort|weisheit)\b/i.test(a)) return false; // „Berühmter Spruch" ohne „aus <Herkunft>" reicht nicht
+  return !/^(aus\s|sprichwort|spruch|weisheit|chinesisch|japanisch|russisch|afrikanisch|unbekannt|anonym|volksmund|altes|alte\s)/i.test(a);
 }
 function nlZitatePool(){ try{ const s=localStorage.getItem('yavis_nl_zitate'); if(s){ const a=JSON.parse(s); if(Array.isArray(a)&&a.length) return a; } }catch(e){} return [...NL_ZITATE_STD]; }
 function nlZitateUsed(){ try{ const s=localStorage.getItem('yavis_nl_zitate_used'); if(s){ const a=JSON.parse(s); if(Array.isArray(a)) return a; } }catch(e){} return []; }
