@@ -1454,6 +1454,10 @@
           <input id="einsBcc" type="email" placeholder="deine@email.de" onchange="einsFeldSave()" style="width:220px;padding:6px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--line)">
+          <div><b>Newsletter-Absender</b><div style="font-size:12px;color:var(--muted)">Von dieser Adresse gehen Newsletter raus. Leer = dein eigenes Outlook-Konto. Voraussetzung: dein Konto hat in Microsoft 365 „Senden als" für diese Adresse. Mit „✉️ Test an mich" im Newsletter-Dialog prüfen.</div></div>
+          <input id="einsNlAbsender" type="email" placeholder="tga@senolconsulting.de" onchange="einsFeldSave()" style="width:220px;padding:6px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--line)">
           <div><b>Jobs-Link (Newsletter)</b><div style="font-size:12px;color:var(--muted)">Allgemeine Jobseite — Fallback, wenn eine Stelle keinen eigenen Link hat</div></div>
           <input id="einsJobsUrl" type="text" placeholder="https://www.senolconsulting.de/jobs" onchange="einsFeldSave()" style="width:260px;padding:6px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
         </div>
@@ -8588,6 +8592,7 @@ function oeffneEinstellungen(){
   const radVal=localStorage.getItem('yavis_radius')||'50';
   Array.from(radSel.options).forEach(o=>o.selected=(o.value===radVal));
   document.getElementById('einsBcc').value=localStorage.getItem('yavis_bcc')||'';
+  { const na=document.getElementById('einsNlAbsender'); if(na) na.value=nlAbsender(); }
   { const ju=document.getElementById('einsJobsUrl'); if(ju) ju.value=localStorage.getItem('yavis_jobs_url')||''; }
   { const jv=document.getElementById('einsJobLinkVorlage'); if(jv) jv.value=jobLinkVorlage(); }
   document.getElementById('einsSignatur').value=localStorage.getItem('yavis_signatur')||'';
@@ -8613,6 +8618,7 @@ function einsFeldSave(){
   if(g('einsMeinePlz'))  localStorage.setItem('yavis_meine_plz', g('einsMeinePlz').value.trim());
   if(g('einsRadius'))    localStorage.setItem('yavis_radius', g('einsRadius').value);
   if(g('einsBcc'))       localStorage.setItem('yavis_bcc', g('einsBcc').value.trim());
+  { const na=g('einsNlAbsender'); if(na){ const v=na.value.trim(); if(v&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)){ zeigeMeldung('Ungültige Absender-Adresse','warn'); } else { localStorage.setItem('yavis_nl_absender', v); _nlSendRoute=null; } } } // leer wird bewusst gespeichert = eigenes Konto
   { const ju=g('einsJobsUrl'); if(ju){ const v=ju.value.trim(); if(v) localStorage.setItem('yavis_jobs_url',v); else localStorage.removeItem('yavis_jobs_url'); } }
   { const jv=g('einsJobLinkVorlage'); if(jv) localStorage.setItem('yavis_job_link_vorlage', jv.value.trim()); }
   if(g('einsSignatur'))  localStorage.setItem('yavis_signatur', g('einsSignatur').value);
@@ -10091,6 +10097,7 @@ async function _syncKontext(token){
   const meR=await fetch('https://graph.microsoft.com/v1.0/me?$select=mail,userPrincipalName,proxyAddresses',{headers:{'Authorization':'Bearer '+token}});
   const me=await meR.json();
   const myAddrs=new Set(['senol@senolconsulting.de','senolation@gmail.com','senolation@googlemail.com']);
+  { const _na=(typeof nlAbsender==='function'?nlAbsender():''); if(_na) myAddrs.add(_na.toLowerCase()); } // Newsletter-Absender zählt als „eigene" Adresse
   [me.mail, me.userPrincipalName].forEach(a=>{ if(a) myAddrs.add(String(a).toLowerCase()); });
   (me.proxyAddresses||[]).forEach(p=>{ const a=String(p).replace(/^smtp:/i,'').toLowerCase(); if(a.includes('@')) myAddrs.add(a); });
   const addr2id={};
@@ -14505,6 +14512,7 @@ async function nlPersonalisiertOeffnen(){
       <div style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:13px">
         <div><b>${empfaenger.length}</b> Empfänger — jede Person bekommt eine <b>eigene</b> Mail mit persönlicher Anrede.</div>
         <div style="margin-top:6px">Betreff: <b>${esc(betreff)}</b></div>
+        <div style="margin-top:4px">Absender: <b>${esc(nlAbsender()||'dein Outlook-Konto')}</b></div>
         <div style="margin-top:4px">Stellen: ${(_nlJobs&&_nlJobs.length)?('📋 '+_nlJobs.length+' offene Stellen als Tabelle <b>im Text</b> (kein Excel-Anhang)'):'<span style=\"color:var(--muted)\">keine offenen Stellen geladen</span>'}</div>
       </div>
       <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Vorschau (Beispiel: ${esc(bsp.voller_name||bsp.email)})</div>
@@ -14525,13 +14533,35 @@ async function nlPersTest(btn){
   btn.disabled=true; btn.textContent='⏳ sende Test …';
   const bsp=_nlPers.empfaenger[0];
   const body=_nlPers.textVorlage.replace(/\{Anrede\}/g, nlAnrede(bsp));
-  const res=await _graphSendMail(token, nlPersPayload('[TEST] '+_nlPers.betreff, body, ziel));
+  const res=await _nlSendenMitAbsender(token, nlPersPayload('[TEST] '+_nlPers.betreff, body, ziel));
   btn.disabled=false; btn.textContent='✉️ Test an mich';
-  zeigeMeldung(res.ok?('Test-Mail an '+ziel+' gesendet ✓'):('Testfehler: '+res.msg), res.ok?'ok':'err');
+  const absTxt=nlAbsender()||'deinem Outlook-Konto';
+  if(res.ok) zeigeMeldung('Test-Mail an '+ziel+' gesendet ✓ (Absender: '+absTxt+')','ok');
+  else { zeigeMeldung('Testfehler: '+res.msg,'err'); if(res.rechte) alert(_nlRechteHinweis()); }
+}
+// ----- Newsletter-Absender: Standard tga@senolconsulting.de (Einstellungen → Newsletter-Absender; leer = eigenes Outlook-Konto) -----
+const NL_ABSENDER_STD='tga@senolconsulting.de';
+function nlAbsender(){ const v=localStorage.getItem('yavis_nl_absender'); return (v===null?NL_ABSENDER_STD:v).trim(); }
+let _nlSendRoute=null; // merkt sich, welcher Weg beim Absender funktioniert: 'me' (Senden-als über das eigene Konto) oder 'users' (direkt über das Postfach)
+const _NL_RECHTE_FEHLER=/send.?as|access is denied|errorAccessDenied|forbidden|not have permission|permission|HTTP 403|mailbox/i;
+async function _nlSendenMitAbsender(token, payload){
+  const abs=nlAbsender();
+  if(!abs) return _graphSendMail(token, payload);
+  if(_nlSendRoute!=='users'){
+    const r=await _graphSendMail(token, payload);                       // 1) „Senden als": Absender im from-Feld, Versand über das eigene Konto
+    if(r.ok){ _nlSendRoute='me'; return r; }
+    if(!_NL_RECHTE_FEHLER.test(r.msg||'')||_nlSendRoute==='me') return r;
+  }
+  const r2=await _graphSendMail(token, payload, abs);                    // 2) Versand direkt über das Postfach des Absenders
+  if(r2.ok){ _nlSendRoute='users'; return r2; }
+  return {ok:false, msg:r2.msg, rechte:_NL_RECHTE_FEHLER.test(r2.msg||'')};
 }
 function nlPersPayload(betreff, bodyText, zielEmail, kandidatId){
   // Kein Excel-Anhang mehr — die Stellen stehen jetzt als Tabelle im Mail-Text (nlHtmlBody -> nlJobsHtml)
-  return { message:{ subject:betreff, body:{contentType:'HTML',content:nlHtmlBody(bodyText, kandidatId)}, toRecipients:[{emailAddress:{address:zielEmail}}], attachments:[] }, saveToSentItems:true };
+  const abs=nlAbsender();
+  const msg={ subject:betreff, body:{contentType:'HTML',content:nlHtmlBody(bodyText, kandidatId)}, toRecipients:[{emailAddress:{address:zielEmail}}], attachments:[] };
+  if(abs) msg.from={emailAddress:{address:abs}};
+  return { message:msg, saveToSentItems:true };
 }
 let _nlSendeLaeuft=false;
 async function nlPersSendenStart(btn){
@@ -14550,16 +14580,18 @@ async function nlPersSendenStart(btn){
   async function _eineSenden(r){
     const ziel=r.email||r.email_beruflich||r.email_zweit;
     const body=pers.textVorlage.replace(/\{Anrede\}/g, nlAnrede(r));
-    let res=await _graphSendMail(token, nlPersPayload(pers.betreff, body, ziel, r.id));
-    if(!res.ok && /throttl|429|too many/i.test(res.msg||'')){ await new Promise(x=>setTimeout(x,5000)); res=await _graphSendMail(token, nlPersPayload(pers.betreff, body, ziel, r.id)); }
+    let res=await _nlSendenMitAbsender(token, nlPersPayload(pers.betreff, body, ziel, r.id));
+    if(!res.ok && /throttl|429|too many/i.test(res.msg||'')){ await new Promise(x=>setTimeout(x,5000)); res=await _nlSendenMitAbsender(token, nlPersPayload(pers.betreff, body, ziel, r.id)); }
     return {r,res};
   }
+  let rechteAbbruch=false;
   try{
     for(let i=0;i<emp.length;i+=BUENDEL){
       const teil=emp.slice(i,i+BUENDEL);
       const ergebnisse=await Promise.all(teil.map(_eineSenden));
       let gebremst=false;
-      ergebnisse.forEach(({r,res})=>{ if(res.ok){ ok++; gesendetIds.push({id:r.id}); } else { fehler++; if(/throttl|429|too many/i.test(res.msg||'')) gebremst=true; } });
+      ergebnisse.forEach(({r,res})=>{ if(res.ok){ ok++; gesendetIds.push({id:r.id}); } else { fehler++; if(res.rechte) rechteAbbruch=true; if(/throttl|429|too many/i.test(res.msg||'')) gebremst=true; } });
+      if(rechteAbbruch) break; // fehlende Absender-Berechtigung: nicht alle weiteren Mails sinnlos durchprobieren
       _nlSendeWidget(ok+fehler, emp.length, fehler);
       await new Promise(x=>setTimeout(x, gebremst?3000:150)); // normal kurz, bei Server-Bremse deutlich länger
     }
@@ -14567,6 +14599,12 @@ async function nlPersSendenStart(btn){
   } finally { _nlSendeLaeuft=false; }
   _nlSendeWidgetFertig(ok, emp.length, fehler);
   zeigeMeldung('Newsletter gesendet · '+ok+' von '+emp.length+(fehler?(' ('+fehler+' Fehler)'):'')+' ✓', fehler?'warn':'ok');
+  if(rechteAbbruch) alert(_nlRechteHinweis());
+}
+function _nlRechteHinweis(){
+  return 'Der Versand als „'+nlAbsender()+'" wurde von Outlook abgelehnt – es wurde bei diesem Absender nichts (weiter) gesendet.\n\n'
+    +'Meist fehlt in Microsoft 365 die Berechtigung „Senden als" für dein Konto auf dieses Postfach (Exchange-Admin-Center → Postfächer → '+nlAbsender()+' → Delegierung → „Senden als" → dein Konto hinzufügen; kann bis zu 1 Stunde dauern).\n\n'
+    +'Bis dahin: unter ⚙️ Einstellungen → Newsletter-Absender das Feld leeren, dann sendet YAVIS wieder von deinem eigenen Konto.';
 }
 // Schwebende Fortschrittsanzeige unten rechts (Versand läuft im Hintergrund weiter)
 function _nlSendeWidget(done, total, fehler){
@@ -14836,8 +14874,9 @@ function vorlagenRunter(idx) {
 // ================================================================
 
 // Hilfsfunktion: eine Mail via Graph API senden
-async function _graphSendMail(token, payload) {
-  const resp = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+async function _graphSendMail(token, payload, vonPostfach) {
+  // vonPostfach (optional): Mail über /users/<adresse>/sendMail senden (Gemeinschafts-/Fremdpostfach); sonst über das eigene Konto
+  const resp = await fetch('https://graph.microsoft.com/v1.0/'+(vonPostfach?('users/'+encodeURIComponent(vonPostfach)):'me')+'/sendMail', {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
