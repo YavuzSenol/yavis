@@ -1458,6 +1458,10 @@
           <input id="einsNlAbsender" type="email" placeholder="tga@senolconsulting.de" onchange="einsFeldSave()" style="width:220px;padding:6px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;padding:11px 16px;border-bottom:1px solid var(--line)">
+          <div><b>Newsletter: Pause zwischen zwei Mails</b><div style="font-size:12px;color:var(--muted)">Sekunden. Microsoft 365 erlaubt höchstens ~30 Mails pro Minute je Postfach, bei zu schnellem Versand schlägt der Spam-Schutz an. Standard 4 Sekunden (15 Mails/Minute), kleiner als 2 wird nicht angenommen.</div></div>
+          <input id="einsNlPause" type="number" min="2" step="1" placeholder="4" onchange="einsFeldSave()" style="width:90px;padding:6px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;padding:11px 16px;border-bottom:1px solid var(--line)">
           <div><b>Antworten aus dem Absender-Postfach</b><div style="font-size:12px;color:var(--muted)">Der Mail-Abgleich liest zusätzlich das Postfach des Newsletter-Absenders mit, damit Antworten auf Newsletter im E-Mail-Verlauf der Person erscheinen. Voraussetzung: dein Konto hat dort „Lesen und verwalten".</div></div>
           <div style="display:flex;align-items:center;gap:10px;white-space:nowrap"><span id="gpStatus" style="font-size:12px;color:var(--muted)"></span><button onclick="gpPruefen()" style="padding:6px 12px;border-radius:5px;cursor:pointer;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:13px">Postfach prüfen</button></div>
         </div>
@@ -8609,6 +8613,7 @@ function oeffneEinstellungen(){
   document.getElementById('einsBcc').value=localStorage.getItem('yavis_bcc')||'';
   { const na=document.getElementById('einsNlAbsender'); if(na) na.value=nlAbsender(); }
   gpStatusAnzeigen();
+  { const np=document.getElementById('einsNlPause'); if(np) np.value=localStorage.getItem('yavis_nl_pause')||''; }
   { const ju=document.getElementById('einsJobsUrl'); if(ju) ju.value=localStorage.getItem('yavis_jobs_url')||''; }
   { const jv=document.getElementById('einsJobLinkVorlage'); if(jv) jv.value=jobLinkVorlage(); }
   document.getElementById('einsSignatur').value=localStorage.getItem('yavis_signatur')||'';
@@ -8635,6 +8640,7 @@ function einsFeldSave(){
   if(g('einsRadius'))    localStorage.setItem('yavis_radius', g('einsRadius').value);
   if(g('einsBcc'))       localStorage.setItem('yavis_bcc', g('einsBcc').value.trim());
   { const na=g('einsNlAbsender'); if(na){ const v=na.value.trim(); if(v&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)){ zeigeMeldung('Ungültige Absender-Adresse','warn'); } else { localStorage.setItem('yavis_nl_absender', v); _nlSendRoute=null; localStorage.removeItem('yavis_gp_status'); gpStatusAnzeigen(); } } } // leer wird bewusst gespeichert = eigenes Konto
+  { const np=g('einsNlPause'); if(np){ const v=parseFloat(np.value); if(!np.value.trim()) localStorage.removeItem('yavis_nl_pause'); else { const w=Math.max(2,isNaN(v)?4:v); localStorage.setItem('yavis_nl_pause',String(w)); if(w!==v) np.value=String(w); } } }
   { const ju=g('einsJobsUrl'); if(ju){ const v=ju.value.trim(); if(v) localStorage.setItem('yavis_jobs_url',v); else localStorage.removeItem('yavis_jobs_url'); } }
   { const jv=g('einsJobLinkVorlage'); if(jv) localStorage.setItem('yavis_job_link_vorlage', jv.value.trim()); }
   if(g('einsSignatur'))  localStorage.setItem('yavis_signatur', g('einsSignatur').value);
@@ -14638,6 +14644,10 @@ async function nlPersTest(btn){
 // ----- Newsletter-Absender: Standard tga@senolconsulting.de (Einstellungen → Newsletter-Absender; leer = eigenes Outlook-Konto) -----
 const NL_ABSENDER_STD='tga@senolconsulting.de';
 function nlAbsender(){ const v=localStorage.getItem('yavis_nl_absender'); return (v===null?NL_ABSENDER_STD:v).trim(); }
+// Pause zwischen zwei Newsletter-Mails (Sekunden). Microsoft 365 erlaubt höchstens ~30 Mails/Minute je Postfach; wer deutlich schneller sendet, löst den Spam-Alarm „Suspicious email sending patterns" aus
+// (passiert am 21.10.2026 bei 2.920 Mails in einem Rutsch). Darum: Standard 4 s (= 15 Mails/Min), nie unter 2 s.
+function nlPauseSek(){ const v=parseFloat(String(localStorage.getItem('yavis_nl_pause')||'').replace(',','.')); return Math.max(2, isNaN(v)?4:v); }
+function nlDauerText(n){ const min=Math.ceil(n*nlPauseSek()/60); return min<60?(min+' Minuten'):(Math.floor(min/60)+' Std. '+(min%60?(min%60+' Min.'):'')).trim(); }
 let _nlSendRoute=null; // merkt sich, welcher Weg beim Absender funktioniert: 'me' (Senden-als über das eigene Konto) oder 'users' (direkt über das Postfach)
 const _NL_RECHTE_FEHLER=/send.?as|access is denied|errorAccessDenied|forbidden|not have permission|permission|HTTP 403|mailbox/i;
 async function _nlSendenMitAbsender(token, payload){
@@ -14663,7 +14673,11 @@ let _nlSendeLaeuft=false;
 async function nlPersSendenStart(btn){
   if(!_nlPers) return;
   if(_nlSendeLaeuft){ zeigeMeldung('Es läuft bereits ein Newsletter-Versand','warn'); return; }
-  if(!confirm('Jetzt '+_nlPers.empfaenger.length+' einzelne, personalisierte E-Mails senden?\n\nDas verschickt echte Mails an deine Kandidaten und kann nicht rückgängig gemacht werden.\n\nDas Fenster schließt sich — der Versand läuft dann unten rechts im Hintergrund weiter, du kannst normal weiterarbeiten.\n(Nur den Browser-Tab bitte nicht schließen/neu laden.)')) return;
+  const _nAnz=_nlPers.empfaenger.length;
+  if(!confirm('Jetzt '+_nAnz+' einzelne, personalisierte E-Mails senden?\n\nDas verschickt echte Mails an deine Kandidaten und kann nicht rückgängig gemacht werden.\n\n'
+    +'Microsoft 365 erlaubt nur wenige Mails pro Minute. YAVIS sendet deshalb eine Mail alle '+nlPauseSek()+' Sekunden – das dauert etwa '+nlDauerText(_nAnz)+'.\n'
+    +(_nAnz>500?'\n⚠️ Das sind sehr viele Empfänger auf einmal. Besser in Portionen von höchstens ~400 pro Tag senden, sonst sperrt Microsoft u. U. dein Postfach.\n':'')
+    +'\nDas Fenster schließt sich – der Versand läuft dann unten rechts im Hintergrund weiter, du kannst normal weiterarbeiten.\n(Nur den Browser-Tab bitte nicht schließen/neu laden und den Rechner nicht in den Ruhezustand schicken.)')) return;
   const token=await msGetToken(); if(!token){ zeigeMeldung('Outlook-Verbindung abgelaufen','err'); return; }
   const pers=_nlPers; // lokale Referenz behalten, falls _nlPers später überschrieben wird
   const dlg=btn.closest('dialog'); if(dlg){ dlg.close(); dlg.remove(); } // Dialog zu -> Hintergrund
@@ -14672,12 +14686,13 @@ async function nlPersSendenStart(btn){
   const emp=pers.empfaenger; let ok=0, fehler=0; const gesendetIds=[];
   // Sicher & schneller: kleine Bündel parallel senden (überlappt die Netzwerk-Wartezeit).
   // Jede Mail hat weiter 429-/Throttle-Schutz; wird gebremst, wartet die App länger (adaptiv).
-  const BUENDEL=3;
+  const BUENDEL=1; // eine Mail nach der anderen mit Pause (siehe nlPauseSek) – kein Parallelversand mehr
   async function _eineSenden(r){
     const ziel=r.email||r.email_beruflich||r.email_zweit;
     const body=pers.textVorlage.replace(/\{Anrede\}/g, nlAnrede(r));
-    let res=await _nlSendenMitAbsender(token, nlPersPayload(pers.betreff, body, ziel, r.id));
-    if(!res.ok && /throttl|429|too many/i.test(res.msg||'')){ await new Promise(x=>setTimeout(x,5000)); res=await _nlSendenMitAbsender(token, nlPersPayload(pers.betreff, body, ziel, r.id)); }
+    const tk=(await msGetToken())||token; // Zugangsschlüssel je Mail erneuern lassen: lange Läufe überdauern die ~1 Stunde Gültigkeit
+    let res=await _nlSendenMitAbsender(tk, nlPersPayload(pers.betreff, body, ziel, r.id));
+    if(!res.ok && /throttl|429|too many/i.test(res.msg||'')){ await new Promise(x=>setTimeout(x,60000)); res=await _nlSendenMitAbsender((await msGetToken())||tk, nlPersPayload(pers.betreff, body, ziel, r.id)); }
     return {r,res};
   }
   let rechteAbbruch=false;
@@ -14689,9 +14704,10 @@ async function nlPersSendenStart(btn){
       ergebnisse.forEach(({r,res})=>{ if(res.ok){ ok++; gesendetIds.push({id:r.id}); } else { fehler++; if(res.rechte) rechteAbbruch=true; if(/throttl|429|too many/i.test(res.msg||'')) gebremst=true; } });
       if(rechteAbbruch) break; // fehlende Absender-Berechtigung: nicht alle weiteren Mails sinnlos durchprobieren
       _nlSendeWidget(ok+fehler, emp.length, fehler);
-      await new Promise(x=>setTimeout(x, gebremst?3000:150)); // normal kurz, bei Server-Bremse deutlich länger
+      if(gesendetIds.length>=25){ await nlProtokollieren(gesendetIds.splice(0)); } // laufend protokollieren: bricht ein langer Lauf ab, ist nichts doppelt oder ungebucht
+      if(i+BUENDEL<emp.length) await new Promise(x=>setTimeout(x, gebremst?60000:nlPauseSek()*1000)); // normal Pause laut Einstellung, bei Server-Bremse 1 Minute
     }
-    await nlProtokollieren(gesendetIds); // nur erfolgreich gesendete
+    await nlProtokollieren(gesendetIds); // Rest der erfolgreich gesendeten
   } finally { _nlSendeLaeuft=false; }
   _nlSendeWidgetFertig(ok, emp.length, fehler);
   zeigeMeldung('Newsletter gesendet · '+ok+' von '+emp.length+(fehler?(' ('+fehler+' Fehler)'):'')+' ✓', fehler?'warn':'ok');
