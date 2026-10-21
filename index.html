@@ -14525,6 +14525,13 @@ function _nlTrackUrl(target, kandidatId){
   q+='&c='+encodeURIComponent(nlProtokollLabel?nlProtokollLabel():'Newsletter');
   return NL_TRACK_URL+q;
 }
+// Abmeldelink am Ende jedes Newsletters: führt auf abmelden.html (Bestätigungsknopf, danach setzt die Edge-Function „track" bei der Person „Kein Newsletter").
+// Bewusst NICHT über den Klick-Tracker geleitet; ein bloßes Öffnen des Links meldet nie ab (Link-Scanner der Mailprogramme).
+const NL_ABMELDE_SEITE='https://yavuzsenol.github.io/yavis/abmelden.html';
+function _nlAbmeldeHtml(kandidatId){
+  const href=NL_ABMELDE_SEITE+(kandidatId?('?k='+encodeURIComponent(kandidatId)):'');
+  return '<div style="margin-top:18px;padding-top:10px;border-top:1px solid #dcdcdc;font-size:12px;color:#888;line-height:1.5">Sie möchten keine Stellenangebote und Newsletter mehr erhalten? <a href="'+href+'" style="color:#888;text-decoration:underline">Hier abbestellen</a>.</div>';
+}
 // Newsletter-Signatur: dieselbe Signatur wie überall, nur die Kontakt-Adresse ist die des Newsletter-Absenders (Antworten gehen dorthin)
 function _nlSignatur(){ let s=signaturHtml(); const a=nlAbsender(); if(s && a) s=s.split('senol@senolconsulting.de').join(a); return s; }
 function nlHtmlBody(text, kandidatId){
@@ -14549,7 +14556,7 @@ function nlHtmlBody(text, kandidatId){
   // RESPONSIVE Spalte: bis 640px (Desktop/Web zentriert), aber flexibel -> schrumpft mobil auf Bildschirmbreite.
   // MSO-Ghost-Table fixiert nur Outlook-Desktop auf 640 (versteht kein max-width).
   const inner=_nlHeaderHtml()
-    +'<div style="font-family:Calibri,Arial,sans-serif;font-size:14px;color:#1d1d1b;line-height:1.55">'+html+_nlSignatur()+'</div>';
+    +'<div style="font-family:Calibri,Arial,sans-serif;font-size:14px;color:#1d1d1b;line-height:1.55">'+html+_nlSignatur()+_nlAbmeldeHtml(kandidatId)+'</div>';
   return '<div style="max-width:640px;width:100%;margin:0 auto">'
     +'<!--[if mso]><table role="presentation" align="center" width="640" cellpadding="0" cellspacing="0" border="0"><tr><td style="width:640px;padding:0"><![endif]-->'
     + inner

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Newsletter abbestellen</title>
+<style>
+  :root{ --ink:#1d1d1b; --muted:#6b6b6b; --line:#dcdcdc; --accent:#1d1d1b; --ok:#1e7e34; --err:#b3261e; --bg:#f6f6f4; --card:#ffffff; }
+  @media (prefers-color-scheme: dark){ :root{ --ink:#ececea; --muted:#a3a3a0; --line:#3a3a38; --accent:#ececea; --bg:#161615; --card:#1f1f1e; --ok:#6fcf7f; --err:#ff8a80; } }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--ink);font-family:Calibri,Arial,sans-serif;font-size:16px;line-height:1.55;padding:16px}
+  main{width:100%;max-width:520px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:28px 26px}
+  h1{font-size:22px;margin:0 0 10px}
+  p{margin:0 0 14px}
+  .muted{color:var(--muted);font-size:14px}
+  button{font:inherit;font-weight:700;cursor:pointer;border:none;border-radius:8px;padding:12px 22px;background:var(--accent);color:var(--bg)}
+  button[disabled]{opacity:.55;cursor:default}
+  .ok{color:var(--ok);font-weight:700}
+  .err{color:var(--err);font-weight:700}
+  a{color:var(--ink)}
+  hr{border:none;border-top:1px solid var(--line);margin:20px 0}
+</style>
+</head>
+<body>
+<main>
+  <div id="frage" hidden>
+    <h1>Newsletter abbestellen</h1>
+    <p>Möchten Sie keine Stellenangebote und Newsletter von YSC mehr per E-Mail erhalten?</p>
+    <p><button id="btn" type="button">Ja, Newsletter abbestellen</button></p>
+    <p class="muted">Erst mit dem Klick auf diese Schaltfläche werden Sie abgemeldet. Danach erhalten Sie von uns keine Werbe-E-Mails mehr.</p>
+  </div>
+  <div id="fertig" hidden>
+    <h1 class="ok">Sie sind abgemeldet.</h1>
+    <p>Sie erhalten von uns keine Newsletter und Stellenangebote mehr per E-Mail. Das kann ein bis zwei Tage dauern, falls schon eine Sendung unterwegs ist.</p>
+    <p class="muted">Sie haben sich versehentlich abgemeldet? Schreiben Sie uns kurz an <a href="mailto:tga@senolconsulting.de">tga@senolconsulting.de</a>.</p>
+  </div>
+  <div id="fehler" hidden>
+    <h1 class="err">Das hat leider nicht geklappt.</h1>
+    <p id="fehlerText">Der Link ist unvollständig oder nicht mehr gültig.</p>
+    <p>Bitte schreiben Sie uns kurz an <a href="mailto:tga@senolconsulting.de">tga@senolconsulting.de</a> oder rufen Sie an unter +49 221 955 829-30. Wir tragen Sie dann sofort aus.</p>
+  </div>
+  <hr>
+  <p class="muted">YSC · Yavuz Senol · Vochemsweg 4b, 50259 Pulheim · <a href="https://www.senolconsulting.de">www.senolconsulting.de</a></p>
+</main>
+<script>
+(function(){
+  var id=(new URLSearchParams(location.search).get('k')||'').trim();
+  var API='https://afbyqrwqnccgudpqxziv.supabase.co/functions/v1/track';
+  function zeige(n){ ['frage','fertig','fehler'].forEach(function(x){ document.getElementById(x).hidden=(x!==n); }); }
+  if(!/^[A-Za-z0-9_\-]{3,80}$/.test(id)){ zeige('fehler'); return; }
+  zeige('frage');
+  var btn=document.getElementById('btn');
+  btn.addEventListener('click',function(){
+    btn.disabled=true; btn.textContent='Einen Moment …';
+    fetch(API+'?a='+encodeURIComponent(id)+'&c=abmelden-seite',{method:'POST'})
+      .then(function(r){ return r.json().catch(function(){ return {ok:false}; }); })
+      .then(function(j){ if(j&&j.ok) zeige('fertig'); else { document.getElementById('fehlerText').textContent=(j&&j.fehler==='Link nicht gefunden')?'Dieser Link ist nicht mehr gültig, vermutlich sind Sie bereits abgemeldet.':'Der Link ist unvollständig oder nicht mehr gültig.'; zeige('fehler'); } })
+      .catch(function(){ zeige('fehler'); });
+  });
+})();
+</script>
+</body>
+</html>
