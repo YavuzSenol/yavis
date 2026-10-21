@@ -2277,7 +2277,7 @@ function oaNeuerKandidat(id, nummer){
   _oaPendingId=id; // NACH zeigeFormular setzen (das setzt _oaPendingId zurück)
 }
 async function oaVerwerfen(id){
-  if(!confirm('Diesen Anruf verwerfen? Er verschwindet dann aus der Liste.')) return;
+  // Ohne Rückfrage: verworfene Anrufe lassen sich über Status „verworfen" → „↺ wiederherstellen" zurückholen
   const {error}=await sb.from('anrufe_offen').update({status:'verworfen'}).eq('id',id);
   if(error){ alert('Konnte nicht verwerfen: '+error.message); return; }
   ladeOffeneAnrufe();
