@@ -735,9 +735,9 @@
           </select>
         </div>
         <div style="min-width:200px">
-          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Ausschließen (Wertung)</div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Wertung</div>
           <div class="msdd" id="rmExWertDD">
-            <button type="button" class="msdd-btn" id="rmExWertDD-btn" onclick="msddToggle('rmExWertDD')">Standard-Ausschlüsse ▾</button>
+            <button type="button" class="msdd-btn" id="rmExWertDD-btn" onclick="msddToggle('rmExWertDD')">alle Wertungen ▾</button>
             <div class="msdd-panel" id="rmExWertDD-panel" style="display:none"></div>
           </div>
         </div>
@@ -1498,7 +1498,7 @@
     <!-- Standard-Ausschlüsse (·242: aus dem Listen-Tab hierher — gehört zur Recherche) -->
     <div class="setSec" data-cat="arbeiten" style="margin-bottom:20px">
       <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">🚫 Recherche – Standard-Ausschlüsse</div>
-      <div style="font-size:12px;color:var(--muted);margin:-4px 0 8px">Diese Wertungen sind in der Recherche unter „Wertung ausschließen" von vornherein angehakt. Vorgabe: nichts — du bestimmst es selbst.</div>
+      <div style="font-size:12px;color:var(--muted);margin:-4px 0 8px">Diese Wertungen sind in der Recherche im Feld „Wertung" von vornherein auf ✕ ausgeschlossen gesetzt. Vorgabe: nichts — du bestimmst es selbst.</div>
       <div id="rmExStdCont" style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:11px 16px"></div>
     </div>
 
@@ -12508,7 +12508,7 @@ function rmKiAnwenden(f){
   if(f.abwerbeschutz===false) set('rmAbwerbeschutz','nein'); else if(f.abwerbeschutz===true) set('rmAbwerbeschutz','ja');
   if(Array.isArray(f.bundesland)&&f.bundesland.length) _msddSetSel('rmBundeslandDD', f.bundesland);
   if(Array.isArray(f.quelle)&&f.quelle.length) _msddSetSel('rmQuelleDD', f.quelle);
-  if(Array.isArray(f.wertungAusschluss)&&f.wertungAusschluss.length) _msddSetSel('rmExWertDD', f.wertungAusschluss);
+  if(Array.isArray(f.wertungAusschluss)&&f.wertungAusschluss.length) rmWertSetzen(rmWertLesen().ein, f.wertungAusschluss);
   const det=document.getElementById('rmErweitert'); if(det) det.open=true;
 }
 
@@ -12575,8 +12575,41 @@ async function _rmExWertFuellen(){
     (data||[]).forEach(r=>String(r.wertung||'').split(';').forEach(t=>{ const v=t.trim(); if(v) werte.add(v); }));
   }catch(e){}
   const opts=[...werte].sort((a,b)=>a.localeCompare(b,'de',{sensitivity:'base'}));
-  msddBuild('rmExWertDD', opts, _rmExWertStd(), 'keine Ausschlüsse', null);
+  _rmWertBauen(opts, _rmExWertStd());
 }
+// ----- Wertung-Filter mit drei Zuständen je Wert: egal → ✓ nur diese zeigen → ✕ ausschließen → egal -----
+let _rmWertOpts=[]; const _rmWertZustand={}; // wert -> 'ein' | 'aus'
+function _rmWertBauen(opts, aus){
+  _rmWertOpts=opts;
+  Object.keys(_rmWertZustand).forEach(k=>delete _rmWertZustand[k]);
+  (aus||[]).forEach(w=>{ _rmWertZustand[w]='aus'; });
+  const panel=document.getElementById('rmExWertDD-panel'); if(!panel) return;
+  panel.innerHTML='<div style="font-size:11px;color:var(--muted);padding:3px 7px 6px;white-space:normal;max-width:230px">Klick auf einen Wert schaltet durch: <b>✓ nur diese</b> zeigen, <b>✕ ausschließen</b>, wieder egal.</div>'
+    +opts.map(o=>`<div class="msdd-opt" data-w="${esc(o)}" onclick="rmWertKlick(this.dataset.w)"><span class="rmw-sym" style="display:inline-block;width:18px;text-align:center;font-weight:700"></span>${esc(o)}</div>`).join('')
+    +`<div class="msdd-foot"><button type="button" onclick="rmWertAlleEgal()">zurücksetzen</button><button type="button" onclick="msddClose('rmExWertDD')">schließen</button></div>`;
+  panel.dataset.filled='1';
+  rmWertAnzeigen();
+}
+function rmWertAnzeigen(){
+  document.querySelectorAll('#rmExWertDD-panel .msdd-opt').forEach(r=>{
+    const z=_rmWertZustand[r.dataset.w], s=r.querySelector('.rmw-sym');
+    s.textContent=z==='ein'?'✓':(z==='aus'?'✕':'○');
+    s.style.color=z==='ein'?'var(--ok)':(z==='aus'?'var(--hot)':'var(--muted)');
+    r.style.background=z?'var(--panel2)':'';
+  });
+  const L=rmWertLesen(), btn=document.getElementById('rmExWertDD-btn'); if(!btn) return;
+  const teil=[]; if(L.ein.length) teil.push('✓ '+(L.ein.length===1?L.ein[0]:L.ein.length+' Wertungen')); if(L.aus.length) teil.push('✕ '+(L.aus.length===1?L.aus[0]:L.aus.length+' ausgeschlossen'));
+  btn.textContent=(teil.length?teil.join(' · '):'alle Wertungen')+' ▾';
+}
+function rmWertLesen(){ const ein=[],aus=[]; _rmWertOpts.forEach(w=>{ const z=_rmWertZustand[w]; if(z==='ein') ein.push(w); else if(z==='aus') aus.push(w); }); return {ein,aus}; }
+function rmWertSetzen(ein,aus){ Object.keys(_rmWertZustand).forEach(k=>delete _rmWertZustand[k]); (ein||[]).forEach(w=>{ _rmWertZustand[w]='ein'; }); (aus||[]).forEach(w=>{ _rmWertZustand[w]='aus'; }); rmWertAnzeigen(); }
+function rmWertKlick(w){
+  const z=_rmWertZustand[w];
+  if(!z) _rmWertZustand[w]='ein'; else if(z==='ein') _rmWertZustand[w]='aus'; else delete _rmWertZustand[w];
+  rmWertAnzeigen();
+  try{ rmFilterZaehlerUpdate(); }catch(e){} try{ rmLiveSuche(); }catch(e){}
+}
+function rmWertAlleEgal(){ Object.keys(_rmWertZustand).forEach(k=>delete _rmWertZustand[k]); rmWertAnzeigen(); try{ rmFilterZaehlerUpdate(); }catch(e){} try{ rmLiveSuche(); }catch(e){} }
 // Einstellungen: welche Wertungen sind in der Recherche standardmäßig als Ausschluss vorgewählt
 function rmExStdRender(){
   const cont=document.getElementById('rmExStdCont'); if(!cont) return;
@@ -12796,7 +12829,7 @@ function rmFilterLesen(){
     pos:[..._rmGewaehltePos],
     plz:g('rmPlz')?.value||'', radius:g('rmRadius')?.value||'50', umzug:g('rmUmzug')?.value||'',
     mailMode:g('rmMail')?.value||'', telMode:g('rmTel')?.value||'',
-    ausschluss:msddSel('rmExWertDD'), freitext:g('rmFreitext')?.value||'', arbeitgeber:g('rmArbeitgeber')?.value||'',
+    ausschluss:rmWertLesen().aus, nurWertung:rmWertLesen().ein, freitext:g('rmFreitext')?.value||'', arbeitgeber:g('rmArbeitgeber')?.value||'',
     tags:g('rmTags')?.value||'', bundesland:msddSel('rmBundeslandDD'), keinKontakt:g('rmKeinKontakt')?.value||'',
     gehaltVon:g('rmGehaltVon')?.value||'', gehaltBis:g('rmGehaltBis')?.value||'',
     erfVon:g('rmErfVon')?.value||'', erfBis:g('rmErfBis')?.value||'',
@@ -12823,7 +12856,7 @@ function rmFilterSetzen(f){
   sv('rmAlterVon',f.alterVon); sv('rmAlterBis',f.alterBis); sv('rmQualifikation',f.qualifikation); sv('rmStudiengang',f.studiengang);
   sv('rmAbwerbeschutz',f.abw); sv('rmIstHot',f.istHot?'ja':''); sv('rmHatProfil',f.hatProfil?'ja':'');
   sv('rmRolle',f.rolle); sv('rmHatDok',f.hatDok?'ja':''); sv('rmAnrede',f.anrede); sv('rmProjekt',f.projekt); rcfWerteSetzen(f.custom);
-  _msddSetSel('rmExWertDD', f.ausschluss); _msddSetSel('rmBundeslandDD', f.bundesland); _msddSetSel('rmQuelleDD', f.quelle); _msddSetSel('rmPlanungDD', f.planung);
+  rmWertSetzen(f.nurWertung, f.ausschluss); _msddSetSel('rmBundeslandDD', f.bundesland); _msddSetSel('rmQuelleDD', f.quelle); _msddSetSel('rmPlanungDD', f.planung);
   const det=document.getElementById('rmErweitert'); if(det) det.open=true;
 }
 function rmSuchenLaden(){ try{ const a=JSON.parse(localStorage.getItem('yavis_recherchen')); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
@@ -12865,7 +12898,9 @@ async function rechercheMaskeAusfuehren() {
   const telMode   = document.getElementById('rmTel')?.value||'';
   const statusVal =  document.getElementById('rmStatus').value;
   const umzugVal  = (document.getElementById('rmUmzug').value      || '').trim();
-  const ausschluss = msddSel('rmExWertDD').map(s => s.trim().toLowerCase()).filter(Boolean);
+  const _wl = rmWertLesen();
+  const ausschluss = _wl.aus.map(s => s.trim().toLowerCase()).filter(Boolean);
+  const nurWertung = _wl.ein.map(s => s.trim().toLowerCase()).filter(Boolean); // ✓ = nur diese Wertungen zeigen
   const freitext    = (document.getElementById('rmFreitext')?.value    || '').trim();
   const arbeitgeber = (document.getElementById('rmArbeitgeber')?.value || '').trim();
   const tags        = (document.getElementById('rmTags')?.value        || '').trim();
@@ -12905,7 +12940,7 @@ async function rechercheMaskeAusfuehren() {
     // ·249 FIX: freitext/arbeitgeber/tags/istHot/hatProfil/abwSchutz/newsletter fehlten hier.
     // Die Umkreis-RPC liefert nur einen Teil der Spalten; ohne Nachladen filterten diese
     // Kriterien gegen undefined und lieferten IMMER null Treffer.
-    const brauchtVoll = _rmGewaehltePos.size || statusVal || mailMode || telMode || ausschluss.length || umzugVal || bundesland.length || quelle.length || planung.length || gehaltVon!=null || gehaltBis!=null || erfVon!=null || erfBis!=null || alterVon!=null || alterBis!=null || qualifikation || studiengang || rolle || hatDok || anredeVal
+    const brauchtVoll = _rmGewaehltePos.size || statusVal || mailMode || telMode || ausschluss.length || nurWertung.length || umzugVal || bundesland.length || quelle.length || planung.length || gehaltVon!=null || gehaltBis!=null || erfVon!=null || erfBis!=null || alterVon!=null || alterBis!=null || qualifikation || studiengang || rolle || hatDok || anredeVal
       || freitext || arbeitgeber || tags || istHot || hatProfil || abwSchutz || newsletter || keinKontakt || projektVal;
     if (rpcRows.length && brauchtVoll) {
       const ids = rpcRows.map(r => r.id);
@@ -12959,9 +12994,10 @@ async function rechercheMaskeAusfuehren() {
       if (freitext)     q = q.or(`voller_name.ilike.%${freitext}%,arbeitgeber.ilike.%${freitext}%,tags.ilike.%${freitext}%,faehigkeiten.ilike.%${freitext}%,position_original.ilike.%${freitext}%,stadt.ilike.%${freitext}%`);
       return q;
     };
-    // Alle Treffer holen (Server deckelt bei 1000/Abfrage -> in Blöcken laden), Sicherheits-Obergrenze 5000
+    // Alle Treffer holen (Server deckelt bei 1000/Abfrage -> in Blöcken laden), Sicherheits-Obergrenze 20000
+    // (früher 5000: bei 5.337 Personen fehlten die letzten ~340 nach Nachname in JEDER Recherche ohne PLZ)
     rows = [];
-    for(let off=0; off<5000; off+=1000){
+    for(let off=0; off<20000; off+=1000){
       const { data, error } = await bauQ().range(off, off+999);
       if (error) { anzEl.textContent = 'Fehler: ' + error.message; return; }
       rows = rows.concat(data||[]);
@@ -12977,6 +13013,12 @@ async function rechercheMaskeAusfuehren() {
   if (umzugVal) {
     const ul = umzugVal.toLowerCase();
     rows = rows.filter(r => (r.umzugsbereitschaft || '').toLowerCase().includes(ul));
+  }
+  if (nurWertung.length) { // ✓ in der Wertung-Auswahl: nur Personen mit genau dieser Wertung (bei mehreren Werten: mindestens eine davon)
+    rows = rows.filter(r => {
+      const toks = String(r.wertung || '').split(';').map(s => s.trim().toLowerCase());
+      return nurWertung.some(w => toks.includes(w));
+    });
   }
   if (ausschluss.length) {
     rows = rows.filter(r => {
@@ -13480,8 +13522,7 @@ function rechercheMaskeZuruecksetzen() {
   ['rmMail', 'rmTel'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
-  { const _std=_rmExWertStd(); document.querySelectorAll('#rmExWertDD-panel input').forEach(c=>{ c.checked=_std.includes(c.value); }); }
-  msddUpdateLabel('rmExWertDD');
+  rmWertSetzen([], _rmExWertStd()); // Wertung zurück auf den in den Einstellungen gewählten Standard
   ['rmFreitext','rmArbeitgeber','rmTags','rmGehaltVon','rmGehaltBis','rmErfVon','rmErfBis','rmAlterVon','rmAlterBis','rmQualifikation','rmStudiengang'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   ['rmKeinKontakt','rmAbwerbeschutz','rmNewsletter','rmRolle'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   rcfWerteSetzen({});
@@ -13529,9 +13570,9 @@ function rmAktiveFilter(){
   if (f.hatDok)    liste.push('hat Dokument');
   { const s = document.getElementById('rmStatus'); if (s && s.value) liste.push('Status'); }
   { const n = document.getElementById('rmNewsletter'); if (n && n.value) liste.push('Newsletter'); }
-  // Ausschlüsse zählen nur, wenn sie vom eingestellten Standard abweichen
+  // Wertung zählt nur, wenn sie vom eingestellten Standard abweicht
   { const std = _rmExWertStd().slice().sort().join('|'), ist = (f.ausschluss||[]).slice().sort().join('|');
-    if (ist !== std) liste.push('Ausschlüsse'); }
+    if (ist !== std || (f.nurWertung||[]).length) liste.push('Wertung'); }
   Object.entries(f.custom || {}).forEach(([k, v]) => { if (v && String(v).trim()) liste.push(k); });
   return liste;
 }
