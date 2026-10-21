@@ -10278,35 +10278,44 @@ async function rueckLaeuferPruefen(){
     zeigeMeldung('Durchsuche Posteingang nach Rückläufern …','ok');
     const gefunden={}; let geprueft=0, ndr=0;
     const gesperrt={}; let gesperrtNdr=0; // Rückläufer wegen Absender-Sperre (Microsoft „bad outbound sender"): Empfänger-Adresse ist in Ordnung!
-    let url='https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=50&$select='+_SYNC_SELECT+'&$orderby=receivedDateTime%20desc';
-    while(url && geprueft<1500){
-      const resp=await fetch(url,{headers:{'Authorization':'Bearer '+token,'Prefer':'outlook.body-content-type="text"'}});
-      if(!resp.ok) break;
-      const data=await resp.json();
-      for(const m of (data.value||[])){
-        geprueft++;
-        const from=(m.from&&m.from.emailAddress&&m.from.emailAddress.address||'').toLowerCase();
-        const subj=(m.subject||'');
-        if(!(_NDR_FROM.test(from)||_NDR_SUBJ.test(subj))) continue;
-        ndr++;
-        const body=(m.body&&m.body.content||'');
-        const alle=((subj+' '+body).match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/gi)||[]);
-        const seen=new Set();
-        // Absender-Sperre (nicht die Schuld des Empfängers): NICHT als „unzustellbar" markieren, sondern gesondert sammeln
-        const istSperre=_RL_SPERRE.test(subj+' '+body);
-        if(istSperre) gesperrtNdr++;
-        alle.forEach(a=>{ const low=a.toLowerCase(); if(seen.has(low)) return; seen.add(low);
-          const kid=addr2id[low];
-          if(!kid) return;
-          if(istSperre){ if(!gesperrt[kid]) gesperrt[kid]={id:kid, email:low}; return; }
-          if(!gefunden[kid]) gefunden[kid]={id:kid, email:low, betreff:subj.slice(0,140), datum:m.receivedDateTime}; });
+    // Rückläufer gehen an die ABSENDER-Adresse: bei Newslettern von tga@ also in das Postfach tga@, nicht in dein persönliches. Beide durchsuchen.
+    const postfaecher=[{base:'https://graph.microsoft.com/v1.0/me', name:'dein Postfach'}];
+    const gpA=(typeof gpAdresse==='function')?gpAdresse():'';
+    if(gpA && gpA!=='senol@senolconsulting.de') postfaecher.push({base:'https://graph.microsoft.com/v1.0/users/'+encodeURIComponent(gpA), name:gpA, optional:true});
+    const durchsucht=[]; let gpFehlt=false;
+    for(const pf of postfaecher){
+      let url=pf.base+'/mailFolders/inbox/messages?$top=50&$select='+_SYNC_SELECT+'&$orderby=receivedDateTime%20desc';
+      let proPostfach=0;
+      while(url && proPostfach<5000){
+        const resp=await fetch(url,{headers:{'Authorization':'Bearer '+token,'Prefer':'outlook.body-content-type="text"'}});
+        if(!resp.ok){ if(pf.optional && (resp.status===401||resp.status===403||resp.status===404)) gpFehlt=true; break; }
+        const data=await resp.json();
+        for(const m of (data.value||[])){
+          geprueft++; proPostfach++;
+          const from=(m.from&&m.from.emailAddress&&m.from.emailAddress.address||'').toLowerCase();
+          const subj=(m.subject||'');
+          if(!(_NDR_FROM.test(from)||_NDR_SUBJ.test(subj))) continue;
+          ndr++;
+          const body=(m.body&&m.body.content||'');
+          const alle=((subj+' '+body).match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/gi)||[]);
+          const seen=new Set();
+          // Absender-Sperre (nicht die Schuld des Empfängers): NICHT als „unzustellbar" markieren, sondern gesondert sammeln
+          const istSperre=_RL_SPERRE.test(subj+' '+body);
+          if(istSperre) gesperrtNdr++;
+          alle.forEach(a=>{ const low=a.toLowerCase(); if(seen.has(low)) return; seen.add(low);
+            const kid=addr2id[low];
+            if(!kid) return;
+            if(istSperre){ if(!gesperrt[kid]) gesperrt[kid]={id:kid, email:low}; return; }
+            if(!gefunden[kid]) gefunden[kid]={id:kid, email:low, betreff:subj.slice(0,140), datum:m.receivedDateTime}; });
+        }
+        url=data['@odata.nextLink']||null;
+        zeigeMeldung('Durchsuche '+pf.name+' … '+geprueft+' geprüft, '+ndr+' Rückläufer','ok');
       }
-      url=data['@odata.nextLink']||null;
-      zeigeMeldung('Durchsuche … '+geprueft+' geprüft, '+ndr+' Rückläufer','ok');
+      if(!(pf.optional&&gpFehlt)) durchsucht.push(pf.name);
     }
     if(gesperrtNdr){ await rlGesperrtAufraeumen(Object.values(gesperrt), gesperrtNdr); }
     const treffer=Object.values(gefunden);
-    if(!treffer.length){ alert('Keine unzustellbaren Kandidaten-Mails im Posteingang gefunden.\n\nGeprüft: '+geprueft+' Mails, davon '+ndr+' Rückläufer-Meldungen (keine passte zu einer Kandidaten-Adresse).'); zeigeMeldung('Keine Rückläufer zugeordnet','warn'); return; }
+    if(!treffer.length){ alert('Keine unzustellbaren Kandidaten-Mails gefunden.\n\nDurchsucht: '+durchsucht.join(' und ')+(gpFehlt?'\n(Das Postfach '+gpA+' ließ sich nicht lesen – bitte unter ⚙️ → ✉️ E-Mail & Vorlagen „Postfach prüfen" klicken.)':'')+'\nGeprüft: '+geprueft+' Mails, davon '+ndr+' Rückläufer-Meldungen'+(gesperrtNdr?' (davon '+gesperrtNdr+' wegen Absender-Sperre)':' (keine passte zu einer Kandidaten-Adresse)')+'.'); zeigeMeldung('Keine Rückläufer zugeordnet','warn'); return; }
     const ids=treffer.map(t=>t.id); const namen={};
     for(let i=0;i<ids.length;i+=300){ const {data}=await sb.from('kandidaten').select('id,voller_name,email,email_beruflich,email_zweit,telefon,mobil,email_unzustellbar').in('id',ids.slice(i,i+300)); (data||[]).forEach(k=>namen[k.id]=k); }
     treffer.forEach(t=>{ const k=namen[t.id]||{}; t.name=k.voller_name||'(ohne Name)'; t.schon=!!k.email_unzustellbar;
