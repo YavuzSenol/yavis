@@ -385,6 +385,10 @@
           <option value="ohne_telefon">ohne jede Telefonnr.</option>
           <option value="ohne_position">ohne Position</option>
         </select></div>
+      <div class="field"><label>Angelegt</label>
+        <select id="kNeu" onchange="ladeKandidaten()" title="Nur Personen, die in diesem Zeitraum neu angelegt wurden">
+          <option value="">alle</option><option value="heute">heute</option><option value="7">letzte 7 Tage</option><option value="30">letzte 30 Tage</option><option value="90">letzte 90 Tage</option>
+        </select></div>
       <div class="field"><label>Umkreis um PLZ</label>
         <input id="kPlz" placeholder="z.B. 50667" style="min-width:110px"></div>
       <div class="field"><label>Radius km</label>
@@ -473,6 +477,10 @@
       <div class="field" data-filter="ausland"><label>&nbsp;</label>
         <label style="display:flex;align-items:center;gap:6px;height:32px;cursor:pointer;white-space:nowrap;font-size:12px;text-transform:none;letter-spacing:normal;color:var(--muted)">
           <input type="checkbox" id="cAusland" onchange="ladeKunden()" style="width:13px;height:13px;cursor:pointer;accent-color:var(--muted)">nur ausland</label></div>
+      <div class="field" data-filter="neu"><label>Angelegt</label>
+        <select id="cNeu" onchange="ladeKunden()" title="Nur Firmen, die in diesem Zeitraum neu angelegt wurden">
+          <option value="">alle</option><option value="heute">heute</option><option value="7">letzte 7 Tage</option><option value="30">letzte 30 Tage</option><option value="90">letzte 90 Tage</option>
+        </select></div>
       <div class="field" data-filter="plz"><label>PLZ (Umkreis)</label>
         <input id="cPlz" placeholder="z.B. 50667" style="width:90px" maxlength="5" onkeydown="if(event.key==='Enter')ladeKunden()"></div>
       <div class="field" data-filter="radius"><label>Radius km</label>
@@ -775,6 +783,12 @@
             <select id="rmKeinKontakt" style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
               <option value="">egal</option><option value="30">30 Tagen</option><option value="60">60 Tagen</option>
               <option value="90">90 Tagen</option><option value="180">180 Tagen</option><option value="365">1 Jahr</option>
+            </select>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Angelegt in den letzten</div>
+            <select id="rmNeu" style="padding:7px 10px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:5px">
+              <option value="">egal</option><option value="heute">heute</option><option value="7">7 Tagen</option><option value="30">30 Tagen</option><option value="90">90 Tagen</option>
             </select>
           </div>
           <div>
@@ -4045,6 +4059,9 @@ async function ladeKandidaten(){
   const hotLabel=nurHot?' · 🔥 Hot':'';
   const ausland=!!(document.getElementById('kAusland')||{}).checked;
   const auslandLabel=ausland?' · ausland':'';
+  const neuW=(document.getElementById('kNeu')||{}).value||'';
+  const neuIso=neuSeitIso(neuW);
+  const neuLabel=neuW?' · '+(NEU_LABEL[neuW]||'neu'):'';
   const plz=document.getElementById('kPlz').value.trim();
   const radius=document.getElementById('kRadius').value;
   const body=document.getElementById('kBody'); body.innerHTML='';
@@ -4069,7 +4086,7 @@ async function ladeKandidaten(){
     if(posListe) rows=rows.filter(r=>posListe.includes(r.berufsbezeichnung));
     // Die Umkreis-Funktion liefert nur Basisfelder → volle Datensätze nachladen,
     // wenn Tag-Filter aktiv ist ODER Spalten angezeigt werden, die sie nicht enthält.
-    if(rows.length && (tagFilterAktiv() || brauchtVolleDaten() || luecke || mitProfil || nurHot || ausland || rolleFilter!=='alle')){
+    if(rows.length && (tagFilterAktiv() || brauchtVolleDaten() || luecke || mitProfil || nurHot || ausland || neuIso || rolleFilter!=='alle')){
       const ids=rows.map(r=>r.id); const map={};
       for(let i=0;i<ids.length;i+=300){ const teil=ids.slice(i,i+300);
         const {data:td}=await sb.from('kandidaten').select('*').in('id',teil);
@@ -4081,8 +4098,9 @@ async function ladeKandidaten(){
     if(mitProfil) rows=rows.filter(r=>hatProfil(r));
     if(nurHot) rows=rows.filter(r=>r.ist_hot);
     if(ausland) rows=rows.filter(r=>{const l=(r.land||'').trim(); return l&&l!=='Deutschland'&&l!=='Germany';});
+    if(neuIso) rows=rows.filter(r=>r.erstellt_am&&r.erstellt_am>=neuIso);
     if(rolleFilter!=='alle') rows=rows.filter(rolleMatch);
-    document.getElementById('kCount').textContent=rows.length+' '+personenNomen()+' im Umkreis von '+radius+' km um '+plz+posLabel+lueckeLabel+profilLabel+hotLabel+auslandLabel+tagFilterLabel();
+    document.getElementById('kCount').textContent=rows.length+' '+personenNomen()+' im Umkreis von '+radius+' km um '+plz+posLabel+lueckeLabel+profilLabel+hotLabel+auslandLabel+neuLabel+tagFilterLabel();
     _kandGeladen=rows; _kandMitKm=true; renderKandTabelle();
     return;
   }
@@ -4095,6 +4113,7 @@ async function ladeKandidaten(){
   if(mitProfil) query=query.or('xing_profil.ilike.%http%,linkedin_profil.ilike.%http%');
   if(nurHot) query=query.eq('ist_hot',true);
   if(ausland) query=query.not('land','is',null).neq('land','').not('land','in','("Deutschland","Germany")');
+  if(neuIso) query=query.gte('erstellt_am',neuIso);
   if(q) query=query.or(`voller_name.ilike.%${q}%,berufsbezeichnung.ilike.%${q}%,faehigkeiten.ilike.%${q}%,stadt.ilike.%${q}%,arbeitgeber.ilike.%${q}%`);
   const tmod=tagModusWert();
   if(tmod==='leer'){ query=query.or('tags.is.null,tags.eq.,tags.eq.;;'); }
@@ -4109,11 +4128,11 @@ async function ladeKandidaten(){
   else if(rolleFilter==='lieferant') query=query.ilike('rollen','%;Lieferant;%');
   else if(rolleFilter==='sonstiges') query=query.ilike('rollen','%;Sonstiges;%');
   else if(rolleFilter==='doppel') query=query.ilike('rollen','%;Kandidat;%').ilike('rollen','%;Ansprechpartner;%');
-  query=query.order('letzte_aktivitaet',{ascending:false,nullsFirst:false});
+  query=neuIso ? query.order('erstellt_am',{ascending:false,nullsFirst:false}) : query.order('letzte_aktivitaet',{ascending:false,nullsFirst:false}); // „angelegt in den letzten …": neueste Neuanlage zuerst
   const {data,error}=await query;
   if(error){document.getElementById('kCount').textContent='Fehler: '+error.message;return;}
   // ·243 (C10): „weitere laden"-Link, wenn die Liste am Limit abgeschnitten ist
-  const kTxt=(data.length)+' '+personenNomen()+(data.length>=_kandLimit?` (erste ${_kandLimit})`:'')+posLabel+lueckeLabel+profilLabel+hotLabel+auslandLabel+tagFilterLabel();
+  const kTxt=(data.length)+' '+personenNomen()+(data.length>=_kandLimit?` (erste ${_kandLimit})`:'')+posLabel+lueckeLabel+profilLabel+hotLabel+auslandLabel+neuLabel+tagFilterLabel();
   const kEl=document.getElementById('kCount');
   if(data.length>=_kandLimit){ kEl.innerHTML=esc(kTxt)+' · <span onclick="kandMehrLaden()" style="color:var(--accent);cursor:pointer;text-decoration:underline">▸ weitere 200 laden</span>'; }
   else kEl.textContent=kTxt;
@@ -4765,15 +4784,16 @@ const SPALTEN_DEF=[
   {key:'tags', label:'Fähigkeiten', render:r=>esc((r.tags||'').replace(/^;|;$/g,'').replace(/;/g,', '))||'–'},
   {key:'bemerkung', label:'Bemerkung (frei)', render:r=>esc((r.bemerkung||'').slice(0,80))||'–'},
   {key:'letzte_aktivitaet', label:'Letzte Aktivität', render:r=>r.letzte_aktivitaet?fmtDat(r.letzte_aktivitaet):'–'},
+  {key:'erstellt_am', label:'Angelegt am', render:r=>r.erstellt_am?fmtDatum(r.erstellt_am):'–'},
 ];
 // Spalten, die NICHT in der PLZ-Umkreis-Funktion enthalten sind (Nachladen nötig)
 const SPALTEN_VOLL=['nachname','vorname','arbeitgeber','email','telefon','mobil','profil',
   'begruessung','titel','funktion','rollen','email_beruflich','bundesland','geburtstag','erfahrung_jahre',
   'qualifikation','studiengang','gehalt_aktuell','gehalt_erwartet','kuendigungsfrist','umzugsbereitschaft',
-  'wunschregion','kontaktstatus','wertung','quelle','tags','bemerkung','letzte_aktivitaet'];
+  'wunschregion','kontaktstatus','wertung','quelle','tags','bemerkung','letzte_aktivitaet','erstellt_am'];
 const SPALTEN_MAP=Object.fromEntries(SPALTEN_DEF.map(c=>[c.key,c]));
 // Phase 7: sinnvolle Default-Spaltenbreiten (px) — werden vom Header als data-w ausgegeben, tblResize nutzt sie als Default (gezogene Breiten haben Vorrang)
-const SPALTEN_W={voller_name:200,nachname:120,vorname:110,berufsbezeichnung:190,arbeitgeber:180,stadt:120,plz:70,email:210,telefon:130,mobil:130,profil:140,status:120,begruessung:90,titel:80,funktion:150,rollen:80,email_beruflich:210,bundesland:130,geburtstag:100,erfahrung_jahre:70,qualifikation:160,studiengang:160,gehalt_aktuell:110,gehalt_erwartet:110,kuendigungsfrist:130,umzugsbereitschaft:100,wunschregion:140,kontaktstatus:130,wertung_intern:150,quelle:130,tags:220,bemerkung:220,letzte_aktivitaet:120};
+const SPALTEN_W={voller_name:200,nachname:120,vorname:110,berufsbezeichnung:190,arbeitgeber:180,stadt:120,plz:70,email:210,telefon:130,mobil:130,profil:140,status:120,begruessung:90,titel:80,funktion:150,rollen:80,email_beruflich:210,bundesland:130,geburtstag:100,erfahrung_jahre:70,qualifikation:160,studiengang:160,gehalt_aktuell:110,gehalt_erwartet:110,kuendigungsfrist:130,umzugsbereitschaft:100,wunschregion:140,kontaktstatus:130,wertung_intern:150,quelle:130,tags:220,bemerkung:220,letzte_aktivitaet:120,erstellt_am:110};
 let sichtbareSpalten = (()=>{ try{ const s=JSON.parse(localStorage.getItem('kand_spalten')); if(Array.isArray(s)&&s.length) return s.filter(k=>SPALTEN_MAP[k]); }catch(e){} return ['voller_name','berufsbezeichnung','stadt','telefon']; })();
 let kandSortKey=null, kandSortDir=1, _kandGeladen=[], _kandMitKm=false;
 function spaltenSpeichern(){ localStorage.setItem('kand_spalten', JSON.stringify(sichtbareSpalten)); }
@@ -4793,7 +4813,13 @@ function kandSortVal(r,key){
     default: return r[key]!=null?r[key]:'';
   }
 }
-function kandSortBy(key){ if(kandSortKey===key) kandSortDir=-kandSortDir; else { kandSortKey=key; kandSortDir=1; } renderKandTabelle(); }
+// Datumsspalten starten beim ersten Klick mit „neueste zuerst"
+const _DATUMS_SPALTEN=['erstellt_am','letzte_aktivitaet'];
+function kandSortBy(key){ if(kandSortKey===key) kandSortDir=-kandSortDir; else { kandSortKey=key; kandSortDir=_DATUMS_SPALTEN.includes(key)?-1:1; } renderKandTabelle(); }
+// Filter „angelegt in den letzten …": Auswahlwert -> ISO-Zeitpunkt ab dem gezählt wird (null = kein Filter)
+function neuSeitIso(w){ if(!w) return null; const d=new Date(); if(w==='heute') d.setHours(0,0,0,0); else d.setTime(d.getTime()-Number(w)*864e5); return d.toISOString(); }
+const NEU_OPTIONEN='<option value="">alle</option><option value="heute">heute</option><option value="7">letzte 7 Tage</option><option value="30">letzte 30 Tage</option><option value="90">letzte 90 Tage</option>';
+const NEU_LABEL={heute:'heute angelegt','7':'angelegt: 7 Tage','30':'angelegt: 30 Tage','90':'angelegt: 90 Tage'};
 function renderKandTabelle(){
   const body=document.getElementById('kBody'); if(!body) return;
   let rows=_kandGeladen.slice();
@@ -7475,9 +7501,10 @@ const KUNDEN_SPALTEN_DEF=[
   {key:'land',       label:'Land',       get:r=>r.land||'',       render:r=>esc(r.land)||'–'},
   {key:'telefon',    label:'Telefon',    get:r=>r.telefon||'',    render:r=>r.telefon?fmtTel(r.telefon):'–'},
   {key:'webseite',   label:'Website',    get:r=>r.webseite||'',    render:r=>r.webseite?`<a class="calllink" href="${/^https?:/i.test(r.webseite)?esc(r.webseite):'https://'+esc(r.webseite)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(r.webseite)} ↗</a>`:'–'},
+  {key:'erstellt_am',label:'Angelegt am',get:r=>r.erstellt_am||'',    render:r=>r.erstellt_am?fmtDatum(r.erstellt_am):'–'},
 ];
 const KUNDEN_SPALTEN_MAP=Object.fromEntries(KUNDEN_SPALTEN_DEF.map(c=>[c.key,c]));
-const KUNDEN_SPALTEN_W={name:210,typ:130,branche:160,strasse:160,plz:70,stadt:120,bundesland:130,land:110,telefon:130,webseite:200};
+const KUNDEN_SPALTEN_W={name:210,typ:130,branche:160,strasse:160,plz:70,stadt:120,bundesland:130,land:110,telefon:130,webseite:200,erstellt_am:110};
 let kSichtbareSpalten=(()=>{ try{ const s=JSON.parse(localStorage.getItem('kunden_spalten')); if(Array.isArray(s)&&s.length) return s.filter(k=>KUNDEN_SPALTEN_MAP[k]); }catch(e){} return ['name','typ','branche','plz','stadt','telefon']; })();
 let kSortKey=null, kSortDir=1, _kundenMitKm=false;
 let _kNavIds=[]; // Reihenfolge der Firmenliste fürs Blättern im Detail
@@ -7499,7 +7526,7 @@ function kSpaltenHeaderRender(mitKm){
     + kSpaltenListe().map(c=>{ const pf=kSortKey===c.key?(kSortDir===1?' ▲':' ▼'):''; return `<th data-w="${KUNDEN_SPALTEN_W[c.key]||''}" style="cursor:pointer;user-select:none;white-space:nowrap" onclick="kSortBy('${c.key}')" title="Auf-/absteigend sortieren">${c.label}${pf}</th>`; }).join('')
     + (mitKm?`<th>Entfernung</th>`:'');
 }
-function kSortBy(key){ if(kSortKey===key) kSortDir=-kSortDir; else { kSortKey=key; kSortDir=1; } renderKundenTabelle(_kundenMitKm); }
+function kSortBy(key){ if(kSortKey===key) kSortDir=-kSortDir; else { kSortKey=key; kSortDir=(key==='erstellt_am')?-1:1; } renderKundenTabelle(_kundenMitKm); } // Datum: erster Klick = neueste zuerst
 function renderKundenTabelle(mitKm){
   const body=document.getElementById('cBody'); if(!body) return;
   _kundenMitKm=mitKm;
@@ -7556,6 +7583,7 @@ const KUNDEN_FILTER_DEF=[
   {key:'branche',label:'Branche',el:'cBranche'},
   {key:'stadt',label:'Stadt',el:'cStadt'},
   {key:'ausland',label:'nur ausland',el:'cAusland'},
+  {key:'neu',label:'Angelegt',el:'cNeu'},
   {key:'plz',label:'PLZ (Umkreis)',el:'cPlz'},
   {key:'radius',label:'Radius',el:'cRadius'},
 ];
@@ -7591,6 +7619,9 @@ async function ladeKunden(){
   const branche=(document.getElementById('cBranche')||{}).value||'';
   const stadtEl=document.getElementById('cStadt'); const stadt=stadtEl?stadtEl.value.trim():'';
   const ausland=!!(document.getElementById('cAusland')||{}).checked;
+  const neuW=(document.getElementById('cNeu')||{}).value||'';
+  const neuIso=neuSeitIso(neuW);
+  const neuLabel=neuW?' · '+(NEU_LABEL[neuW]||'neu'):'';
   const cPlzEl=document.getElementById('cPlz');
   const plz=cPlzEl?cPlzEl.value.trim():'';
   const radius=parseInt((document.getElementById('cRadius')||{}).value||'50')||50;
@@ -7629,6 +7660,7 @@ async function ladeKunden(){
     let pool=data;
     if(branche) pool=pool.filter(r=>(r.branche||'')===branche);
     if(ausland) pool=pool.filter(r=>{const l=(r.land||'').trim(); return l&&l!=='Deutschland'&&l!=='Germany';});
+    if(neuIso) pool=pool.filter(r=>r.erstellt_am&&r.erstellt_am>=neuIso);
     if(stadt){const sl=stadt.toLowerCase();pool=pool.filter(r=>(r.stadt||'').toLowerCase().includes(sl));}
     if(q){const ql=q.toLowerCase();pool=pool.filter(r=>(r.name||'').toLowerCase().includes(ql)||(r.branche||'').toLowerCase().includes(ql)||(r.stadt||'').toLowerCase().includes(ql));}
     const ohneKoord=pool.filter(r=>r.lat==null||r.lng==null).length;
@@ -7636,7 +7668,7 @@ async function ladeKunden(){
     rows.forEach(r=>{ r._km=Math.round(haversineKm(cLat,cLng,r.lat,r.lng)); });
     rows.sort((a,b)=>a._km-b._km);
     _kundenGeladen=rows;
-    let txt=rows.length+' Firmen im Umkreis von '+radius+' km um '+plz+(typ?' · '+typ:'')+(branche?' · '+branche:'')+(stadt?' · '+stadt:'')+(ausland?' · ausland':'')+(q?' · "'+q+'"':'');
+    let txt=rows.length+' Firmen im Umkreis von '+radius+' km um '+plz+(typ?' · '+typ:'')+(branche?' · '+branche:'')+(stadt?' · '+stadt:'')+(ausland?' · ausland':'')+neuLabel+(q?' · "'+q+'"':'');
     if(ohneKoord) txt+=' · ⚠️ '+ohneKoord+' ohne Koordinaten nicht berücksichtigt';
     document.getElementById('cCount').textContent=txt;
     renderKundenTabelle(true);
@@ -7644,17 +7676,18 @@ async function ladeKunden(){
   }
 
   // ---- Normale Suche ----
-  let query=sb.from('kunden').select('*').limit(_kundenLimit).order('name'); // ·243 (C10): nachladbar statt hart 200
+  let query=sb.from('kunden').select('*').limit(_kundenLimit).order(neuIso?'erstellt_am':'name',{ascending:!neuIso}); // ·243 (C10): nachladbar statt hart 200 · bei „angelegt in den letzten …": neueste zuerst
   if(softDeleteAktiv) query=query.is('geloescht_am',null);
   if(q) query=query.or(`name.ilike.%${q}%,branche.ilike.%${q}%,stadt.ilike.%${q}%`);
   if(typ) query=query.eq('typ',typ);
   if(branche) query=query.eq('branche',branche);
   if(stadt) query=query.ilike('stadt',`%${stadt}%`);
   if(ausland) query=query.not('land','is',null).neq('land','').not('land','in','("Deutschland","Germany")');
+  if(neuIso) query=query.gte('erstellt_am',neuIso);
   const {data,error}=await query;
   if(error){document.getElementById('cCount').textContent='Fehler: '+error.message;return;}
   _kundenGeladen=data;
-  const cTxt=data.length+' Firmen'+(data.length>=_kundenLimit?` (erste ${_kundenLimit})`:'')+(typ?' · '+typ:'')+(branche?' · '+branche:'')+(stadt?' · '+stadt:'')+(ausland?' · ausland':'');
+  const cTxt=data.length+' Firmen'+(data.length>=_kundenLimit?` (erste ${_kundenLimit})`:'')+(typ?' · '+typ:'')+(branche?' · '+branche:'')+(stadt?' · '+stadt:'')+(ausland?' · ausland':'')+neuLabel;
   const cEl=document.getElementById('cCount');
   if(data.length>=_kundenLimit){ cEl.innerHTML=esc(cTxt)+' · <span onclick="kundenMehrLaden()" style="color:var(--accent);cursor:pointer;text-decoration:underline">▸ weitere 200 laden</span>'; }
   else cEl.textContent=cTxt;
@@ -12830,7 +12863,7 @@ function rmFilterLesen(){
     plz:g('rmPlz')?.value||'', radius:g('rmRadius')?.value||'50', umzug:g('rmUmzug')?.value||'',
     mailMode:g('rmMail')?.value||'', telMode:g('rmTel')?.value||'',
     ausschluss:rmWertLesen().aus, nurWertung:rmWertLesen().ein, freitext:g('rmFreitext')?.value||'', arbeitgeber:g('rmArbeitgeber')?.value||'',
-    tags:g('rmTags')?.value||'', bundesland:msddSel('rmBundeslandDD'), keinKontakt:g('rmKeinKontakt')?.value||'',
+    tags:g('rmTags')?.value||'', bundesland:msddSel('rmBundeslandDD'), keinKontakt:g('rmKeinKontakt')?.value||'', neu:g('rmNeu')?.value||'',
     gehaltVon:g('rmGehaltVon')?.value||'', gehaltBis:g('rmGehaltBis')?.value||'',
     erfVon:g('rmErfVon')?.value||'', erfBis:g('rmErfBis')?.value||'',
     alterVon:g('rmAlterVon')?.value||'', alterBis:g('rmAlterBis')?.value||'',
@@ -12851,7 +12884,7 @@ function rmFilterSetzen(f){
   _rmGewaehltePos.clear(); (f.pos||[]).forEach(p=>_rmGewaehltePos.add(p)); zeigeRechercheMaske();
   sv('rmPlz',f.plz); sv('rmRadius',f.radius||'50'); sv('rmUmzug',f.umzug);
   sv('rmMail',f.mailMode); sv('rmTel',f.telMode);
-  sv('rmFreitext',f.freitext); sv('rmArbeitgeber',f.arbeitgeber); sv('rmTags',f.tags); sv('rmKeinKontakt',f.keinKontakt);
+  sv('rmFreitext',f.freitext); sv('rmArbeitgeber',f.arbeitgeber); sv('rmTags',f.tags); sv('rmKeinKontakt',f.keinKontakt); sv('rmNeu',f.neu);
   sv('rmGehaltVon',f.gehaltVon); sv('rmGehaltBis',f.gehaltBis); sv('rmErfVon',f.erfVon); sv('rmErfBis',f.erfBis);
   sv('rmAlterVon',f.alterVon); sv('rmAlterBis',f.alterBis); sv('rmQualifikation',f.qualifikation); sv('rmStudiengang',f.studiengang);
   sv('rmAbwerbeschutz',f.abw); sv('rmIstHot',f.istHot?'ja':''); sv('rmHatProfil',f.hatProfil?'ja':'');
@@ -12906,6 +12939,7 @@ async function rechercheMaskeAusfuehren() {
   const tags        = (document.getElementById('rmTags')?.value        || '').trim();
   const bundesland  = msddSel('rmBundeslandDD');
   const keinKontakt = parseInt(document.getElementById('rmKeinKontakt')?.value||'0')||0;
+  const neuIso = neuSeitIso(document.getElementById('rmNeu')?.value||''); // „Angelegt in den letzten …"
   const _num=id=>{ const v=parseFloat(String(document.getElementById(id)?.value||'').replace(',','.')); return isNaN(v)?null:v; };
   const gehaltVon=_num('rmGehaltVon'), gehaltBis=_num('rmGehaltBis');
   const erfVon=_num('rmErfVon'), erfBis=_num('rmErfBis');
@@ -12941,7 +12975,7 @@ async function rechercheMaskeAusfuehren() {
     // Die Umkreis-RPC liefert nur einen Teil der Spalten; ohne Nachladen filterten diese
     // Kriterien gegen undefined und lieferten IMMER null Treffer.
     const brauchtVoll = _rmGewaehltePos.size || statusVal || mailMode || telMode || ausschluss.length || nurWertung.length || umzugVal || bundesland.length || quelle.length || planung.length || gehaltVon!=null || gehaltBis!=null || erfVon!=null || erfBis!=null || alterVon!=null || alterBis!=null || qualifikation || studiengang || rolle || hatDok || anredeVal
-      || freitext || arbeitgeber || tags || istHot || hatProfil || abwSchutz || newsletter || keinKontakt || projektVal;
+      || freitext || arbeitgeber || tags || istHot || hatProfil || abwSchutz || newsletter || keinKontakt || neuIso || projektVal;
     if (rpcRows.length && brauchtVoll) {
       const ids = rpcRows.map(r => r.id);
       const map = {};
@@ -13063,6 +13097,7 @@ async function rechercheMaskeAusfuehren() {
   else if (anredeVal)            rows=rows.filter(r=>r.begruessung===anredeVal);
   if (hatDok){ const dokSet=await _ladeDokIds(); rows=rows.filter(r=>dokSet.has(r.id)); }
   if (keinKontakt) { const cutoff=new Date(); cutoff.setDate(cutoff.getDate()-keinKontakt); rows=rows.filter(r=>!r.letzte_aktivitaet||new Date(r.letzte_aktivitaet)<cutoff); }
+  if (neuIso) rows=rows.filter(r=>r.erstellt_am&&r.erstellt_am>=neuIso);
 
   // ----------- Ergebnis-Label -----------
   const n = rows.length;
@@ -13376,6 +13411,7 @@ const RM_COLS=[
  {key:'planung_ausfuehrung',label:'Planung/Ausf.',get:r=>r.planung_ausfuehrung||'',render:r=>esc(r.planung_ausfuehrung||'–')},
  {key:'tags',label:'Fähigkeiten',get:r=>r.tags||'',render:r=>esc((r.tags||'').replace(/^;|;$/g,'').replace(/;/g,', ')||'–')},
  {key:'letzte_aktivitaet',label:'Letzte Aktivität',get:r=>r.letzte_aktivitaet||'',render:r=>r.letzte_aktivitaet?fmtDat(r.letzte_aktivitaet):'–'},
+ {key:'erstellt_am',label:'Angelegt am',get:r=>r.erstellt_am||'',render:r=>r.erstellt_am?fmtDatum(r.erstellt_am):'–'},
  // ·252: in welchen Projekten steckt die Person? Wird aus _projNamenMap gespeist (nur geladen,
  // wenn diese Spalte gewählt ist — sonst kostet sie nichts).
  {key:'projekte',label:'Projekte',get:r=>(_projNamenMap.get(r.id)||[]).length,
@@ -13524,7 +13560,7 @@ function rechercheMaskeZuruecksetzen() {
   });
   rmWertSetzen([], _rmExWertStd()); // Wertung zurück auf den in den Einstellungen gewählten Standard
   ['rmFreitext','rmArbeitgeber','rmTags','rmGehaltVon','rmGehaltBis','rmErfVon','rmErfBis','rmAlterVon','rmAlterBis','rmQualifikation','rmStudiengang'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
-  ['rmKeinKontakt','rmAbwerbeschutz','rmNewsletter','rmRolle'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  ['rmKeinKontakt','rmNeu','rmAbwerbeschutz','rmNewsletter','rmRolle'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   rcfWerteSetzen({});
   msddClear('rmBundeslandDD'); msddClear('rmQuelleDD');
   // ·249: fehlten bisher — Planung/Ausführung, Anrede und der Radius blieben nach
@@ -13555,7 +13591,7 @@ function rmAktiveFilter(){
   txt(f.freitext, 'Suchtext');  txt(f.arbeitgeber, 'Arbeitgeber'); txt(f.tags, 'Fähigkeiten');
   txt(f.umzug, 'Umzug');        txt(f.mailMode, 'E-Mail');         txt(f.telMode, 'Telefon');
   txt(f.qualifikation, 'Qualifikation'); txt(f.studiengang, 'Studiengang');
-  txt(f.keinKontakt, 'Kein Kontakt seit'); txt(f.abw, 'Abwerbeschutz'); txt(f.rolle, 'Rolle');
+  txt(f.keinKontakt, 'Kein Kontakt seit'); txt(f.neu, 'Angelegt'); txt(f.abw, 'Abwerbeschutz'); txt(f.rolle, 'Rolle');
   txt(f.anrede, 'Anrede');
   if (f.projekt==='__mit__') liste.push('in einem Projekt');
   else if (f.projekt==='__ohne__') liste.push('in keinem Projekt');
