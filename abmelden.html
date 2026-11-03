@@ -45,17 +45,19 @@
 </main>
 <script>
 (function(){
-  var id=(new URLSearchParams(location.search).get('k')||'').trim();
+  var qs=new URLSearchParams(location.search);
+  var id=(qs.get('k')||'').trim();
+  var code=(qs.get('t')||'').trim();   // zufaelliger Code der Person (ab 2026-10 in jedem Link); aeltere Links haben keinen
   var API='https://afbyqrwqnccgudpqxziv.supabase.co/functions/v1/track';
   function zeige(n){ ['frage','fertig','fehler'].forEach(function(x){ document.getElementById(x).hidden=(x!==n); }); }
-  if(!/^[A-Za-z0-9_\-]{3,80}$/.test(id)){ zeige('fehler'); return; }
+  if(!/^[A-Za-z0-9_\-]{3,80}$/.test(id) || (code && !/^[a-f0-9]{32}$/.test(code))){ zeige('fehler'); return; }
   zeige('frage');
   var btn=document.getElementById('btn');
   btn.addEventListener('click',function(){
     btn.disabled=true; btn.textContent='Einen Moment …';
-    fetch(API+'?a='+encodeURIComponent(id)+'&c=abmelden-seite',{method:'POST'})
+    fetch(API+'?a='+encodeURIComponent(id)+(code?'&t='+code:'')+'&c=abmelden-seite',{method:'POST'})
       .then(function(r){ return r.json().catch(function(){ return {ok:false}; }); })
-      .then(function(j){ if(j&&j.ok) zeige('fertig'); else { document.getElementById('fehlerText').textContent=(j&&j.fehler==='Link nicht gefunden')?'Dieser Link ist nicht mehr gültig, vermutlich sind Sie bereits abgemeldet.':'Der Link ist unvollständig oder nicht mehr gültig.'; zeige('fehler'); } })
+      .then(function(j){ if(j&&j.ok) zeige('fertig'); else { document.getElementById('fehlerText').textContent=(j&&j.fehler==='Link nicht gefunden')?'Dieser Link ist nicht mehr gültig, vermutlich sind Sie bereits abgemeldet.':(j&&j.fehler==='Link veraltet')?'Dieser ältere Link ist nicht mehr gültig.':'Der Link ist unvollständig oder nicht mehr gültig.'; zeige('fehler'); } })
       .catch(function(){ zeige('fehler'); });
   });
 })();

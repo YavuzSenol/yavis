@@ -12,6 +12,7 @@
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const FALLBACK = "https://yavuzsenol.github.io/yavis";
+const ALT_LINKS_BIS = Date.parse("2027-01-01T00:00:00Z"); // Abmeldelinks OHNE Code (aus frueheren Newslettern) funktionieren bis einschl. 31.12.2026
 const CORS = {
   "Access-Control-Allow-Origin": "https://yavuzsenol.github.io",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -66,9 +67,14 @@ Deno.serve(async (req) => {
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
     if (req.method !== "POST") return json({ ok: false, fehler: "nur POST" }, 405);
     const id = (p.get("a") || "").trim();
+    const code = (p.get("t") || "").trim();
     if (!/^[A-Za-z0-9_\-]{3,80}$/.test(id)) return json({ ok: false, fehler: "ungueltiger Link" }, 400);
+    if (code && !/^[a-f0-9]{32}$/.test(code)) return json({ ok: false, fehler: "ungueltiger Link" }, 400);
+    // Seit Version 279 enthaelt jeder Abmeldelink einen zufaelligen Code der Person (kandidaten.abmelde_token).
+    // Links aus frueheren Newslettern haben keinen Code und gelten nur noch bis ALT_LINKS_BIS.
+    if (!code && Date.now() >= ALT_LINKS_BIS) return json({ ok: false, fehler: "Link veraltet" }, 410);
     try {
-      const r = await fetch(SUPABASE_URL + "/rest/v1/kandidaten?id=eq." + encodeURIComponent(id) + "&geloescht_am=is.null", {
+      const r = await fetch(SUPABASE_URL + "/rest/v1/kandidaten?id=eq." + encodeURIComponent(id) + "&geloescht_am=is.null" + (code ? "&abmelde_token=eq." + code : ""), {
         method: "PATCH",
         headers: {
           "apikey": SERVICE,
