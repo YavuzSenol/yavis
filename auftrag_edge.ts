@@ -47,13 +47,13 @@ Erlaubte Werte (genau so schreiben, sonst null):
 
 Regeln:
 - Erfinde nichts. Was nicht im Text steht, ist null (bei Listen: leere Liste). Gehalt nur, wenn genannt.
-- jobtitel im Muster "Projektleiter (d/m/w) HKLS - Ratingen" (Titel, (d/m/w), Gewerk, Bindestrich, Ort). Ort weglassen, wenn unbekannt.
+- jobtitel im Muster "Projektleiter HKLS - Ratingen" (Titel, Gewerk, Bindestrich, Ort). Niemals (d/m/w), (m/w/d), (M/W/D) oder andere Geschlechtszusätze im Titel. Ort weglassen, wenn unbekannt.
 - kunde_name und ansprechpartner_name: nur wenn im Text genannt. Diese Namen dürfen NIRGENDS in beschreibung, suchprofil oder Suchstrings stehen.
 - beschreibung: die Stellenanzeige in genau dieser Form, Klartext, Überschriften als eigene Zeilen, Aufzählungen mit "- ":
 
 Unser Partner
 
-<Ein bis zwei Sätze zum Auftraggeber, anonym: Branche, Größe, Ausrichtung, Standort. Danach ein Satz im Muster "Wir suchen einen erfahrenen <Titel> (d/m/w) für den Standort <Ort>.">
+<Ein bis zwei Sätze zum Auftraggeber, anonym: Branche, Größe, Ausrichtung, Standort. Danach ein Satz im Muster "Wir suchen einen erfahrenen <Titel> für den Standort <Ort>." (ohne Geschlechtszusatz)>
 
 Ihr Verantwortungsbereich
 
@@ -80,7 +80,7 @@ Gib das Ergebnis ausschließlich über das Werkzeug "projekt_anlegen" zurück.`;
     const schema = {
       type: "object",
       properties: {
-        jobtitel: nul("Jobtitel im Muster Titel (d/m/w) Gewerk - Ort"),
+        jobtitel: nul("Jobtitel im Muster Titel Gewerk - Ort, ohne Geschlechtszusatz"),
         position: nul("Erlaubter Wert oder null"),
         gewerk: nul("Erlaubter Wert oder null"),
         branche: nul("Erlaubter Wert oder null"),
