@@ -74,24 +74,48 @@ Das dürfen Sie erwarten
 - suchstring_xing: einfacher, wenige Begriffe, höchstens 150 Zeichen.
 - hinweise: Liste kurzer Sätze zu allem, was fehlt oder unklar ist und der Berater klären sollte (z. B. Gehalt, Ort, Vertraulichkeit). Höchstens 5.
 
-Antworte NUR mit diesem JSON, kein Text davor oder danach:
-{"jobtitel":null,"position":null,"gewerk":null,"branche":null,"stellentyp":null,"berufserfahrung":null,"stadt":null,"gehalt":null,"anzahl_positionen":null,"kunde_name":null,"ansprechpartner_name":null,"beschreibung":"","erforderliche_skills":"","suchprofil":"","suchstring_linkedin":"","suchstring_xing":"","hinweise":[]}`;
+Gib das Ergebnis ausschließlich über das Werkzeug "projekt_anlegen" zurück.`;
+
+    const nul = (d: string) => ({ type: ["string", "null"], description: d });
+    const schema = {
+      type: "object",
+      properties: {
+        jobtitel: nul("Jobtitel im Muster Titel (d/m/w) Gewerk - Ort"),
+        position: nul("Erlaubter Wert oder null"),
+        gewerk: nul("Erlaubter Wert oder null"),
+        branche: nul("Erlaubter Wert oder null"),
+        stellentyp: nul("Erlaubter Wert oder null"),
+        berufserfahrung: nul("Erlaubter Wert oder null"),
+        stadt: nul("Ort der Stelle"),
+        gehalt: nul("Nur wenn im Text genannt"),
+        anzahl_positionen: { type: ["integer", "null"] },
+        kunde_name: nul("Auftraggeber, nur wenn genannt"),
+        ansprechpartner_name: nul("Nur wenn genannt"),
+        beschreibung: { type: "string", description: "Stellenanzeige in der vorgegebenen Form" },
+        erforderliche_skills: { type: "string" },
+        suchprofil: { type: "string" },
+        suchstring_linkedin: { type: "string" },
+        suchstring_xing: { type: "string" },
+        hinweise: { type: "array", items: { type: "string" } },
+      },
+      required: ["jobtitel", "beschreibung", "suchprofil", "suchstring_linkedin", "suchstring_xing", "hinweise"],
+    };
 
     const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-api-key": anthropicKey, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
         model: "claude-sonnet-5-5",
-        max_tokens: 4000,
+        max_tokens: 6000,
+        tools: [{ name: "projekt_anlegen", description: "Felder des neuen Projekts", input_schema: schema }],
         messages: [{ role: "user", content: [{ type: "text", text: prompt }] }],
       }),
     });
     if (!claudeRes.ok) throw new Error(`Claude API Fehler ${claudeRes.status}: ${await claudeRes.text()}`);
     const data = await claudeRes.json();
-    const raw: string = (data.content || []).filter((b: {type: string}) => b.type === "text").map((b: {text: string}) => b.text).join("");
-    const m = raw.match(/\{[\s\S]*\}/);
-    if (!m) throw new Error("Kein gültiges JSON geliefert: " + raw.slice(0, 200));
-    const o = JSON.parse(m[0]);
+    const blk = (data.content || []).find((b: { type: string }) => b.type === "tool_use");
+    if (!blk || !blk.input) throw new Error("Keine Antwort der KI erhalten (stop_reason: " + data.stop_reason + ")");
+    const o = blk.input;
     const inListe = (v: unknown, l: string[]) => (typeof v === "string" && l.includes(v) ? v : null);
     const s = (v: unknown, max: number) => (v == null || v === "null" ? null : String(v).slice(0, max));
     const auftrag = {
