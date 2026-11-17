@@ -47,7 +47,7 @@ Erlaubte Werte (genau so schreiben, sonst null):
 
 Regeln:
 - Erfinde nichts. Was nicht im Text steht, ist null (bei Listen: leere Liste). Gehalt nur, wenn genannt.
-- jobtitel im Muster "Projektleiter HKLS - Ratingen" (Titel, Gewerk, Bindestrich, Ort). Niemals (d/m/w), (m/w/d), (M/W/D) oder andere Geschlechtszusätze im Titel. Ort weglassen, wenn unbekannt.
+- jobtitel im Muster "Projektleiter HKLS - Ratingen" (Titel, Gewerk, Bindestrich, Ort). Niemals (d/m/w), (m/w/d), (M/W/D) oder andere Geschlechtszusätze im Titel. Formuliere den Titel nach Möglichkeit geschlechtsneutral mit Leitung/Planung/Überwachung (Projektleitung, Bauleitung, Bereichsleitung, Fachplanung, Objektüberwachung statt Projektleiter, Bauleiter), wenn das natürlich klingt; sonst die übliche Form. Ort weglassen, wenn unbekannt.
 - kunde_name und ansprechpartner_name: nur wenn im Text genannt. Diese Namen dürfen NIRGENDS in beschreibung, suchprofil oder Suchstrings stehen.
 - beschreibung: die Stellenanzeige in genau dieser Form, Klartext, Überschriften als eigene Zeilen, Aufzählungen mit "- ":
 
