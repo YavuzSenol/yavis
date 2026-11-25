@@ -21,3 +21,6 @@ create table if not exists public.stellenfunde (
 alter table public.stellenfunde enable row level security;
 drop policy if exists app_access on public.stellenfunde;
 create policy app_access on public.stellenfunde for all to authenticated using (true) with check (true);
+
+-- 25.11.2026: Text der Anzeige, Grundlage für die eigene Stellenbeschreibung
+alter table public.stellenfunde add column if not exists anzeigentext text;
